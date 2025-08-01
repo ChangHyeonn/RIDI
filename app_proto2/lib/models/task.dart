@@ -3,12 +3,14 @@ class Task {
   final String title;
   final DateTime date;
   final bool isCompleted;
+  final bool isImportant;
 
   Task({
     required this.id,
     required this.title,
     required this.date,
     this.isCompleted = false,
+    this.isImportant = false,
   });
 
   Task copyWith({
@@ -16,12 +18,14 @@ class Task {
     String? title,
     DateTime? date,
     bool? isCompleted,
+    bool? isImportant,
   }) {
     return Task(
       id: id ?? this.id,
       title: title ?? this.title,
       date: date ?? this.date,
       isCompleted: isCompleted ?? this.isCompleted,
+      isImportant: isImportant ?? this.isImportant,
     );
   }
 
@@ -31,6 +35,7 @@ class Task {
       'title': title,
       'date': date.toIso8601String(),
       'isCompleted': isCompleted,
+      'isImportant': isImportant,
     };
   }
 
@@ -40,6 +45,7 @@ class Task {
       title: json['title'],
       date: DateTime.parse(json['date']),
       isCompleted: json['isCompleted'] ?? false,
+      isImportant: json['isImportant'] ?? false,
     );
   }
-} 
+}

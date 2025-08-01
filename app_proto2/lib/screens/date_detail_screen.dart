@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
 import '../models/task.dart';
+import 'edit_task_screen.dart';
 
 class DateDetailScreen extends StatefulWidget {
   final DateTime date;
@@ -75,6 +76,9 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                 builder: (context, taskProvider, child) {
                   final tasks = taskProvider.getTasksForDate(widget.date);
 
+                  // 시간이 임박한 순서대로 정렬
+                  tasks.sort((a, b) => a.date.compareTo(b.date));
+
                   if (tasks.isEmpty) {
                     return const Center(
                       child: Text(
@@ -98,7 +102,18 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                         ),
                         child: Row(
                           children: [
-                            // 일정 제목과 시간 (좌우 배치)
+                            // 중요도 표시 (별표)
+                            if (task.isImportant)
+                              Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                child: const Icon(
+                                  Icons.star,
+                                  color: Color(0xFFFFD700), // 노란색 별
+                                  size: 20,
+                                ),
+                              ),
+
+                            // 일정 제목과 시간
                             Expanded(
                               child: Row(
                                 children: [
@@ -108,8 +123,8 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                       task.title,
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold, // 더 굵게
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
@@ -119,8 +134,8 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                     _formatTime(task.date),
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w300, // 더 얇게
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w300,
                                     ),
                                   ),
                                 ],
@@ -141,6 +156,38 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                 task.isCompleted ? Icons.check : Icons.remove,
                                 color: Colors.white,
                                 size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // 수정 버튼
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        EditTaskScreen(task: task),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF4CAF50), // 초록색
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  '수정',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),

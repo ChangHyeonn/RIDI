@@ -27,31 +27,6 @@ class _AlarmScreenState extends State<AlarmScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 상단 "알람화면" 텍스트
-              Text(
-                '알람화면',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18 * (0.5 + fontSize),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // 시간 정보
-              Row(
-                children: [
-                  Text(
-                    '${widget.task.date.hour.toString().padLeft(2, '0')}:${widget.task.date.minute.toString().padLeft(2, '0')}',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16 * (0.5 + fontSize),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
               // 오전/오후 표시
               Center(
                 child: Text(
@@ -84,23 +59,12 @@ class _AlarmScreenState extends State<AlarmScreen> {
                   widget.task.title,
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 24 * (0.5 + fontSize),
+                    fontSize: 48 * (0.5 + fontSize), // 기존 24 -> 48
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-
-              // 메모 내용 (일정 제목을 메모로 사용)
-              Center(
-                child: Text(
-                  '메모내용',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18 * (0.5 + fontSize),
-                  ),
-                ),
-              ),
 
               const Spacer(),
 
@@ -141,7 +105,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
     // 알람 소리 정지
     final alarmService = AlarmService();
     alarmService.stopAlarmSound();
-    
+
     // 알람 해제 시 일정을 완료 상태로 변경
     final taskProvider = context.read<TaskProvider>();
     final completedTask = widget.task.copyWith(isCompleted: true);
