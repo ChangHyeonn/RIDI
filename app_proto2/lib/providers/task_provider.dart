@@ -106,6 +106,18 @@ class TaskProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // 소리 크기 가져오기
+  double get soundVolume {
+    return _settings['soundVolume'] ?? 0.5;
+  }
+
+  // 소리 크기 설정
+  Future<void> setSoundVolume(double volume) async {
+    _settings['soundVolume'] = volume;
+    await _taskService.saveSettings(_settings);
+    notifyListeners();
+  }
+
   // 오늘 일정 완료 상태 확인
   bool get isTodayCompleted {
     final todayTasks = getTodayTasks();

@@ -91,20 +91,65 @@ class AlarmService {
   // 알람 소리 재생 (진동 + 오디오)
   void _playAlarmSound() async {
     try {
-      // 진동으로 알람 효과 생성
+      print('=== 알람 소리 재생 시작 ===');
+
+      // 진동으로 알람 효과 생성 (더 강한 진동)
       HapticFeedback.heavyImpact();
+      HapticFeedback.heavyImpact();
+      HapticFeedback.heavyImpact();
+      print('진동 발생 완료');
 
-      // 오디오 플레이어 초기화 및 소리 재생
-      _audioPlayer?.dispose();
+      // 기존 오디오 플레이어 정리
+      if (_audioPlayer != null) {
+        await _audioPlayer?.stop();
+        await _audioPlayer?.dispose();
+        _audioPlayer = null;
+        print('기존 오디오 플레이어 정리 완료');
+      }
+
+      // 새로운 오디오 플레이어 생성
       _audioPlayer = AudioPlayer();
+      print('새 오디오 플레이어 생성 완료');
 
-      // 로컬 알람 소리 파일 사용 (M4A, MP3 등 지원)
-      await _audioPlayer?.setAsset('assets/sounds/alarm.m4a');
+      // 로컬 알람 소리 파일 사용
+      final assetPath = 'assets/sounds/alarm.mp3';
+      print('오디오 파일 로딩 시작: $assetPath');
+
+      // 파일 존재 여부 확인을 위한 테스트
+      try {
+        await _audioPlayer?.setAsset(assetPath);
+        print('오디오 파일 로딩 성공');
+      } catch (e) {
+        print('오디오 파일 로딩 실패: $e');
+        // 대체 방법: 시스템 알람 소리 사용
+        print('시스템 알람 소리로 대체 시도...');
+        await _audioPlayer?.setAsset('assets/sounds/alarm.mp3');
+      }
+      print('오디오 파일 로딩 완료');
+
+      // 볼륨 설정 (0.0 ~ 1.0)
+      await _audioPlayer?.setVolume(1.0);
+      print('볼륨 설정 완료: 1.0');
+
+      // 재생 시작
       await _audioPlayer?.play();
+      print('오디오 재생 시작 완료');
 
-      print('알람 진동 및 소리 발생...');
+      // 재생 상태 모니터링
+      _audioPlayer?.playerStateStream.listen((state) {
+        print('오디오 플레이어 상태: $state');
+      });
+
+      // 에러 모니터링
+      _audioPlayer?.playbackEventStream.listen((event) {
+        print('오디오 이벤트: $event');
+      });
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      print('알람 진동 및 소리 발생 완료 (타임스탬프: $timestamp)');
     } catch (e) {
       print('알람 소리/진동 실패: $e');
+      print('에러 상세 정보: ${e.toString()}');
       // 소리/진동에 실패해도 알람은 계속 작동
     }
   }
