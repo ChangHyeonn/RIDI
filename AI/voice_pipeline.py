@@ -7,7 +7,7 @@ from typing import Dict, Any
 # AI 모듈 import
 sys.path.append(os.path.join(os.path.dirname(__file__), 'Models'))
 from Models.STT import WhisperSTT
-from Models.LLM import Llama3LLM
+from Models.LLM import LLMFactory
 from Models.TTS import TTS
 
 class VoicePipeline:
@@ -15,12 +15,12 @@ class VoicePipeline:
     
     def __init__(self, 
                  stt_model: str = "small",
-                 llm_model: str = "meta-llama/Llama-3-8B-Instruct",
-                 use_quantization: bool = True,
+                 llm_type: str = "gemini",  # "gpt" or "gemini"
                  device: str = "auto"):
         self.device = self._get_device(device)
+        self.llm_type = llm_type
         self._setup_logging()
-        self._initialize_components(stt_model, llm_model, use_quantization)
+        self._initialize_components(stt_model)
         self.logger.info(f"Voice Pipeline initialized successfully on {self.device}")
     
     def _get_device(self, device: str) -> str:
@@ -38,17 +38,14 @@ class VoicePipeline:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
     
-    def _initialize_components(self, stt_model: str, llm_model: str, use_quantization: bool):
+    def _initialize_components(self, stt_model: str):
         self.logger.info("Initializing AI components...")
         
         self.stt = WhisperSTT(model_name=stt_model, device=self.device)
         self.stt.optimize_for_korean(True)
         
-        self.llm = Llama3LLM(
-            model_name=llm_model,
-            use_quantization=use_quantization,
-            device=self.device
-        )
+        # LLM 초기화 (GPT/Gemini 선택 가능)
+        self.llm = LLMFactory.create_llm(self.llm_type)
         
         self.tts = TTS()
         
