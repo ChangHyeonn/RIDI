@@ -1,146 +1,168 @@
-# STT 성능 테스트
+# 🎤 Voice Chat Pipeline Test
 
-이 폴더는 STT(Speech-to-Text) 모델의 성능을 다양한 device 환경에서 테스트하기 위한 스크립트들을 포함합니다.
+STT + LLM + TTS를 통합한 음성 대화 시스템 테스트
 
 ## 📁 파일 구조
 
 ```
 test_folder/
-├── stt_performance_test.py    # STT 성능 테스트 메인 스크립트
-├── create_test_audio.py       # 테스트용 음성 파일 생성
-├── README.md                  # 이 파일
-└── stt_performance_results.json  # 테스트 결과 (자동 생성)
+├── voice_chat_pipeline.py    # 통합 음성 대화 파이프라인
+├── voice_test.py             # 음성 녹음/재생 테스트
+├── requirements.txt          # 필요한 패키지 목록
+└── README.md                # 사용법 설명
 ```
 
-## 🚀 사용법
+## 🚀 설치 및 실행
 
-### 1. 테스트용 음성 파일 생성
-
+### 1. 패키지 설치
 ```bash
-cd test_folder
-python create_test_audio.py
+pip install -r requirements.txt
 ```
 
-이 스크립트는 4개의 한국어 테스트 음성 파일을 생성합니다:
-- `test_audio_1.mp3`: "안녕하세요. 오늘 날씨가 정말 좋네요."
-- `test_audio_2.mp3`: "내일 오후 3시에 병원 예약이 있습니다."
-- `test_audio_3.mp3`: "주말에 가족들과 함께 저녁 식사를 할 예정입니다."
-- `test_audio_4.mp3`: "다음 주 월요일부터 새로운 프로젝트를 시작합니다."
-
-### 2. STT 성능 테스트 실행
-
+### 2. 환경 변수 설정
 ```bash
-python stt_performance_test.py
+# OpenAI API 키 (GPT 사용시)
+export OPENAI_API_KEY="your-openai-api-key"
+
+# Google API 키 (Gemini 사용시)
+export GOOGLE_API_KEY="your-google-api-key"
 ```
 
-이 스크립트는 다음을 수행합니다:
-
-1. **사용 가능한 device 확인**
-   - CUDA (NVIDIA GPU)
-   - CPU (기본값)
-   - ⚠️ MPS는 Whisper 모델과 호환성 문제로 제외
-
-2. **각 device에서 STT 성능 테스트**
-   - 모델 초기화 시간
-   - 음성 변환 시간
-   - 총 처리 시간
-   - 메모리 사용량
-
-3. **성능 비교 및 분석**
-   - 가장 빠른 device
-   - 성능 순위
-   - 성능 개선율
-
-## 📊 테스트 결과 예시
-
-```
-================================================================================
-📊 STT 성능 테스트 결과
-================================================================================
-🎵 음성 파일: test_audio_1.mp3
-🤖 모델: small
-⏰ 테스트 시간: 2024-01-15 14:30:25
-
-📈 개별 성능 결과:
---------------------------------------------------------------------------------
-
-🔧 CUDA 환경:
-  ✅ 초기화 시간: 1.23초
-  ✅ 변환 시간: 0.45초
-  ✅ 총 시간: 1.68초
-  💾 메모리: {'allocated': '2.34 GB', 'cached': '3.12 GB', 'total': '8.00 GB'}
-  📝 변환 결과: 안녕하세요. 오늘 날씨가 정말 좋네요...
-
-🔧 CPU 환경:
-  ✅ 초기화 시간: 1.89초
-  ✅ 변환 시간: 3.45초
-  ✅ 총 시간: 5.34초
-  💾 메모리: {'info': 'CPU memory', 'note': 'System RAM usage'}
-  📝 변환 결과: 안녕하세요. 오늘 날씨가 정말 좋네요...
-
-🏆 성능 비교:
---------------------------------------------------------------------------------
-🥇 가장 빠른 device: CUDA
-⏱️  최고 기록: 1.68초
-
-📊 성능 순위:
-  1. CUDA: 1.68초 (+0.00초)
-  2. CPU: 5.34초 (+3.66초)
-
-📈 성능 개선율:
-  CPU: 68.5% 느림
-================================================================================
-```
-
-## 🔧 환경별 특징
-
-### 🎮 CUDA (NVIDIA GPU)
-- **장점**: 가장 빠른 성능
-- **단점**: NVIDIA GPU 필요
-- **사용 시**: 실사용 환경에서 권장
-
-### 💻 CPU
-- **장점**: 모든 환경에서 사용 가능
-- **단점**: 상대적으로 느린 성능
-- **사용 시**: 개발 환경 및 안전한 대안
-
-### ⚠️ MPS (Apple Silicon)
-- **상태**: Whisper 모델과 호환성 문제로 제외
-- **이유**: `aten::_sparse_coo_tensor_with_dims_and_tensors` 연산 미지원
-- **해결책**: CPU 사용 권장
-
-## 📈 예상 성능
-
-| Device | 초기화 시간 | 변환 시간 | 총 시간 | 메모리 사용량 |
-|--------|-------------|-----------|---------|---------------|
-| CUDA   | 1-2초      | 0.5-1초   | 1.5-3초 | 2-4GB         |
-| CPU    | 1-2초      | 3-5초     | 4-7초   | 1-2GB         |
-
-## 🛠️ 문제 해결
-
-### 1. 모듈 import 오류
+### 3. 테스트 실행
 ```bash
-# AI 폴더의 Models를 Python path에 추가
-export PYTHONPATH="${PYTHONPATH}:/path/to/RIDI/AI/Models"
+# 기본 테스트 (파이프라인 정보만 출력)
+python voice_chat_pipeline.py
+
+# 음성 대화 테스트 (실제 녹음/재생)
+python voice_test.py
 ```
 
-### 2. 음성 파일 없음
+## 🎯 기능
+
+### **VoiceChatPipeline 클래스**
+- **STT**: Whisper 모델로 음성 → 텍스트 변환
+- **LLM**: GPT/Gemini로 자연어 응답 생성
+- **TTS**: Google TTS로 텍스트 → 음성 변환
+
+### **VoiceChatTest 클래스**
+- **음성 녹음**: 5초간 음성 녹음
+- **AI 대화**: 녹음된 음성으로 AI와 대화
+- **음성 재생**: AI 응답을 음성으로 재생
+
+## 📊 파이프라인 흐름
+
+```
+🎤 음성 입력 → 🔤 STT → 🤖 LLM → 🔊 TTS → 🎵 음성 출력
+```
+
+1. **음성 녹음** (5초)
+2. **STT 처리** (Whisper)
+3. **LLM 응답** (GPT/Gemini)
+4. **TTS 변환** (Google TTS)
+5. **음성 재생**
+
+## ⚙️ 설정 옵션
+
+### **LLM 모델 선택**
+```python
+# Gemini 사용 (무료)
+pipeline = VoiceChatPipeline(llm_type="gemini")
+
+# GPT 사용 (유료)
+pipeline = VoiceChatPipeline(llm_type="gpt")
+```
+
+### **STT 모델 선택**
+```python
+# 작은 모델 (빠름, 정확도 낮음)
+pipeline = VoiceChatPipeline(stt_model="tiny")
+
+# 중간 모델 (균형)
+pipeline = VoiceChatPipeline(stt_model="small")
+
+# 큰 모델 (느림, 정확도 높음)
+pipeline = VoiceChatPipeline(stt_model="base")
+```
+
+## 🎮 사용법
+
+### **1. 기본 테스트**
 ```bash
-# 테스트용 음성 파일 생성
-python create_test_audio.py
+python voice_chat_pipeline.py
+```
+- 파이프라인 정보 출력
+- 모델 초기화 확인
+
+### **2. 음성 대화 테스트**
+```bash
+python voice_test.py
+```
+1. LLM 모델 선택 (gpt/gemini)
+2. 5초간 음성 녹음
+3. AI 응답 텍스트 출력
+4. AI 응답 음성 재생
+5. 반복 (종료하려면 "종료" 말하기)
+
+## 📈 성능 정보
+
+### **처리 시간 (예상)**
+- **STT**: 1-3초
+- **LLM**: 2-5초
+- **TTS**: 1-2초
+- **총 시간**: 4-10초
+
+### **모델 크기**
+- **Whisper tiny**: 39MB
+- **Whisper small**: 244MB
+- **Whisper base**: 461MB
+
+## 🔧 문제 해결
+
+### **음성 녹음 오류**
+```bash
+# macOS
+brew install portaudio
+
+# Ubuntu
+sudo apt-get install portaudio19-dev
 ```
 
-### 3. MPS 호환성 문제
-- **문제**: Whisper 모델이 MPS에서 지원되지 않는 연산 사용
-- **해결책**: CPU 사용 (안정적이고 호환성 보장)
-- **대안**: CUDA 사용 (가장 빠른 성능)
+### **API 키 오류**
+```bash
+# 환경 변수 확인
+echo $OPENAI_API_KEY
+echo $GOOGLE_API_KEY
+```
 
-## 📝 결과 저장
+### **메모리 부족**
+```python
+# 더 작은 STT 모델 사용
+pipeline = VoiceChatPipeline(stt_model="tiny")
+```
 
-테스트 결과는 `stt_performance_results.json` 파일에 자동으로 저장됩니다. 이 파일에는 다음 정보가 포함됩니다:
+## 🎯 예시 대화
 
-- 테스트 정보 (파일, 모델, 시간)
-- 각 device별 상세 결과
-- 성능 비교 분석
+```
+👤 사용자: "안녕하세요"
+🤖 AI: "안녕하세요! 무엇을 도와드릴까요?"
 
-이 파일을 통해 나중에 결과를 다시 분석하거나 다른 도구로 시각화할 수 있습니다. 
+👤 사용자: "오늘 날씨는 어때?"
+🤖 AI: "죄송하지만 실시간 날씨 정보는 제공할 수 없습니다. 인터넷에서 확인해보시는 것을 추천드려요."
+
+👤 사용자: "종료"
+🤖 AI: "대화를 종료합니다. 좋은 하루 되세요!"
+```
+
+## 📝 주의사항
+
+1. **API 키 필요**: GPT 또는 Gemini API 키가 필요합니다
+2. **인터넷 연결**: TTS와 LLM에 인터넷 연결이 필요합니다
+3. **마이크 권한**: 음성 녹음에 마이크 권한이 필요합니다
+4. **음성 품질**: 조용한 환경에서 녹음하면 인식률이 높아집니다
+
+## 🚀 다음 단계
+
+1. **실시간 스트리밍**: 실시간 음성 처리
+2. **음성 품질 개선**: 더 자연스러운 TTS
+3. **다국어 지원**: 영어, 일본어 등 추가
+4. **대화 기록**: 대화 히스토리 저장 
