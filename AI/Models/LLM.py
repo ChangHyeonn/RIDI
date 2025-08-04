@@ -3,7 +3,6 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 
-# Base LLM class
 class BaseLLM(ABC):
     @abstractmethod
     def generate_response(self, user_input: str) -> str:
@@ -13,7 +12,6 @@ class BaseLLM(ABC):
     def get_model_info(self) -> Dict[str, Any]:
         pass
 
-# GPT LLM Implementation
 class GPTLLM(BaseLLM):
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-3.5-turbo"):
         self.model = model
@@ -72,9 +70,8 @@ class GPTLLM(BaseLLM):
             }
         }
 
-# Gemini LLM Implementation
 class GeminiLLM(BaseLLM):
-    def __init__(self, api_key: Optional[str] = None, model: str = "gemini-pro"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "gemini-1.5-flash"):
         self.model_name = model
         self.api_key = api_key or os.getenv('GOOGLE_API_KEY')
         
@@ -97,7 +94,6 @@ class GeminiLLM(BaseLLM):
 특히 일정 관리, 캘린더 관련 명령에 대해 도움을 주세요."""
     
     def _initialize_model(self):
-        """Gemini 모델 초기화"""
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.api_key)
@@ -107,9 +103,7 @@ class GeminiLLM(BaseLLM):
             raise
     
     def generate_response(self, user_input: str) -> str:
-        """사용자 입력에 대한 응답 생성"""
         try:
-            # 시스템 프롬프트와 사용자 입력 결합
             full_prompt = f"{self.korean_system_prompt}\n\n사용자: {user_input}"
             
             response = self.model.generate_content(full_prompt)
@@ -138,17 +132,9 @@ class GeminiLLM(BaseLLM):
             }
         }
 
-# LLM Factory for easy model selection
 class LLMFactory:
     @staticmethod
     def create_llm(model_type: str = "gemini", **kwargs) -> BaseLLM:
-        """
-        LLM 모델 생성 팩토리
-        
-        Args:
-            model_type: "gpt" or "gemini"
-            **kwargs: 모델별 추가 파라미터
-        """
         if model_type.lower() == "gpt":
             return GPTLLM(**kwargs)
         elif model_type.lower() == "gemini":
@@ -156,4 +142,3 @@ class LLMFactory:
         else:
             raise ValueError(f"Unsupported model type: {model_type}. Use 'gpt' or 'gemini'")
 
-# Llama3LLM 클래스는 삭제됨 - GPT/Gemini만 지원

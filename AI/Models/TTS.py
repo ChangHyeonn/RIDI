@@ -24,15 +24,12 @@ class TTS:
             raise
     
     def _preprocess_korean_text(self, text: str) -> str:
-        """한국어 텍스트 전처리"""
         if not text:
             return ""
         
-        # 텍스트 정리
         text = re.sub(r'\s+', ' ', text)
         text = text.strip()
         
-        # 긴 텍스트 자르기 (TTS 제한)
         if len(text) > 500:
             sentences = text.split('.')
             text = '. '.join(sentences[:3]) + '.'
@@ -48,13 +45,22 @@ class TTS:
             tts = gTTS(text=text, lang='ko', slow=False)
             tts.save(output_path)
             
-            with open(output_path, 'rb') as f:
+            from pydub import AudioSegment
+            audio = AudioSegment.from_mp3(output_path)
+            wav_path = output_path.replace('.mp3', '.wav')
+            audio.export(wav_path, format="wav")
+            
+            with open(wav_path, 'rb') as f:
                 audio_data = f.read()
             
             if output_path.startswith('/tmp/'):
                 os.unlink(output_path)
+            if wav_path.startswith('/tmp/'):
+                os.unlink(wav_path)
             
             return audio_data
+            
+
         except Exception as e:
             self.logger.error(f"Speech generation failed: {e}")
             raise
