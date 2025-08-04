@@ -17,16 +17,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final settings = context.read<TaskProvider>().settings;
+      final taskProvider = context.read<TaskProvider>();
       setState(() {
-        _soundVolume = settings['soundVolume'] ?? 0.5;
-        _fontSize = settings['fontSize'] ?? 0.5;
+        _soundVolume = taskProvider.soundVolume;
+        _fontSize = taskProvider.fontSize;
       });
     });
   }
 
   void _updateSettings() {
     context.read<TaskProvider>().setFontSize(_fontSize);
+  }
+
+  void _updateSoundVolume() {
+    context.read<TaskProvider>().setSoundVolume(_soundVolume);
   }
 
   @override
@@ -60,9 +64,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 32),
-            
+
             // 소리 크기 슬라이더
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -94,16 +98,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         setState(() {
                           _soundVolume = value;
                         });
-                        _updateSettings();
+                        _updateSoundVolume();
                       },
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 32),
-            
+
             // 글씨 크기 슬라이더
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -142,9 +146,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
-            
+
             const Spacer(),
-            
+
             // 탈퇴 버튼
             Padding(
               padding: const EdgeInsets.all(24),
@@ -184,10 +188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   child: const Text(
                     '탈퇴',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -197,4 +198,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-} 
+}
