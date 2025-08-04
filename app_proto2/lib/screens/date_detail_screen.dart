@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
-import '../models/task.dart';
 
 class DateDetailScreen extends StatefulWidget {
   final DateTime date;
@@ -16,6 +15,8 @@ class DateDetailScreen extends StatefulWidget {
 class _DateDetailScreenState extends State<DateDetailScreen> {
   // 요일 가져오기
   String _getDayOfWeek(DateTime date) {
+
+    
     const days = ['월', '화', '수', '목', '금', '토', '일'];
     return days[date.weekday - 1];
   }

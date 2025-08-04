@@ -231,7 +231,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              'AM',
+                              '오전',
                               style: TextStyle(
                                 color: _isAM ? Colors.white : Colors.grey,
                                 fontWeight: FontWeight.bold,
@@ -254,7 +254,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              'PM',
+                              '오후',
                               style: TextStyle(
                                 color: !_isAM ? Colors.white : Colors.grey,
                                 fontWeight: FontWeight.bold,
