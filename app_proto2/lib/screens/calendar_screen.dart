@@ -151,7 +151,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                     outsideDaysVisible: false,
                     // 날짜 셀 높이 더 증가
-                    cellMargin: const EdgeInsets.symmetric(vertical: 38),
+                    cellMargin: EdgeInsets.symmetric(vertical: 38),
                     // 날짜 텍스트 스타일 명시적 설정
                     defaultTextStyle: TextStyle(
                       fontSize: 16,

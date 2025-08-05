@@ -710,6 +710,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                             border: Border.all(
                               color: !_isImportant
                                   ? const Color(0xFF9C27B0)
+<<<<<<< HEAD
                                   : Colors.grey,
                             ),
                           ),
@@ -722,6 +723,39 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                                     ? Colors.white
                                     : Colors.grey,
                                 size: 20,
+=======
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '오전',
+                              style: TextStyle(
+                                color: _isAM ? Colors.white : Colors.grey,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () => setState(() => _isAM = false),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: !_isAM
+                                  ? const Color(0xFF9C27B0)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '오후',
+                              style: TextStyle(
+                                color: !_isAM ? Colors.white : Colors.grey,
+                                fontWeight: FontWeight.bold,
+>>>>>>> 1b04b0892b82ecf473e22cf463ef19e7606cba37
                               ),
                               const SizedBox(width: 8),
                               Text(
