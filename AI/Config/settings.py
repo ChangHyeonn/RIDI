@@ -23,11 +23,33 @@ class Settings:
     LLM_TYPE = os.getenv('LLM_TYPE', 'gemini')
     DEVICE = os.getenv('DEVICE', 'auto')
     
-    # 고령자 특화 설정
-    SPEECH_RATE = float(os.getenv('SPEECH_RATE', 1.0))
-    VOLUME_LEVEL = float(os.getenv('VOLUME_LEVEL', 1.2))  # 더 크게
-    SIMPLE_RESPONSES = os.getenv('SIMPLE_RESPONSES', 'True').lower() == 'true'
+    # 접근성 설정
+    FONT_SIZE = os.getenv('FONT_SIZE', 'medium')  # small, medium, large
+    VOLUME_LEVEL = float(os.getenv('VOLUME_LEVEL', 1.0))  # 0.5 ~ 2.0
+    SPEECH_RATE = float(os.getenv('SPEECH_RATE', 1.0))  # 0.5 ~ 2.0
+    HIGH_CONTRAST = os.getenv('HIGH_CONTRAST', 'False').lower() == 'true'
+    TEXT_TO_SPEECH = os.getenv('TEXT_TO_SPEECH', 'True').lower() == 'true'
     REPEAT_IMPORTANT = os.getenv('REPEAT_IMPORTANT', 'True').lower() == 'true'
+    SIMPLE_RESPONSES = os.getenv('SIMPLE_RESPONSES', 'True').lower() == 'true'
+    
+    # 일정 관리 설정
+    MAX_SCHEDULES_PER_USER = int(os.getenv('MAX_SCHEDULES_PER_USER', 100))
+    SCHEDULE_REMINDER_DEFAULT = os.getenv('SCHEDULE_REMINDER_DEFAULT', 'True').lower() == 'true'
+    SCHEDULE_CATEGORIES = ['일반', '업무', '개인', '의료', '가족', '기타']
+    SCHEDULE_PRIORITIES = ['not_important', 'important']
+    
+    # 명령 분류 설정
+    COMMAND_CLASSIFICATION_ENABLED = os.getenv('COMMAND_CLASSIFICATION_ENABLED', 'True').lower() == 'true'
+    COMMAND_CONFIDENCE_THRESHOLD = float(os.getenv('COMMAND_CONFIDENCE_THRESHOLD', 0.7))
+    
+    # 기본값 설정
+    DEFAULT_FONT_SIZE = 'medium'
+    DEFAULT_VOLUME_LEVEL = 1.0
+    DEFAULT_SPEECH_RATE = 1.0
+    DEFAULT_HIGH_CONTRAST = False
+    DEFAULT_TEXT_TO_SPEECH = True
+    DEFAULT_REPEAT_IMPORTANT = True
+    DEFAULT_SIMPLE_RESPONSES = True
     
     # 보안 설정
     API_KEY = os.getenv('API_KEY')
@@ -48,7 +70,6 @@ class Settings:
     
     # 일정 관리 설정
     DEFAULT_REMINDER_MINUTES = int(os.getenv('DEFAULT_REMINDER_MINUTES', 30))
-    MAX_SCHEDULES_PER_USER = int(os.getenv('MAX_SCHEDULES_PER_USER', 100))
     
     @classmethod
     def get_device(cls) -> str:
