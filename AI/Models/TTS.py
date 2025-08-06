@@ -42,21 +42,20 @@ class TTS:
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as tmp_file:
                     output_path = tmp_file.name
             
+            # 텍스트를 더 짧게 나누어서 처리 (더 빠른 속도)
+            if len(text) > 100:
+                sentences = text.split('.')
+                text = '. '.join(sentences[:2]) + '.'
+            
             tts = gTTS(text=text, lang='ko', slow=False)
             tts.save(output_path)
             
-            from pydub import AudioSegment
-            audio = AudioSegment.from_mp3(output_path)
-            wav_path = output_path.replace('.mp3', '.wav')
-            audio.export(wav_path, format="wav")
-            
-            with open(wav_path, 'rb') as f:
+            # MP3 파일을 직접 읽기 (pydub 없이)
+            with open(output_path, 'rb') as f:
                 audio_data = f.read()
             
             if output_path.startswith('/tmp/'):
                 os.unlink(output_path)
-            if wav_path.startswith('/tmp/'):
-                os.unlink(wav_path)
             
             return audio_data
             

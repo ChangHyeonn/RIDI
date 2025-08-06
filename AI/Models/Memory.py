@@ -50,7 +50,7 @@ class MemoryManager:
             if len(self.user_interactions[user_id]) > Settings.MAX_MEMORY_ITEMS:
                 self.user_interactions[user_id] = self.user_interactions[user_id][-Settings.MAX_MEMORY_ITEMS:]
             
-            self.logger.info(f"Stored interaction for user {user_id}")
+
             
         except Exception as e:
             self.logger.error(f"Failed to store interaction: {e}")
@@ -67,7 +67,7 @@ class MemoryManager:
             if len(self.user_schedules[user_id]) > Settings.MAX_SCHEDULES_PER_USER:
                 self.user_schedules[user_id] = self.user_schedules[user_id][-Settings.MAX_SCHEDULES_PER_USER:]
             
-            self.logger.info(f"Stored schedule for user {user_id}")
+
             
         except Exception as e:
             self.logger.error(f"Failed to store schedule: {e}")

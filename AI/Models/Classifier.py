@@ -83,7 +83,7 @@ class ScheduleClassifier:
     
     def classify_schedule(self, text: str) -> Dict[str, Any]:
         try:
-            self.logger.info(f"Classifying schedule from: {text}")
+
             
             # 현재 날짜 정보 추가
             current_date = datetime.now().strftime("%Y-%m-%d")
@@ -141,7 +141,7 @@ class ScheduleClassifier:
             
             if matches:
                 json_str = max(matches, key=len)
-                self.logger.info(f"Found JSON: {json_str}")
+
                 return json.loads(json_str)
             
             start_idx = response.find('{')
@@ -149,7 +149,7 @@ class ScheduleClassifier:
             
             if start_idx != -1 and end_idx != -1:
                 json_str = response[start_idx:end_idx]
-                self.logger.info(f"Fallback JSON: {json_str}")
+
                 return json.loads(json_str)
             else:
                 raise ValueError("JSON not found in response")
