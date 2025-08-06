@@ -45,7 +45,7 @@ class AIService:
             # 메모리 관리자 초기화
             self.memory_manager = MemoryManager()
             
-            self.logger.info("All AI components initialized successfully")
+    
             
         except Exception as e:
             self.logger.error(f"Failed to initialize AI components: {e}")
@@ -54,8 +54,6 @@ class AIService:
     def process_voice_command(self, audio_path: str, user_id: Optional[str] = None) -> Dict[str, Any]:
         """음성 명령 처리"""
         try:
-            self.logger.info(f"Processing voice command: {audio_path}")
-            
             # 음성 처리
             result = self.pipeline.process_voice_command(audio_path)
             
@@ -121,7 +119,7 @@ class AIService:
     def add_schedule(self, schedule_data: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """일정 추가"""
         try:
-            self.logger.info(f"Adding schedule for user {user_id}")
+
             
             # 일정 데이터 검증
             validation_result = self._validate_schedule_data(schedule_data)
@@ -152,7 +150,7 @@ class AIService:
     def get_schedules(self, user_id: str) -> Dict[str, Any]:
         """일정 목록 조회"""
         try:
-            self.logger.info(f"Getting schedules for user {user_id}")
+
             
             schedules = self.memory_manager.get_schedules(user_id)
             

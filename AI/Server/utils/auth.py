@@ -34,7 +34,7 @@ class AuthManager:
             'last_used': timestamp
         }
         
-        logger.info(f"Generated API key for user {user_id}")
+
         return api_key
     
     def validate_api_key(self, api_key: str) -> Dict[str, Any]:
@@ -57,7 +57,7 @@ class AuthManager:
         """API 키 폐기"""
         if api_key in self.api_keys:
             del self.api_keys[api_key]
-            logger.info(f"Revoked API key: {api_key[:10]}...")
+    
             return True
         return False
     
@@ -147,7 +147,7 @@ def create_session(user_id: str) -> str:
         'last_activity': time.time()
     }
     
-    logger.info(f"Created session for user {user_id}")
+    
     return session_id
 
 def validate_session(session_id: str) -> Dict[str, Any]:
@@ -175,7 +175,7 @@ def revoke_session(session_id: str) -> bool:
     """세션 폐기"""
     if session_id in auth_manager.sessions:
         del auth_manager.sessions[session_id]
-        logger.info(f"Revoked session: {session_id[:10]}...")
+
         return True
     return False
 
