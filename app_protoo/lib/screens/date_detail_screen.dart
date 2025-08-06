@@ -93,149 +93,69 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                     itemCount: tasks.length,
                     itemBuilder: (context, index) {
                       final task = tasks[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF42A5F5), // 조금 더 옅은 파란색으로 변경
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            // 중요도 표시 (별표)
-                            if (task.isImportant)
-                              Container(
-                                margin: const EdgeInsets.only(right: 8),
-                                child: const Icon(
-                                  Icons.star,
-                                  color: Color(0xFFFFD700), // 노란색 별
-                                  size: 20,
+                      return GestureDetector(
+                        onTap: () {
+                          // 일정 박스 전체를 탭하면 일정 수정창으로 이동
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EditTaskScreen(task: task),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            // 완료 상태에 따라 색상 변경
+                            color: task.isCompleted
+                                ? const Color(0xFF4CAF50) // 초록색 (완료)
+                                : const Color(0xFFF44336), // 빨간색 (미완료)
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              // 중요도 표시 (별표)
+                              if (task.isImportant)
+                                Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  child: const Icon(
+                                    Icons.star,
+                                    color: Color(0xFFFFD700), // 노란색 별
+                                    size: 20,
+                                  ),
                                 ),
-                              ),
 
-                            // 일정 제목과 시간
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  // 일정 제목 (굵게)
-                                  Expanded(
-                                    child: Text(
-                                      task.title,
+                              // 일정 제목과 시간
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    // 일정 제목 (굵게)
+                                    Expanded(
+                                      child: Text(
+                                        task.title,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    // 시간 표시 (얇게)
+                                    Text(
+                                      _formatTime(task.date),
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w300,
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  // 시간 표시 (얇게)
-                                  Text(
-                                    _formatTime(task.date),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w300,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-
-                            // 완료 상태 표시
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: task.isCompleted
-                                    ? Colors.green
-                                    : Colors.red,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Icon(
-                                task.isCompleted ? Icons.check : Icons.remove,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-
-                            // 수정 버튼
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        EditTaskScreen(task: task),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF4CAF50), // 초록색
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  '수정',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  ],
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-
-                            // 삭제 버튼
-                            GestureDetector(
-                              onTap: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('일정 삭제'),
-                                    content: const Text('이 일정을 삭제하시겠습니까?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('취소'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          taskProvider.deleteTask(task.id);
-                                          Navigator.pop(context);
-                                        },
-                                        child: const Text('삭제'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2196F3),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  '삭제',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       );
                     },

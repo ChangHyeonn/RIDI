@@ -17,6 +17,8 @@ class AddTaskScreen extends StatefulWidget {
 class _AddTaskScreenState extends State<AddTaskScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
+  final _hourController = TextEditingController();
+  final _minuteController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   bool _isAM = true;
@@ -25,18 +27,81 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   bool _isContinuousIncrement = false;
   bool _isContinuousDecrement = false;
   bool _isHourSelected = true; // 시간 선택 여부
+  bool _isEditingHour = false; // 시간 직접 입력 모드
+  bool _isEditingMinute = false; // 분 직접 입력 모드
 
   @override
   void initState() {
     super.initState();
     _selectedDate = widget.selectedDate;
+    _updateTimeControllers();
   }
 
   @override
   void dispose() {
     _titleController.dispose();
+    _hourController.dispose();
+    _minuteController.dispose();
     _continuousTimer?.cancel();
     super.dispose();
+  }
+
+  void _updateTimeControllers() {
+    _hourController.text = _selectedTime.hour.toString().padLeft(2, '0');
+    _minuteController.text = _selectedTime.minute.toString().padLeft(2, '0');
+  }
+
+  void _updateTimeFromControllers() {
+    final hour = int.tryParse(_hourController.text) ?? _selectedTime.hour;
+    final minute = int.tryParse(_minuteController.text) ?? _selectedTime.minute;
+
+    // 입력 검증
+    if (hour < 0 || hour > 24 || minute < 0 || minute >= 60) {
+      // 잘못된 입력 알림
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('알림'),
+            content: const Text('잘못된 입력입니다.\n시간: 0-24, 분: 0-59 범위로 입력해주세요.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // 컨트롤러를 원래 값으로 복원
+                  _updateTimeControllers();
+                },
+                child: const Text('확인'),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    // 24시간 형식을 12시간 형식으로 변환
+    int displayHour;
+    bool newIsAM;
+
+    if (hour == 0) {
+      displayHour = 12;
+      newIsAM = true;
+    } else if (hour <= 12) {
+      displayHour = hour;
+      newIsAM = true;
+    } else {
+      displayHour = hour - 12;
+      newIsAM = false;
+    }
+
+    setState(() {
+      _selectedTime = TimeOfDay(hour: displayHour, minute: minute);
+      _isAM = newIsAM;
+      // 컨트롤러 업데이트
+      _hourController.text = displayHour.toString().padLeft(2, '0');
+      _minuteController.text = minute.toString().padLeft(2, '0');
+    });
   }
 
   void _startContinuousIncrement() {
@@ -188,16 +253,46 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
   void _addTask() {
     if (_formKey.currentState!.validate()) {
+      // 선택된 날짜와 시간으로 DateTime 객체 생성
+      final selectedDateTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _selectedTime.hour,
+        _selectedTime.minute,
+      );
+
+      // 현재 시간과 비교
+      final now = DateTime.now();
+
+      // 이미 지난 시간인지 체크
+      if (selectedDateTime.isBefore(now)) {
+        // 경고 메시지 표시
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('알림'),
+              content: const Text('이미 지난 시간입니다.\n미래의 시간을 선택해주세요.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('확인'),
+                ),
+              ],
+            );
+          },
+        );
+        return; // 일정 추가 중단
+      }
+
+      // 유효한 시간인 경우 일정 추가
       final task = Task(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         title: _titleController.text,
-        date: DateTime(
-          _selectedDate.year,
-          _selectedDate.month,
-          _selectedDate.day,
-          _selectedTime.hour,
-          _selectedTime.minute,
-        ),
+        date: selectedDateTime,
         isImportant: _isImportant,
       );
 
@@ -308,326 +403,435 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 ),
                 child: Row(
                   children: [
-                    // 시간 설정
+                    // 시간 설정 (왼쪽)
                     Expanded(
+                      flex: 3,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // 시간 (시)
-                          Row(
-                            children: [
-                              Text(
-                                '${_selectedTime.hour.toString().padLeft(2, '0')}',
-                                style: TextStyle(
-                                  fontSize: 32,
-                                  color: _isHourSelected
-                                      ? const Color(0xFF9C27B0)
-                                      : Colors.grey,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Column(
-                                children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _isHourSelected = true; // 시간 선택
-                                        int currentHour = _selectedTime.hour;
-                                        int newHour;
-                                        bool newIsAM = _isAM;
-
-                                        if (_isAM) {
-                                          // 오전인 경우
-                                          if (currentHour == 12) {
-                                            newHour = 1;
-                                            newIsAM = false; // 오후로 변경
-                                          } else {
-                                            newHour = currentHour + 1;
-                                          }
-                                        } else {
-                                          // 오후인 경우
-                                          if (currentHour == 12) {
-                                            newHour = 1;
-                                            newIsAM = true; // 오전으로 변경
-                                          } else if (currentHour == 11) {
-                                            newHour = 12;
-                                          } else {
-                                            newHour = currentHour + 1;
-                                          }
-                                        }
-
-                                        _selectedTime = TimeOfDay(
-                                          hour: newHour,
-                                          minute: _selectedTime.minute,
-                                        );
-                                        _isAM = newIsAM;
-                                      });
-                                    },
-                                    onLongPressStart: (details) {
-                                      _startContinuousIncrement();
-                                    },
-                                    onLongPressEnd: (details) {
-                                      _stopContinuousIncrement();
-                                    },
-                                    child: Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Icon(
-                                        Icons.keyboard_arrow_up,
-                                        color: Colors.grey,
-                                        size: 20,
+                          // 시간 (시) - 탭하면 직접 입력
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isHourSelected = true;
+                                _isEditingHour = true;
+                                _isEditingMinute = false;
+                                // 기존 숫자 지우기
+                                _hourController.clear();
+                              });
+                            },
+                            child: _isEditingHour
+                                ? Container(
+                                    width: 60,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: const Color(0xFF9C27B0),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _isHourSelected = true; // 시간 선택
-                                        int currentHour = _selectedTime.hour;
-                                        int newHour;
-                                        bool newIsAM = _isAM;
-
-                                        if (_isAM) {
-                                          // 오전인 경우
-                                          if (currentHour == 1) {
-                                            newHour = 12;
-                                            newIsAM = false; // 오후로 변경
-                                          } else {
-                                            newHour = currentHour - 1;
-                                          }
-                                        } else {
-                                          // 오후인 경우
-                                          if (currentHour == 1) {
-                                            newHour = 12;
-                                            newIsAM = true; // 오전으로 변경
-                                          } else if (currentHour == 12) {
-                                            newHour = 11;
-                                          } else {
-                                            newHour = currentHour - 1;
-                                          }
-                                        }
-
-                                        _selectedTime = TimeOfDay(
-                                          hour: newHour,
-                                          minute: _selectedTime.minute,
-                                        );
-                                        _isAM = newIsAM;
-                                      });
-                                    },
-                                    onLongPressStart: (details) {
-                                      _startContinuousDecrement();
-                                    },
-                                    onLongPressEnd: (details) {
-                                      _stopContinuousDecrement();
-                                    },
-                                    child: Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(4),
+                                    child: TextFormField(
+                                      controller: _hourController,
+                                      textAlign: TextAlign.center,
+                                      keyboardType: TextInputType.number,
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF9C27B0),
                                       ),
-                                      child: const Icon(
-                                        Icons.keyboard_arrow_down,
-                                        color: Colors.grey,
-                                        size: 20,
+                                      decoration: const InputDecoration(
+                                        border: InputBorder.none,
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
                                       ),
+                                      onChanged: (value) {
+                                        // 입력 중에는 변환하지 않음
+                                      },
+                                      onEditingComplete: () {
+                                        // 입력 완료 시에만 변환
+                                        _updateTimeFromControllers();
+                                        setState(() {
+                                          _isEditingHour = false;
+                                        });
+                                      },
+                                    ),
+                                  )
+                                : Text(
+                                    '${_selectedTime.hour.toString().padLeft(2, '0')}',
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      color: _isHourSelected
+                                          ? const Color(0xFF9C27B0)
+                                          : Colors.grey,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const Text(
-                            ':',
-                            style: TextStyle(
-                              fontSize: 32,
-                              color: Color(0xFF9C27B0),
-                              fontWeight: FontWeight.bold,
-                            ),
                           ),
                           const SizedBox(width: 8),
-                          // 시간 (분)
-                          Row(
+                          Column(
                             children: [
-                              Text(
-                                '${_selectedTime.minute.toString().padLeft(2, '0')}',
-                                style: TextStyle(
-                                  fontSize: 32,
-                                  color: !_isHourSelected
-                                      ? const Color(0xFF9C27B0)
-                                      : Colors.grey,
-                                  fontWeight: !_isHourSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
+                              GestureDetector(
+                                onTap: () {
+                                  // 편집 중이면 버튼 비활성화
+                                  if (_isEditingHour || _isEditingMinute)
+                                    return;
+
+                                  setState(() {
+                                    _isHourSelected = true;
+                                    int currentHour = _selectedTime.hour;
+                                    int newHour;
+                                    bool newIsAM = _isAM;
+
+                                    if (_isAM) {
+                                      if (currentHour == 12) {
+                                        newHour = 1;
+                                        newIsAM = false;
+                                      } else {
+                                        newHour = currentHour + 1;
+                                      }
+                                    } else {
+                                      if (currentHour == 12) {
+                                        newHour = 1;
+                                        newIsAM = true;
+                                      } else if (currentHour == 11) {
+                                        newHour = 12;
+                                      } else {
+                                        newHour = currentHour + 1;
+                                      }
+                                    }
+
+                                    _selectedTime = TimeOfDay(
+                                      hour: newHour,
+                                      minute: _selectedTime.minute,
+                                    );
+                                    _isAM = newIsAM;
+                                    _updateTimeControllers();
+                                  });
+                                },
+                                onLongPressStart: (details) {
+                                  // 편집 중이면 버튼 비활성화
+                                  if (_isEditingHour || _isEditingMinute)
+                                    return;
+                                  _startContinuousIncrement();
+                                },
+                                onLongPressEnd: (details) {
+                                  _stopContinuousIncrement();
+                                },
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: (_isEditingHour || _isEditingMinute)
+                                        ? Colors.grey[100]
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Icon(
+                                    Icons.keyboard_arrow_up,
+                                    color: (_isEditingHour || _isEditingMinute)
+                                        ? Colors.grey[300]
+                                        : Colors.grey,
+                                    size: 20,
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Column(
-                                children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _isHourSelected = false; // 분 선택
-                                        int newMinute =
-                                            _selectedTime.minute + 1;
-                                        if (newMinute > 59) newMinute = 0;
-                                        _selectedTime = TimeOfDay(
-                                          hour: _selectedTime.hour,
-                                          minute: newMinute,
-                                        );
-                                      });
-                                    },
-                                    onLongPressStart: (details) {
-                                      _startContinuousMinuteIncrement();
-                                    },
-                                    onLongPressEnd: (details) {
-                                      _stopContinuousMinuteIncrement();
-                                    },
-                                    child: Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Icon(
-                                        Icons.keyboard_arrow_up,
-                                        color: Colors.grey,
-                                        size: 20,
-                                      ),
-                                    ),
+                              const SizedBox(height: 4),
+                              GestureDetector(
+                                onTap: () {
+                                  // 편집 중이면 버튼 비활성화
+                                  if (_isEditingHour || _isEditingMinute)
+                                    return;
+
+                                  setState(() {
+                                    _isHourSelected = true;
+                                    int currentHour = _selectedTime.hour;
+                                    int newHour;
+                                    bool newIsAM = _isAM;
+
+                                    if (_isAM) {
+                                      if (currentHour == 1) {
+                                        newHour = 12;
+                                        newIsAM = false;
+                                      } else {
+                                        newHour = currentHour - 1;
+                                      }
+                                    } else {
+                                      if (currentHour == 1) {
+                                        newHour = 12;
+                                        newIsAM = true;
+                                      } else if (currentHour == 12) {
+                                        newHour = 11;
+                                      } else {
+                                        newHour = currentHour - 1;
+                                      }
+                                    }
+
+                                    _selectedTime = TimeOfDay(
+                                      hour: newHour,
+                                      minute: _selectedTime.minute,
+                                    );
+                                    _isAM = newIsAM;
+                                    _updateTimeControllers();
+                                  });
+                                },
+                                onLongPressStart: (details) {
+                                  // 편집 중이면 버튼 비활성화
+                                  if (_isEditingHour || _isEditingMinute)
+                                    return;
+                                  _startContinuousDecrement();
+                                },
+                                onLongPressEnd: (details) {
+                                  _stopContinuousDecrement();
+                                },
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: (_isEditingHour || _isEditingMinute)
+                                        ? Colors.grey[100]
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
-                                  const SizedBox(height: 4),
-                                  GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _isHourSelected = false; // 분 선택
-                                        int newMinute =
-                                            _selectedTime.minute - 1;
-                                        if (newMinute < 0) newMinute = 59;
-                                        _selectedTime = TimeOfDay(
-                                          hour: _selectedTime.hour,
-                                          minute: newMinute,
-                                        );
-                                      });
-                                    },
-                                    onLongPressStart: (details) {
-                                      _startContinuousMinuteDecrement();
-                                    },
-                                    onLongPressEnd: (details) {
-                                      _stopContinuousMinuteDecrement();
-                                    },
-                                    child: Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Icon(
-                                        Icons.keyboard_arrow_down,
-                                        color: Colors.grey,
-                                        size: 20,
-                                      ),
-                                    ),
+                                  child: Icon(
+                                    Icons.keyboard_arrow_down,
+                                    color: (_isEditingHour || _isEditingMinute)
+                                        ? Colors.grey[300]
+                                        : Colors.grey,
+                                    size: 20,
                                   ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    // 오전/오후 선택
-                    Column(
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _isAM = true;
-                              // 오전으로 변경 시 시간도 12시간제로 변환
-                              if (_selectedTime.hour > 12) {
-                                _selectedTime = TimeOfDay(
-                                  hour: _selectedTime.hour - 12,
-                                  minute: _selectedTime.minute,
-                                );
-                              }
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _isAM
-                                  ? const Color(0xFF9C27B0)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: _isAM
-                                    ? const Color(0xFF9C27B0)
-                                    : Colors.grey,
+                    const Text(
+                      ':',
+                      style: TextStyle(
+                        fontSize: 32,
+                        color: Color(0xFF9C27B0),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // 시간 (분) - 탭하면 직접 입력
+                    Expanded(
+                      flex: 3,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isHourSelected = false;
+                                _isEditingMinute = true;
+                                _isEditingHour = false;
+                                // 기존 숫자 지우기
+                                _minuteController.clear();
+                              });
+                            },
+                            child: _isEditingMinute
+                                ? Container(
+                                    width: 60,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: const Color(0xFF9C27B0),
+                                      ),
+                                    ),
+                                    child: TextFormField(
+                                      controller: _minuteController,
+                                      textAlign: TextAlign.center,
+                                      keyboardType: TextInputType.number,
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF9C27B0),
+                                      ),
+                                      decoration: const InputDecoration(
+                                        border: InputBorder.none,
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
+                                      ),
+                                      onChanged: (value) {
+                                        // 입력 중에는 변환하지 않음
+                                      },
+                                      onEditingComplete: () {
+                                        // 입력 완료 시에만 변환
+                                        _updateTimeFromControllers();
+                                        setState(() {
+                                          _isEditingMinute = false;
+                                        });
+                                      },
+                                    ),
+                                  )
+                                : Text(
+                                    '${_selectedTime.minute.toString().padLeft(2, '0')}',
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      color: !_isHourSelected
+                                          ? const Color(0xFF9C27B0)
+                                          : Colors.grey,
+                                      fontWeight: !_isHourSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  // 편집 중이면 버튼 비활성화
+                                  if (_isEditingHour || _isEditingMinute)
+                                    return;
+
+                                  setState(() {
+                                    _isHourSelected = false;
+                                    int currentMinute = _selectedTime.minute;
+                                    int newMinute = (currentMinute + 1) % 60;
+
+                                    _selectedTime = TimeOfDay(
+                                      hour: _selectedTime.hour,
+                                      minute: newMinute,
+                                    );
+                                    _updateTimeControllers();
+                                  });
+                                },
+                                onLongPressStart: (details) {
+                                  // 편집 중이면 버튼 비활성화
+                                  if (_isEditingHour || _isEditingMinute)
+                                    return;
+                                  _startContinuousMinuteIncrement();
+                                },
+                                onLongPressEnd: (details) {
+                                  _stopContinuousMinuteIncrement();
+                                },
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: (_isEditingHour || _isEditingMinute)
+                                        ? Colors.grey[100]
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Icon(
+                                    Icons.keyboard_arrow_up,
+                                    color: (_isEditingHour || _isEditingMinute)
+                                        ? Colors.grey[300]
+                                        : Colors.grey,
+                                    size: 20,
+                                  ),
+                                ),
                               ),
-                            ),
-                            child: Text(
-                              '오전',
-                              style: TextStyle(
-                                color: _isAM ? Colors.white : Colors.grey,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
+                              const SizedBox(height: 4),
+                              GestureDetector(
+                                onTap: () {
+                                  // 편집 중이면 버튼 비활성화
+                                  if (_isEditingHour || _isEditingMinute)
+                                    return;
+
+                                  setState(() {
+                                    _isHourSelected = false;
+                                    int currentMinute = _selectedTime.minute;
+                                    int newMinute =
+                                        (currentMinute - 1 + 60) % 60;
+
+                                    _selectedTime = TimeOfDay(
+                                      hour: _selectedTime.hour,
+                                      minute: newMinute,
+                                    );
+                                    _updateTimeControllers();
+                                  });
+                                },
+                                onLongPressStart: (details) {
+                                  // 편집 중이면 버튼 비활성화
+                                  if (_isEditingHour || _isEditingMinute)
+                                    return;
+                                  _startContinuousMinuteDecrement();
+                                },
+                                onLongPressEnd: (details) {
+                                  _stopContinuousMinuteDecrement();
+                                },
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: (_isEditingHour || _isEditingMinute)
+                                        ? Colors.grey[100]
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Icon(
+                                    Icons.keyboard_arrow_down,
+                                    color: (_isEditingHour || _isEditingMinute)
+                                        ? Colors.grey[300]
+                                        : Colors.grey,
+                                    size: 20,
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // 오전/오후 선택 (오른쪽) - 하나의 토글 버튼
+                    Expanded(
+                      flex: 2,
+                      child: GestureDetector(
+                        onTap: () {
+                          // 편집 중이면 버튼 비활성화
+                          if (_isEditingHour || _isEditingMinute) return;
+                          setState(() => _isAM = !_isAM);
+                        },
+                        child: Container(
+                          height: 80,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: (_isEditingHour || _isEditingMinute)
+                                ? Colors.grey[300]
+                                : const Color(0xFF9C27B0),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF9C27B0)),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _isAM ? Icons.wb_sunny : Icons.nightlight_round,
+                                color: (_isEditingHour || _isEditingMinute)
+                                    ? Colors.grey[400]
+                                    : Colors.white,
+                                size: 20,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _isAM ? '오전' : '오후',
+                                style: TextStyle(
+                                  color: (_isEditingHour || _isEditingMinute)
+                                      ? Colors.grey[400]
+                                      : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _isAM = false;
-                              // 오후로 변경 시 시간도 12시간제로 변환
-                              if (_selectedTime.hour <= 12) {
-                                _selectedTime = TimeOfDay(
-                                  hour: _selectedTime.hour + 12,
-                                  minute: _selectedTime.minute,
-                                );
-                              }
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: !_isAM
-                                  ? const Color(0xFF9C27B0)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: !_isAM
-                                    ? const Color(0xFF9C27B0)
-                                    : Colors.grey,
-                              ),
-                            ),
-                            child: Text(
-                              '오후',
-                              style: TextStyle(
-                                color: !_isAM ? Colors.white : Colors.grey,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -640,106 +844,94 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE1BEE7)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _isImportant = true),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isImportant = true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _isImportant
+                              ? const Color(0xFF9C27B0)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
                             color: _isImportant
-                                ? const Color(0xFFFFD700) // 노란색
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: _isImportant
-                                  ? const Color(0xFFFFD700)
-                                  : Colors.grey,
-                            ),
+                                ? const Color(0xFF9C27B0)
+                                : Colors.grey,
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.star,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.star,
+                              color: _isImportant ? Colors.white : Colors.grey,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '중요 일정',
+                              style: TextStyle(
                                 color: _isImportant
                                     ? Colors.white
                                     : Colors.grey,
-                                size: 20,
+                                fontWeight: FontWeight.bold,
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '중요한 일정',
-                                style: TextStyle(
-                                  color: _isImportant
-                                      ? Colors.white
-                                      : Colors.grey,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _isImportant = false),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _isImportant = false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: !_isImportant
+                              ? const Color(0xFF9C27B0)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
                             color: !_isImportant
                                 ? const Color(0xFF9C27B0)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: !_isImportant
-                                  ? const Color(0xFF9C27B0)
-                                  : Colors.grey,
-                            ),
+                                : Colors.grey,
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.star_border,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.star_border,
+                              color: !_isImportant ? Colors.white : Colors.grey,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '일반 일정',
+                              style: TextStyle(
                                 color: !_isImportant
                                     ? Colors.white
                                     : Colors.grey,
-                                size: 20,
+                                fontWeight: FontWeight.bold,
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '일반 일정',
-                                style: TextStyle(
-                                  color: !_isImportant
-                                      ? Colors.white
-                                      : Colors.grey,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               const Spacer(),
 
