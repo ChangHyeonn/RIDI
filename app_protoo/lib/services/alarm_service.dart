@@ -2,8 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:provider/provider.dart';
 import '../models/task.dart';
 import '../screens/alarm_screen.dart';
+import '../providers/task_provider.dart';
+import '../services/task_service.dart';
 
 // 전역 NavigatorKey
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -16,6 +19,7 @@ class AlarmService {
   final Map<String, Timer> _alarmTimers = {};
   final Map<String, DateTime> _scheduledAlarms = {};
   AudioPlayer? _audioPlayer;
+  final TaskService _taskService = TaskService();
 
   // 알람 설정
   void scheduleAlarm(Task task, [BuildContext? context]) {
@@ -79,7 +83,7 @@ class AlarmService {
   // 알람 화면 표시
   void _showAlarmScreen(Task task, BuildContext? context) {
     // 알람 소리 재생 (진동)
-    _playAlarmSound();
+    _playAlarmSound(context);
 
     // 전역 NavigatorKey를 사용하여 알람 화면 표시
     navigatorKey.currentState?.pushAndRemoveUntil(
@@ -88,8 +92,8 @@ class AlarmService {
     );
   }
 
-  // 알람 소리 재생 (진동 + 오디오)
-  void _playAlarmSound() async {
+  // 알람 소리 재생 (진동 + 오디오) - 볼륨 설정 적용
+  void _playAlarmSound([BuildContext? context]) async {
     try {
       print('=== 알람 소리 재생 시작 ===');
 
@@ -98,6 +102,39 @@ class AlarmService {
       HapticFeedback.heavyImpact();
       HapticFeedback.heavyImpact();
       print('진동 발생 완료');
+
+      // 볼륨 설정 - 설정 화면에서 조절한 값 사용
+      double volume = 0.5; // 기본값
+
+      // context가 있으면 Provider에서 가져오기
+      if (context != null) {
+        try {
+          final taskProvider = context.read<TaskProvider>();
+          volume = taskProvider.soundVolume;
+          print('🔊 Provider에서 설정된 볼륨 값: $volume (${(volume * 100).toInt()}%)');
+        } catch (e) {
+          print('❌ Provider에서 볼륨 설정 가져오기 실패: $e');
+        }
+      }
+
+      // context가 없거나 Provider에서 가져오기 실패한 경우 TaskService에서 직접 가져오기
+      if (volume == 0.5) {
+        try {
+          final settings = await _taskService.getSettings();
+          volume = settings['soundVolume'] ?? 0.5;
+          print(
+            '🔊 TaskService에서 설정된 볼륨 값: $volume (${(volume * 100).toInt()}%)',
+          );
+        } catch (e) {
+          print('❌ TaskService에서 볼륨 설정 가져오기 실패: $e');
+        }
+      }
+
+      // 볼륨이 0이면 소리 재생하지 않음
+      if (volume <= 0.0) {
+        print(' 볼륨이 0이므로 소리 재생하지 않음 (진동만 발생)');
+        return;
+      }
 
       // 기존 오디오 플레이어 정리
       if (_audioPlayer != null) {
@@ -127,9 +164,8 @@ class AlarmService {
       }
       print('오디오 파일 로딩 완료');
 
-      // 볼륨 설정 (0.0 ~ 1.0)
-      await _audioPlayer?.setVolume(1.0);
-      print('볼륨 설정 완료: 1.0');
+      await _audioPlayer?.setVolume(volume);
+      print('🔊 최종 볼륨 설정 완료: $volume (${(volume * 100).toInt()}%)');
 
       // 재생 시작
       await _audioPlayer?.play();

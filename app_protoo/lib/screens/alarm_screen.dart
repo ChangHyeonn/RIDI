@@ -111,10 +111,10 @@ class _AlarmScreenState extends State<AlarmScreen> {
     final completedTask = widget.task.copyWith(isCompleted: true);
     taskProvider.updateTask(completedTask);
 
-    // 메인 화면으로 돌아가기
+    // 메인 화면으로 돌아가기 (설정 유지)
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const MainScreen()),
-      (route) => false, // 모든 이전 화면 제거
+      (route) => false, // 모든 이전 화면 제거하되, 설정은 Provider에서 유지됨
     );
   }
 }

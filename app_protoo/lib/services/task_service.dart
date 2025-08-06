@@ -57,19 +57,33 @@ class TaskService {
   // 설정 가져오기
   Future<Map<String, dynamic>> getSettings() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // JSON으로 저장된 설정을 먼저 시도
     final settingsJson = prefs.getString(_settingsKey);
     if (settingsJson != null) {
-      return jsonDecode(settingsJson);
+      try {
+        return Map<String, dynamic>.from(jsonDecode(settingsJson));
+      } catch (e) {
+        print('설정 JSON 파싱 실패: $e');
+      }
     }
+
+    // 개별 키로 저장된 설정을 시도 (이전 버전 호환성)
     return {
-      'soundVolume': 0.5,
-      'fontSize': 0.5,
+      'soundVolume': prefs.getDouble('soundVolume') ?? 0.5,
+      'fontSize': prefs.getDouble('fontSize') ?? 0.5,
     };
   }
 
   // 설정 저장하기
   Future<void> saveSettings(Map<String, dynamic> settings) async {
     final prefs = await SharedPreferences.getInstance();
+
+    // JSON으로 저장
     await prefs.setString(_settingsKey, jsonEncode(settings));
+
+    // 개별 키로도 저장 (이전 버전 호환성)
+    await prefs.setDouble('soundVolume', settings['soundVolume'] ?? 0.5);
+    await prefs.setDouble('fontSize', settings['fontSize'] ?? 0.5);
   }
-} 
+}
