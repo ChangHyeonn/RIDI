@@ -35,7 +35,7 @@ class Settings:
     # 일정 관리 설정
     MAX_SCHEDULES_PER_USER = int(os.getenv('MAX_SCHEDULES_PER_USER', 100))
     SCHEDULE_REMINDER_DEFAULT = os.getenv('SCHEDULE_REMINDER_DEFAULT', 'True').lower() == 'true'
-    SCHEDULE_CATEGORIES = ['일반', '업무', '개인', '의료', '가족', '기타']
+    SCHEDULE_CATEGORIES = ['일반', '건강', '경조사']
     SCHEDULE_PRIORITIES = ['not_important', 'important']
     
     # 명령 분류 설정

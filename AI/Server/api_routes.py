@@ -305,3 +305,5 @@ def setup_routes(app):
     @app.errorhandler(500)
     def internal_error(error):
         return create_error_response("서버 내부 오류가 발생했습니다", 500) 
+    def internal_error(error):
+        return create_error_response("서버 내부 오류가 발생했습니다", 500) 

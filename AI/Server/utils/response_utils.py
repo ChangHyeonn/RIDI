@@ -4,6 +4,7 @@ Response Utilities
 고령층 일정 메모 관리 AI 서버 응답 유틸리티
 """
 
+import base64
 from flask import jsonify
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -135,6 +136,68 @@ def create_voice_response(voice_result: Dict[str, Any]) -> tuple:
     if response.get('success'):
         response['elderly_optimized'] = True
         response['simple_response'] = _extract_simple_message(response)
+    
+    return jsonify(response), 200
+
+def create_voice_response_with_audio(voice_result: Dict[str, Any]) -> tuple:
+    """음성 데이터가 base64로 인코딩된 응답 생성"""
+    response = {
+        "success": voice_result.get('success', False),
+        "user_message": voice_result.get('user_message', ''),
+        "ai_response": voice_result.get('ai_response', ''),
+        "schedule_result": voice_result.get('schedule_result', {}),
+        "command_type": voice_result.get('command_type', 'unknown'),
+        "processing_time": voice_result.get('processing_time', 0),
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    # 음성 데이터를 base64로 인코딩
+    audio_data = voice_result.get('audio_response')
+    if audio_data and isinstance(audio_data, bytes):
+        try:
+            audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+            response['audio_response'] = audio_base64
+            response['audio_format'] = 'mp3'
+            response['audio_encoding'] = 'base64'
+        except Exception as e:
+            response['audio_error'] = f"음성 인코딩 실패: {str(e)}"
+    
+    # 고령자 특화 처리
+    if response.get('success'):
+        response['elderly_optimized'] = True
+        response['simple_response'] = _extract_simple_message(response)
+    
+    return jsonify(response), 200
+
+def create_schedule_response_with_audio(success: bool, data: Dict[str, Any], 
+                                      audio_data: bytes = None, message: str = "") -> tuple:
+    """일정 응답에 음성 포함"""
+    response = {
+        "success": success,
+        "timestamp": datetime.now().isoformat(),
+        "type": "schedule",
+        "message": message or "일정 처리가 완료되었습니다"
+    }
+    
+    if success:
+        response.update({
+            "data": data
+        })
+    else:
+        response.update({
+            "error": data.get("error", "일정 처리 중 오류가 발생했습니다"),
+            "details": data
+        })
+    
+    # 음성 데이터 추가
+    if audio_data and isinstance(audio_data, bytes):
+        try:
+            audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+            response['audio_response'] = audio_base64
+            response['audio_format'] = 'mp3'
+            response['audio_encoding'] = 'base64'
+        except Exception as e:
+            response['audio_error'] = f"음성 인코딩 실패: {str(e)}"
     
     return jsonify(response), 200
 
