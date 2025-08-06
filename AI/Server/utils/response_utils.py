@@ -6,7 +6,7 @@ Response Utilities
 
 from flask import jsonify
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 def create_response(data: Dict[str, Any], status_code: int = 200) -> tuple:
     """표준 응답 생성"""
@@ -42,17 +42,82 @@ def create_elderly_response(data: Dict[str, Any], status_code: int = 200) -> tup
     }
     return jsonify(response), status_code
 
-def create_schedule_response(schedule_data: Dict[str, Any], 
-                           message: str = "일정이 성공적으로 처리되었습니다") -> tuple:
+def create_schedule_response(success: bool, data: Dict[str, Any], message: str = "") -> Dict[str, Any]:
     """일정 관련 응답 생성"""
     response = {
-        "success": True,
-        "message": message,
-        "schedule": schedule_data,
+        "success": success,
         "timestamp": datetime.now().isoformat(),
-        "reminder_set": schedule_data.get('reminder', True)
+        "type": "schedule"
     }
-    return jsonify(response), 200
+    
+    if success:
+        response.update({
+            "message": message or "일정 처리가 완료되었습니다",
+            "data": data
+        })
+    else:
+        response.update({
+            "error": data.get("error", "일정 처리 중 오류가 발생했습니다"),
+            "details": data
+        })
+    
+    return response
+
+def create_accessibility_response(success: bool, data: Dict[str, Any], message: str = "") -> Dict[str, Any]:
+    """접근성 설정 응답 생성"""
+    response = {
+        "success": success,
+        "timestamp": datetime.now().isoformat(),
+        "type": "accessibility"
+    }
+    
+    if success:
+        response.update({
+            "message": message or "접근성 설정이 업데이트되었습니다",
+            "settings": data
+        })
+    else:
+        response.update({
+            "error": data.get("error", "접근성 설정 처리 중 오류가 발생했습니다"),
+            "details": data
+        })
+    
+    return response
+
+def create_important_schedule_response(schedules: List[Dict[str, Any]], count: int) -> Dict[str, Any]:
+    """중요 일정 응답 생성"""
+    return {
+        "success": True,
+        "timestamp": datetime.now().isoformat(),
+        "type": "important_schedules",
+        "message": f"중요 일정 {count}개를 찾았습니다",
+        "schedules": schedules,
+        "count": count
+    }
+
+def create_schedule_list_response(schedules: List[Dict[str, Any]], date: str, count: int) -> Dict[str, Any]:
+    """일정 목록 응답 생성"""
+    return {
+        "success": True,
+        "timestamp": datetime.now().isoformat(),
+        "type": "schedule_list",
+        "message": f"{date}의 일정 {count}개를 찾았습니다",
+        "schedules": schedules,
+        "date": date,
+        "count": count
+    }
+
+def create_command_classification_response(classification: Dict[str, Any], text: str) -> Dict[str, Any]:
+    """명령 분류 응답 생성"""
+    return {
+        "success": True,
+        "timestamp": datetime.now().isoformat(),
+        "type": "command_classification",
+        "original_text": text,
+        "classification": classification,
+        "confidence": classification.get("confidence", 0.0),
+        "command_type": classification.get("type", "unknown")
+    }
 
 def create_voice_response(voice_result: Dict[str, Any]) -> tuple:
     """음성 처리 응답 생성"""

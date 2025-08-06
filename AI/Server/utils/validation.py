@@ -101,22 +101,125 @@ def validate_datetime_format(datetime_str: str) -> bool:
     except ValueError:
         return False
 
+def validate_schedule_deletion(data: Dict[str, Any]) -> Dict[str, Any]:
+    """일정 삭제 데이터 검증"""
+    errors = []
+    
+    if not data:
+        errors.append("삭제할 일정 데이터가 없습니다")
+        return {"valid": False, "errors": errors}
+    
+    schedule_id = data.get('schedule_id')
+    if not schedule_id:
+        errors.append("일정 ID가 필요합니다")
+    
+    if not isinstance(schedule_id, str):
+        errors.append("일정 ID는 문자열이어야 합니다")
+    
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors
+    }
+
+def validate_date_format(date_str: str) -> Dict[str, Any]:
+    """날짜 형식 검증"""
+    errors = []
+    
+    if not date_str:
+        errors.append("날짜가 필요합니다")
+        return {"valid": False, "errors": errors}
+    
+    # 특별한 날짜 키워드
+    special_dates = ["today", "tomorrow", "yesterday", "오늘", "내일", "어제"]
+    if date_str.lower() in special_dates:
+        return {"valid": True, "date": date_str}
+    
+    # YYYY-MM-DD 형식 검증
+    import re
+    date_pattern = r'^\d{4}-\d{2}-\d{2}$'
+    if not re.match(date_pattern, date_str):
+        errors.append("날짜 형식이 올바르지 않습니다 (YYYY-MM-DD)")
+    
+    # 실제 날짜인지 확인
+    try:
+        from datetime import datetime
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        errors.append("유효하지 않은 날짜입니다")
+    
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors
+    }
+
+def validate_accessibility_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
+    """접근성 설정 검증"""
+    errors = []
+    
+    if not settings:
+        errors.append("접근성 설정 데이터가 없습니다")
+        return {"valid": False, "errors": errors}
+    
+    valid_settings = {
+        "font_size": ["small", "medium", "large"],
+        "volume_level": (0.5, 2.0),
+        "speech_rate": (0.5, 2.0),
+        "high_contrast": [True, False],
+        "text_to_speech": [True, False],
+        "repeat_important": [True, False],
+        "simple_responses": [True, False]
+    }
+    
+    for key, value in settings.items():
+        if key not in valid_settings:
+            errors.append(f"지원하지 않는 설정입니다: {key}")
+            continue
+        
+        expected_type = valid_settings[key]
+        
+        if isinstance(expected_type, list):
+            if value not in expected_type:
+                errors.append(f"{key}의 값이 올바르지 않습니다: {value}")
+        elif isinstance(expected_type, tuple):
+            try:
+                float_value = float(value)
+                min_val, max_val = expected_type
+                if not (min_val <= float_value <= max_val):
+                    errors.append(f"{key}의 값이 범위를 벗어났습니다: {min_val}~{max_val}")
+            except (ValueError, TypeError):
+                errors.append(f"{key}의 값이 숫자가 아닙니다: {value}")
+    
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors
+    }
+
 def validate_user_id(user_id: str) -> Dict[str, Any]:
     """사용자 ID 검증"""
+    errors = []
+    
     if not user_id:
-        return {"valid": False, "error": "사용자 ID가 제공되지 않았습니다"}
+        errors.append("사용자 ID가 필요합니다")
+        return {"valid": False, "errors": errors}
+    
+    if not isinstance(user_id, str):
+        errors.append("사용자 ID는 문자열이어야 합니다")
     
     if len(user_id) < 3:
-        return {"valid": False, "error": "사용자 ID는 3자 이상이어야 합니다"}
+        errors.append("사용자 ID는 최소 3자 이상이어야 합니다")
     
     if len(user_id) > 50:
-        return {"valid": False, "error": "사용자 ID는 50자 이하여야 합니다"}
+        errors.append("사용자 ID는 최대 50자까지 가능합니다")
     
     # 특수문자 제한
-    if not re.match(r'^[a-zA-Z0-9_-]+$', user_id):
-        return {"valid": False, "error": "사용자 ID는 영문, 숫자, 언더스코어, 하이픈만 허용됩니다"}
+    import re
+    if re.search(r'[^a-zA-Z0-9_-]', user_id):
+        errors.append("사용자 ID에는 영문자, 숫자, 언더스코어(_), 하이픈(-)만 사용 가능합니다")
     
-    return {"valid": True}
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors
+    }
 
 def validate_api_key(api_key: str) -> Dict[str, Any]:
     """API 키 검증"""

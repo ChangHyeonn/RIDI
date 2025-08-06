@@ -4,14 +4,22 @@ Authentication Utilities
 고령층 일정 메모 관리 AI 서버 인증 유틸리티
 """
 
+import os
+import time
 import hashlib
 import secrets
-import time
+from functools import wraps
+from flask import request, jsonify, current_app
 from typing import Dict, Any, Optional
-from config.settings import Settings
-from config.logging_config import get_logger
+import logging
 
-logger = get_logger(__name__)
+# 프로젝트 루트를 Python 경로에 추가
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+
+from Config.settings import Settings
+
+logger = logging.getLogger(__name__)
 
 class AuthManager:
     """인증 관리자"""
@@ -101,6 +109,25 @@ def require_user_auth(f):
         # 사용자 ID 형식 검증
         if len(user_id) < 3 or len(user_id) > 50:
             return {"error": "유효하지 않은 사용자 ID입니다"}, 400
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+def require_api_key(f):
+    """API 키 인증 데코레이터"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get('X-API-Key')
+        
+        if not api_key:
+            return jsonify({"error": "API 키가 필요합니다"}), 401
+        
+        # API 키 검증
+        auth_manager = AuthManager()
+        validation_result = auth_manager.validate_api_key(api_key)
+        
+        if not validation_result['valid']:
+            return jsonify({"error": validation_result['error']}), 401
         
         return f(*args, **kwargs)
     return decorated_function

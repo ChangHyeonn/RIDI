@@ -4,22 +4,24 @@ API Routes for AI Server
 고령층 일정 메모 관리 AI 서버 API 라우트
 """
 
-import tempfile
+import sys
 import os
+import tempfile
+import logging
+
+# 프로젝트 루트를 Python 경로에 추가
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime
-import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from utils.response_utils import create_response, create_error_response
-from utils.validation import validate_audio_file, validate_schedule_data
-from utils.auth import require_auth
+from Server.utils.response_utils import create_response, create_error_response
+from Server.utils.validation import validate_audio_file, validate_schedule_data, validate_accessibility_settings
+from Server.utils.auth import require_api_key
 from Config.settings import Settings
-from Config.logging_config import get_logger
 
 # Blueprint 생성
 api_bp = Blueprint('api', __name__)
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 @api_bp.route('/health', methods=['GET'])
 def health_check():
@@ -205,6 +207,87 @@ def repeat_important_message():
     except Exception as e:
         logger.error(f"Message repetition failed: {e}")
         return create_error_response("메시지 반복 중 오류가 발생했습니다", 500)
+
+@api_bp.route('/schedule/delete', methods=['DELETE'])
+def delete_schedule():
+    """일정 삭제 API"""
+    try:
+        data = request.get_json()
+        if not data:
+            return create_error_response("삭제할 일정 정보가 제공되지 않았습니다", 400)
+        
+        user_id = request.headers.get('X-User-ID', 'default_user')
+        schedule_id = data.get('schedule_id')
+        
+        if not schedule_id:
+            return create_error_response("일정 ID가 필요합니다", 400)
+        
+        result = current_app.ai_service.delete_schedule(user_id, schedule_id)
+        return create_response(result)
+        
+    except Exception as e:
+        logger.error(f"Schedule deletion failed: {e}")
+        return create_error_response("일정 삭제 중 오류가 발생했습니다", 500)
+
+@api_bp.route('/schedule/read', methods=['GET'])
+def read_schedules_by_date():
+    """특정 날짜 일정 조회 API"""
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        target_date = request.args.get('date', 'today')
+        
+        result = current_app.ai_service.get_schedules_by_date(user_id, target_date)
+        return create_response(result)
+        
+    except Exception as e:
+        logger.error(f"Schedule reading failed: {e}")
+        return create_error_response("일정 조회 중 오류가 발생했습니다", 500)
+
+@api_bp.route('/schedule/important', methods=['GET'])
+def get_important_schedules():
+    """중요 일정 조회 API"""
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        result = current_app.ai_service.get_important_schedules(user_id)
+        return create_response(result)
+        
+    except Exception as e:
+        logger.error(f"Important schedule retrieval failed: {e}")
+        return create_error_response("중요 일정 조회 중 오류가 발생했습니다", 500)
+
+@api_bp.route('/settings/accessibility', methods=['PUT'])
+def update_accessibility_settings():
+    """접근성 설정 업데이트 API"""
+    try:
+        data = request.get_json()
+        if not data:
+            return create_error_response("접근성 설정 데이터가 제공되지 않았습니다", 400)
+        
+        user_id = request.headers.get('X-User-ID', 'default_user')
+        
+        # 설정 검증
+        validation_result = validate_accessibility_settings(data)
+        if not validation_result['valid']:
+            return create_error_response(validation_result['error'], 400)
+        
+        result = current_app.ai_service.update_accessibility_settings(user_id, data)
+        return create_response(result)
+        
+    except Exception as e:
+        logger.error(f"Accessibility settings update failed: {e}")
+        return create_error_response("접근성 설정 업데이트 중 오류가 발생했습니다", 500)
+
+@api_bp.route('/settings/accessibility', methods=['GET'])
+def get_accessibility_settings():
+    """접근성 설정 조회 API"""
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        result = current_app.ai_service.get_accessibility_settings(user_id)
+        return create_response(result)
+        
+    except Exception as e:
+        logger.error(f"Accessibility settings retrieval failed: {e}")
+        return create_error_response("접근성 설정 조회 중 오류가 발생했습니다", 500)
 
 def setup_routes(app):
     """라우트 설정"""
