@@ -133,5 +133,3 @@ class IntegratedPipeline:
         self.voice_pipeline.change_llm_model(llm_type)
         self.schedule_classifier = ScheduleClassifier(llm_type=llm_type)
         self.logger.info(f"LLM model changed to: {llm_type}")
-
- 

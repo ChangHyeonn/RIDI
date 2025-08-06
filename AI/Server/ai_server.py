@@ -9,11 +9,10 @@ import json
 import logging
 import tempfile
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-# AI 모듈 import
 from Processor.voice_pipeline import VoicePipeline
 
 class AIServer:
@@ -25,7 +24,6 @@ class AIServer:
         self.logger.info(f"AI Server initialized successfully on {self.device}")
     
     def _get_device(self, device: str) -> str:
-        """사용 가능한 최적의 device 선택"""
         if device == "auto":
             import torch
             if torch.cuda.is_available():
@@ -35,7 +33,6 @@ class AIServer:
         return device
     
     def _setup_logging(self):
-        """로깅 설정"""
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -43,15 +40,13 @@ class AIServer:
         self.logger = logging.getLogger(__name__)
     
     def _initialize_voice_pipeline(self):
-        """음성 처리 파이프라인 초기화"""
         self.logger.info("Initializing Voice Pipeline...")
         
-        # 환경 변수에서 LLM 타입 가져오기
         llm_type = os.getenv('LLM_MODEL', self.llm_type)
         
         self.voice_pipeline = VoicePipeline(
             stt_model="small",
-            llm_type=llm_type,  # "gpt" or "gemini"
+            llm_type=llm_type,  # "gpt" | "gemini"
             device=self.device
         )
         
@@ -76,16 +71,13 @@ class AIServer:
                 "timestamp": datetime.now().isoformat()
             }
 
-# Flask 앱 초기화
 app = Flask(__name__)
-CORS(app)  # Flutter 앱에서 접근 허용
+CORS(app) 
 
-# AI 서버 인스턴스
 ai_server = None
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """서버 상태 확인"""
     return jsonify({
         "status": "healthy",
         "device": ai_server.device if ai_server else "not_initialized",
@@ -103,15 +95,12 @@ def process_voice():
         
         audio_file = request.files['audio']
         
-        # 임시 파일로 저장
         with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
             audio_file.save(tmp_file.name)
             audio_path = tmp_file.name
         
-        # AI 처리
         result = ai_server.process_voice_command(audio_path)
         
-        # 임시 파일 삭제
         os.unlink(audio_path)
         
         return jsonify(result)
