@@ -71,17 +71,25 @@ class GPTLLM(BaseLLM):
         }
 
 class GeminiLLM(BaseLLM):
-    def __init__(self, api_key: Optional[str] = None, model: str = "gemini-1.5-flash"):
-        self.model_name = model
-        self.api_key = api_key or os.getenv('GOOGLE_API_KEY')
+    def __init__(self, **kwargs):
+        self._setup_logging()
+        self.model_name = "gemini-pro"
+        self.api_key = os.getenv('GOOGLE_API_KEY')
         
         if not self.api_key:
-            raise ValueError("Google API key is required. Set GOOGLE_API_KEY environment variable.")
+            self.logger.warning("Google API key not found. LLM will be disabled.")
+            self.model = None
+            return
         
-        self._setup_logging()
-        self._setup_korean_prompt()
-        self._initialize_model()
-        self.logger.info(f"Gemini LLM initialized successfully with model: {self.model_name}")
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=self.api_key)
+            self.model = genai.GenerativeModel('gemini-pro')
+            self._setup_korean_prompt()
+            self.logger.info("Gemini LLM initialized successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize Gemini LLM: {e}")
+            self.model = None
     
     def _setup_logging(self):
         logging.basicConfig(level=logging.INFO)
@@ -131,6 +139,18 @@ class GeminiLLM(BaseLLM):
                 "multimodal": True
             }
         }
+
+    def generate(self, prompt: str, max_tokens: int = 1000) -> str:
+        """텍스트 생성"""
+        if not self.model:
+            return "죄송합니다. AI 모델이 초기화되지 않았습니다. API 키를 확인해주세요."
+        
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            self.logger.error(f"Text generation failed: {e}")
+            return f"텍스트 생성 중 오류가 발생했습니다: {str(e)}"
 
 class LLMFactory:
     @staticmethod
