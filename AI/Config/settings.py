@@ -24,7 +24,7 @@ class Settings:
     DEVICE = os.getenv('DEVICE', 'auto')
     
     # 고령자 특화 설정
-    SPEECH_RATE = float(os.getenv('SPEECH_RATE', 0.8))  # 더 천천히
+    SPEECH_RATE = float(os.getenv('SPEECH_RATE', 1.0))
     VOLUME_LEVEL = float(os.getenv('VOLUME_LEVEL', 1.2))  # 더 크게
     SIMPLE_RESPONSES = os.getenv('SIMPLE_RESPONSES', 'True').lower() == 'true'
     REPEAT_IMPORTANT = os.getenv('REPEAT_IMPORTANT', 'True').lower() == 'true'
