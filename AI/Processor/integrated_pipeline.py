@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Integrated Pipeline - 통합 음성 처리 파이프라인
-기본 음성 처리 + 일정 분류 기능 통합
-"""
-
 import sys
 import os
 import time
@@ -17,8 +11,6 @@ from Processor.voice_pipeline import VoicePipeline
 from Models.Classifier import ScheduleClassifier
 
 class IntegratedPipeline:
-    """통합 음성 처리 파이프라인"""
-    
     def __init__(self, 
                  stt_model: str = "small",
                  llm_type: str = None,
@@ -40,7 +32,7 @@ class IntegratedPipeline:
         self.logger = logging.getLogger(__name__)
     
     def _initialize_components(self, stt_model: str):
-        self.logger.info("Initializing components...")
+
         
         self.voice_pipeline = VoicePipeline(
             stt_model=stt_model,
@@ -50,14 +42,12 @@ class IntegratedPipeline:
         
         self.schedule_classifier = ScheduleClassifier(llm_type=self.llm_type)
         
-        self.logger.info("All components initialized successfully")
+
     
     def process_voice_command(self, audio_input_path: str) -> Dict[str, Any]:
         start_time = time.time()
         
         try:
-            self.logger.info(f"Processing voice command: {audio_input_path}")
-            
             voice_result = self.voice_pipeline.process_voice(audio_input_path)
             
             if not voice_result["success"]:
