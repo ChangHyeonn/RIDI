@@ -17,66 +17,175 @@ from Config.logging_config import get_logger
 
 # AI 모델들 import
 from Processor.integrated_pipeline import IntegratedPipeline
-from Models.Memory import MemoryManager
+from Services.Memory import MemoryManager
+from Services.ScheduleManager import ScheduleManager
+from Services.AccessibilityManager import AccessibilityManager
+from Services.CommandClassifier import CommandClassifier
 
 class AIService:
     """AI 서비스 클래스"""
     
     def __init__(self):
-        self.logger = get_logger(__name__)
         self._setup_logging()
         self._initialize_components()
-        self.logger.info("AI Service initialized successfully")
     
     def _setup_logging(self):
-        """로깅 설정"""
-        self.logger.info(f"Initializing AI Service with device: {Settings.get_device()}")
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
     
     def _initialize_components(self):
-        """컴포넌트 초기화"""
+        """AI 컴포넌트 초기화"""
         try:
-            # 통합 파이프라인 초기화
+            # 기존 컴포넌트
             self.pipeline = IntegratedPipeline(
                 stt_model=Settings.STT_MODEL,
                 llm_type=Settings.LLM_TYPE,
                 device=Settings.get_device()
             )
-            
-            # 메모리 관리자 초기화
             self.memory_manager = MemoryManager()
             
-            self.logger.info("All AI components initialized successfully")
+            # 새로운 매니저들
+            self.schedule_manager = ScheduleManager()
+            self.accessibility_manager = AccessibilityManager()
+            self.command_classifier = CommandClassifier(llm_type=Settings.LLM_TYPE)
+            
+            self.logger.info("AI Service initialized successfully")
             
         except Exception as e:
-            self.logger.error(f"Failed to initialize AI components: {e}")
+            self.logger.error(f"AI Service initialization failed: {e}")
             raise
     
-    def process_voice_command(self, audio_path: str, user_id: Optional[str] = None) -> Dict[str, Any]:
-        """음성 명령 처리"""
+    def delete_schedule(self, user_id: str, schedule_id: str) -> Dict[str, Any]:
+        """일정 삭제"""
         try:
-            self.logger.info(f"Processing voice command: {audio_path}")
+            result = self.schedule_manager.delete_schedule(user_id, schedule_id)
+            return result
+        except Exception as e:
+            self.logger.error(f"Failed to delete schedule: {e}")
+            return {
+                "success": False,
+                "error": f"일정 삭제 중 오류가 발생했습니다: {str(e)}"
+            }
+    
+    def get_schedules_by_date(self, user_id: str, target_date: str) -> Dict[str, Any]:
+        """특정 날짜 일정 조회"""
+        try:
+            schedules = self.schedule_manager.get_schedules_by_date(user_id, target_date)
+            return {
+                "success": True,
+                "schedules": schedules,
+                "date": target_date,
+                "count": len(schedules)
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to get schedules by date: {e}")
+            return {
+                "success": False,
+                "error": f"일정 조회 중 오류가 발생했습니다: {str(e)}"
+            }
+    
+    def get_important_schedules(self, user_id: str) -> Dict[str, Any]:
+        """중요 일정 조회"""
+        try:
+            schedules = self.schedule_manager.get_important_schedules(user_id)
+            return {
+                "success": True,
+                "schedules": schedules,
+                "count": len(schedules)
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to get important schedules: {e}")
+            return {
+                "success": False,
+                "error": f"중요 일정 조회 중 오류가 발생했습니다: {str(e)}"
+            }
+    
+    def update_accessibility_settings(self, user_id: str, settings: Dict[str, Any]) -> Dict[str, Any]:
+        """접근성 설정 업데이트"""
+        try:
+            result = self.accessibility_manager.update_accessibility_settings(user_id, settings)
+            return result
+        except Exception as e:
+            self.logger.error(f"Failed to update accessibility settings: {e}")
+            return {
+                "success": False,
+                "error": f"접근성 설정 업데이트 중 오류가 발생했습니다: {str(e)}"
+            }
+    
+    def get_accessibility_settings(self, user_id: str) -> Dict[str, Any]:
+        """접근성 설정 조회"""
+        try:
+            settings = self.accessibility_manager.get_accessibility_settings(user_id)
+            return {
+                "success": True,
+                "settings": settings
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to get accessibility settings: {e}")
+            return {
+                "success": False,
+                "error": f"접근성 설정 조회 중 오류가 발생했습니다: {str(e)}"
+            }
+    
+    def process_voice_command(self, audio_path: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """음성 명령 처리 (확장된 버전)"""
+        try:
+            # 기본 파이프라인 처리
+            result = self.pipeline.process_voice_command(audio_path, user_id)
             
-            # 음성 처리
-            result = self.pipeline.process_voice_command(audio_path)
+            if not result:
+                return {
+                    "success": False,
+                    "error": "음성 처리에 실패했습니다."
+                }
             
-            # 사용자 ID가 있으면 메모리에 저장
-            if user_id and result.get('success'):
-                self.memory_manager.store_interaction(user_id, {
-                    'timestamp': datetime.now().isoformat(),
-                    'user_message': result.get('user_message', ''),
-                    'ai_response': result.get('ai_response', ''),
-                    'schedule_result': result.get('schedule_result', {})
-                })
+            # 명령 분류
+            text = result.get('text', '')
+            command_result = self.command_classifier.classify_command(text)
             
-            # 고령자 특화 응답 처리
-            if result.get('success') and Settings.SIMPLE_RESPONSES:
-                result = self._simplify_response_for_elderly(result)
+            # 명령 타입에 따른 추가 처리
+            command_type = command_result.get('type', 'unknown')
             
+            if command_type == "add_schedule":
+                # 일정 추가 처리
+                schedule_info = self.command_classifier.extract_command_info(text, command_type)
+                schedule_result = self.schedule_manager.add_schedule(user_id or 'default_user', schedule_info)
+                result['schedule_result'] = schedule_result
+                
+            elif command_type == "delete_schedule":
+                # 일정 삭제 처리
+                delete_info = self.command_classifier.extract_command_info(text, command_type)
+                # 여기서는 일정 ID가 필요하므로 추가 처리 필요
+                result['delete_info'] = delete_info
+                
+            elif command_type == "read_schedule":
+                # 일정 읽기 처리
+                date_info = self.command_classifier.extract_command_info(text, command_type)
+                schedules = self.schedule_manager.get_schedules_by_date(
+                    user_id or 'default_user', 
+                    date_info.get('date', 'today')
+                )
+                result['schedule_list'] = schedules
+                
+            elif command_type == "important_schedule":
+                # 중요 일정 처리
+                important_schedules = self.schedule_manager.get_important_schedules(user_id or 'default_user')
+                result['important_schedules'] = important_schedules
+                
+            elif command_type == "accessibility":
+                # 접근성 설정 처리
+                accessibility_info = self.command_classifier.extract_command_info(text, command_type)
+                result['accessibility_info'] = accessibility_info
+            
+            result['command_classification'] = command_result
             return result
             
         except Exception as e:
-            self.logger.error(f"Voice processing failed: {e}")
-            return self._create_error_response(f"음성 처리 중 오류가 발생했습니다: {str(e)}")
+            self.logger.error(f"Voice command processing failed: {e}")
+            return {
+                "success": False,
+                "error": f"음성 명령 처리 중 오류가 발생했습니다: {str(e)}"
+            }
     
     def _simplify_response_for_elderly(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """고령자를 위한 응답 단순화"""
@@ -121,7 +230,7 @@ class AIService:
     def add_schedule(self, schedule_data: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """일정 추가"""
         try:
-            self.logger.info(f"Adding schedule for user {user_id}")
+
             
             # 일정 데이터 검증
             validation_result = self._validate_schedule_data(schedule_data)
@@ -152,7 +261,7 @@ class AIService:
     def get_schedules(self, user_id: str) -> Dict[str, Any]:
         """일정 목록 조회"""
         try:
-            self.logger.info(f"Getting schedules for user {user_id}")
+
             
             schedules = self.memory_manager.get_schedules(user_id)
             

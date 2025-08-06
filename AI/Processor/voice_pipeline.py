@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Voice Pipeline - 기본 음성 처리 파이프라인
-STT → LLM → TTS 기본 처리
-"""
-
 import sys
 import os
 import time
@@ -22,8 +16,6 @@ from Models.LLM import LLMFactory
 from Models.TTS import TTS
 
 class VoicePipeline:
-    """기본 음성 처리 파이프라인"""
-    
     def __init__(self, 
                  stt_model: str = "small",
                  llm_type: str = None,
@@ -54,7 +46,7 @@ class VoicePipeline:
         self.logger = logging.getLogger(__name__)
     
     def _initialize_components(self, stt_model: str):
-        self.logger.info("Initializing AI components...")
+
         
         self.stt = WhisperSTT(model_name=stt_model, device=self.device)
         self.stt.optimize_for_korean(True)
@@ -63,13 +55,13 @@ class VoicePipeline:
         
         self.tts = TTS()
         
-        self.logger.info("All AI components initialized successfully")
+
     
     def process_voice(self, audio_input_path: str) -> Dict[str, Any]:
         start_time = time.time()
         
         try:
-            self.logger.info(f"Processing voice: {audio_input_path}")
+    
             
             user_message = self._process_stt(audio_input_path)
             if not user_message:
@@ -92,9 +84,7 @@ class VoicePipeline:
     
     def _process_stt(self, audio_path: str) -> str:
         try:
-            self.logger.info("Processing STT...")
             text = self.stt.transcribe(audio_path)
-            self.logger.info(f"STT Result: {text}")
             return text.strip()
         except Exception as e:
             self.logger.error(f"STT processing failed: {e}")
@@ -102,9 +92,7 @@ class VoicePipeline:
     
     def _process_llm(self, user_message: str) -> str:
         try:
-            self.logger.info("Processing LLM...")
             response = self.llm.generate_response(user_message)
-            self.logger.info(f"LLM Response: {response}")
             return response
         except Exception as e:
             self.logger.error(f"LLM processing failed: {e}")
@@ -112,9 +100,7 @@ class VoicePipeline:
     
     def _process_tts(self, text: str) -> bytes:
         try:
-            self.logger.info("Processing TTS...")
             audio_data = self.tts.generate_from_llm_response(text)
-            self.logger.info("TTS processing completed")
             return audio_data
         except Exception as e:
             self.logger.error(f"TTS processing failed: {e}")

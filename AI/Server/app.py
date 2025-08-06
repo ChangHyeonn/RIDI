@@ -11,11 +11,10 @@ from flask_cors import CORS
 
 # 프로젝트 루트를 Python 경로에 추가
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-from config.settings import Settings
-from server.middleware import setup_middleware
-from server.api_routes import setup_routes
-from server.services.ai_service import AIService
+from Config.settings import Settings
+from Server.middleware import setup_middleware
+from Server.api_routes import setup_routes
+from Server.services.ai_service import AIService
 
 def create_app():
     """Flask 애플리케이션 팩토리"""

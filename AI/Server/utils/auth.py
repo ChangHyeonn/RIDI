@@ -4,14 +4,22 @@ Authentication Utilities
 고령층 일정 메모 관리 AI 서버 인증 유틸리티
 """
 
+import os
+import time
 import hashlib
 import secrets
-import time
+from functools import wraps
+from flask import request, jsonify, current_app
 from typing import Dict, Any, Optional
-from config.settings import Settings
-from config.logging_config import get_logger
+import logging
 
-logger = get_logger(__name__)
+# 프로젝트 루트를 Python 경로에 추가
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+
+from Config.settings import Settings
+
+logger = logging.getLogger(__name__)
 
 class AuthManager:
     """인증 관리자"""
@@ -34,7 +42,7 @@ class AuthManager:
             'last_used': timestamp
         }
         
-        logger.info(f"Generated API key for user {user_id}")
+
         return api_key
     
     def validate_api_key(self, api_key: str) -> Dict[str, Any]:
@@ -57,7 +65,7 @@ class AuthManager:
         """API 키 폐기"""
         if api_key in self.api_keys:
             del self.api_keys[api_key]
-            logger.info(f"Revoked API key: {api_key[:10]}...")
+    
             return True
         return False
     
@@ -105,6 +113,25 @@ def require_user_auth(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def require_api_key(f):
+    """API 키 인증 데코레이터"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_key = request.headers.get('X-API-Key')
+        
+        if not api_key:
+            return jsonify({"error": "API 키가 필요합니다"}), 401
+        
+        # API 키 검증
+        auth_manager = AuthManager()
+        validation_result = auth_manager.validate_api_key(api_key)
+        
+        if not validation_result['valid']:
+            return jsonify({"error": validation_result['error']}), 401
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
 def check_rate_limit(user_id: str, max_requests: int = 100, window: int = 60) -> Dict[str, Any]:
     """속도 제한 확인"""
     current_time = time.time()
@@ -147,7 +174,7 @@ def create_session(user_id: str) -> str:
         'last_activity': time.time()
     }
     
-    logger.info(f"Created session for user {user_id}")
+    
     return session_id
 
 def validate_session(session_id: str) -> Dict[str, Any]:
@@ -175,7 +202,7 @@ def revoke_session(session_id: str) -> bool:
     """세션 폐기"""
     if session_id in auth_manager.sessions:
         del auth_manager.sessions[session_id]
-        logger.info(f"Revoked session: {session_id[:10]}...")
+
         return True
     return False
 

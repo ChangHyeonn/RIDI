@@ -1,13 +1,15 @@
-import sys
-import os
-import json
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
+import os
+import sys
 from dotenv import load_dotenv
 
-from LLM import LLMFactory
+# 프로젝트 루트를 Python 경로에 추가
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from Models.LLM import LLMFactory
 
 class ScheduleClassifier:
     """일정 정보 분류기"""

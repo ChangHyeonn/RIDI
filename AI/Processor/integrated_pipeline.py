@@ -1,93 +1,114 @@
-#!/usr/bin/env python3
-"""
-Integrated Pipeline - 통합 음성 처리 파이프라인
-기본 음성 처리 + 일정 분류 기능 통합
-"""
-
 import sys
 import os
 import time
 import logging
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from Processor.voice_pipeline import VoicePipeline
-from Models.Classifier import ScheduleClassifier
+from Services.Classifier import ScheduleClassifier
+from Services.CommandClassifier import CommandClassifier
 
 class IntegratedPipeline:
-    """통합 음성 처리 파이프라인"""
-    
-    def __init__(self, 
-                 stt_model: str = "small",
-                 llm_type: str = None,
-                 device: str = "auto"):
-        load_dotenv()
-        
+    def __init__(self, stt_model: str = "small", llm_type: str = "gemini", device: str = "auto"):
+        self.stt_model = stt_model
+        self.llm_type = llm_type
         self.device = device
-        self.llm_type = llm_type or os.getenv('LLM_MODEL', 'gemini')
-        
         self._setup_logging()
-        self._initialize_components(stt_model)
-        self.logger.info(f"Integrated Pipeline initialized successfully")
+        self._initialize_components()
     
     def _setup_logging(self):
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
     
-    def _initialize_components(self, stt_model: str):
-        self.logger.info("Initializing components...")
-        
-        self.voice_pipeline = VoicePipeline(
-            stt_model=stt_model,
-            llm_type=self.llm_type,
-            device=self.device
-        )
-        
-        self.schedule_classifier = ScheduleClassifier(llm_type=self.llm_type)
-        
-        self.logger.info("All components initialized successfully")
-    
-    def process_voice_command(self, audio_input_path: str) -> Dict[str, Any]:
-        start_time = time.time()
-        
+    def _initialize_components(self):
+        """컴포넌트 초기화"""
         try:
-            self.logger.info(f"Processing voice command: {audio_input_path}")
+            # 기존 컴포넌트
+            self.voice_pipeline = VoicePipeline(
+                stt_model=self.stt_model,
+                llm_type=self.llm_type,
+                device=self.device
+            )
+            self.schedule_classifier = ScheduleClassifier()
             
+            # 새로운 컴포넌트
+            self.command_classifier = CommandClassifier(llm_type=self.llm_type)
+            
+            self.logger.info("Integrated Pipeline initialized successfully")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to initialize components: {e}")
+            raise
+    
+    def process_voice_command(self, audio_input_path: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """음성 명령 처리 (확장된 버전)"""
+        try:
+            # 1. 음성 처리 (STT -> LLM -> TTS)
             voice_result = self.voice_pipeline.process_voice(audio_input_path)
             
-            if not voice_result["success"]:
+            if not voice_result.get('success'):
                 return voice_result
             
-            user_message = voice_result["user_message"]
+            # 2. 명령 분류
+            text = voice_result.get('text', '')
+            command_result = self.command_classifier.classify_command(text)
             
-            schedule_result = self.schedule_classifier.classify_schedule(user_message)
+            # 3. 명령 타입에 따른 처리
+            command_type = command_result.get('type', 'unknown')
+            confidence = command_result.get('confidence', 0.0)
             
-            if schedule_result.get("is_schedule"):
-                schedule_info = schedule_result["schedule_info"]
-                ai_response = f"일정이 등록되었습니다. 제목: {schedule_info['title']}, 시간: {schedule_info['datetime']}, 카테고리: {schedule_info['category']}"
-            elif schedule_result.get("needs_clarification"):
-                questions = schedule_result["questions"]
-                ai_response = "추가 정보가 필요합니다. " + " ".join(questions)
-            else:
-                ai_response = voice_result["ai_response"]
+            result = {
+                'success': True,
+                'text': text,
+                'command_classification': command_result,
+                'command_type': command_type,
+                'confidence': confidence,
+                'user_id': user_id
+            }
             
-            audio_response = self.voice_pipeline._process_tts(ai_response)
+            # 4. 명령 타입별 특별 처리
+            if command_type == "add_schedule":
+                # 일정 추가 처리
+                schedule_info = self.command_classifier.extract_command_info(text, command_type)
+                schedule_result = self.schedule_classifier.classify_schedule(text)
+                result['schedule_info'] = schedule_info
+                result['schedule_classification'] = schedule_result
+                
+            elif command_type == "delete_schedule":
+                # 일정 삭제 처리
+                delete_info = self.command_classifier.extract_command_info(text, command_type)
+                result['delete_info'] = delete_info
+                
+            elif command_type == "read_schedule":
+                # 일정 읽기 처리
+                date_info = self.command_classifier.extract_command_info(text, command_type)
+                result['date_info'] = date_info
+                
+            elif command_type == "important_schedule":
+                # 중요 일정 처리
+                result['important_schedule_request'] = True
+                
+            elif command_type == "accessibility":
+                # 접근성 설정 처리
+                accessibility_info = self.command_classifier.extract_command_info(text, command_type)
+                result['accessibility_info'] = accessibility_info
             
-            total_time = time.time() - start_time
+            # 5. 음성 응답 생성
+            if voice_result.get('audio_response'):
+                result['audio_response'] = voice_result['audio_response']
             
-            return self._create_success_response(
-                user_message, ai_response, audio_response, 
-                schedule_result, total_time
-            )
+            self.logger.info(f"Voice command processed: {command_type} (confidence: {confidence})")
+            return result
             
         except Exception as e:
             self.logger.error(f"Voice command processing failed: {e}")
-            return self._create_error_response(f"처리 중 오류가 발생했습니다: {str(e)}")
+            return {
+                'success': False,
+                'error': f"음성 명령 처리 중 오류가 발생했습니다: {str(e)}"
+            }
     
     def _create_success_response(self, user_message: str, ai_response: str, 
                                audio_response: bytes, schedule_result: Dict[str, Any], 

@@ -26,10 +26,7 @@ def setup_middleware(app):
         g.start_time = time.time()
         g.request_id = f"req_{int(time.time() * 1000)}"
         
-        # 요청 정보 로깅
-        logger.info(f"Request started: {g.request_id} - {request.method} {request.path}")
-        logger.info(f"User-Agent: {request.headers.get('User-Agent', 'Unknown')}")
-        logger.info(f"Remote Address: {request.remote_addr}")
+        # 요청 정보 로깅 (에러만)
         
         # 요청 크기 검증
         content_length = request.content_length
@@ -42,9 +39,8 @@ def setup_middleware(app):
         """요청 후 처리"""
         if hasattr(g, 'start_time'):
             duration = time.time() - g.start_time
-            logger.info(f"Request completed: {g.request_id} - Duration: {duration:.3f}s")
             
-            # 응답 시간이 오래 걸린 경우 경고
+            # 응답 시간이 오래 걸린 경우만 경고
             if duration > 5.0:
                 logger.warning(f"Slow request: {g.request_id} took {duration:.3f}s")
         
