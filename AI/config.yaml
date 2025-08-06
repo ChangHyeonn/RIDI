@@ -1,0 +1,52 @@
+# AI Server Configuration
+# 고령층 일정 메모 관리 AI 서버 설정
+
+server:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+  allowed_origins: "*"
+
+ai_models:
+  stt_model: "small"
+  llm_type: "gemini"
+  device: "auto"
+
+elderly_settings:
+  speech_rate: 0.8
+  volume_level: 1.2
+  simple_responses: true
+  repeat_important: true
+
+security:
+  max_audio_size: 10485760  # 10MB
+  max_request_size: 16777216  # 16MB
+  api_key_required: false
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_rotation: true
+  max_log_files: 30
+
+file_upload:
+  upload_folder: "/tmp/ai_uploads"
+  allowed_audio_extensions:
+    - ".wav"
+    - ".mp3"
+    - ".m4a"
+    - ".flac"
+    - ".ogg"
+
+memory_management:
+  max_memory_items: 100
+  memory_expiry_hours: 24
+
+schedule_management:
+  default_reminder_minutes: 30
+  max_schedules_per_user: 100
+
+# 환경 변수로 오버라이드 가능
+# 예: export HOST=127.0.0.1
+# 예: export PORT=8080
+# 예: export LLM_TYPE=gpt 
