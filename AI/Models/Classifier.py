@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Schedule Classifier - 일정 정보 분류 모듈
-텍스트에서 일정 정보를 추출하고 분류하는 기능
-"""
-
 import sys
 import os
 import json
@@ -13,9 +7,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
-# AI 모듈 import
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from Models.LLM import LLMFactory
+from LLM import LLMFactory
 
 class ScheduleClassifier:
     """일정 정보 분류기"""
