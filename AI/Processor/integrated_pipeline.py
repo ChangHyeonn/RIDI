@@ -12,7 +12,6 @@ from datetime import datetime
 from typing import Dict, Any
 from dotenv import load_dotenv
 
-# AI 모듈 import
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from Processor.voice_pipeline import VoicePipeline
 from Models.Classifier import ScheduleClassifier
