@@ -34,6 +34,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   void initState() {
     super.initState();
     _selectedDate = widget.selectedDate;
+    // 현재 시간을 기준으로 AM/PM 설정
+    final now = TimeOfDay.now();
+    _isAM = now.hour < 12;
     _updateTimeControllers();
   }
 
@@ -253,12 +256,20 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
   void _addTask() {
     if (_formKey.currentState!.validate()) {
+      // 12시간 형식을 24시간 형식으로 변환
+      int hour24 = _selectedTime.hour;
+      if (!_isAM && _selectedTime.hour != 12) {
+        hour24 = _selectedTime.hour + 12;
+      } else if (_isAM && _selectedTime.hour == 12) {
+        hour24 = 0;
+      }
+
       // 선택된 날짜와 시간으로 DateTime 객체 생성
       final selectedDateTime = DateTime(
         _selectedDate.year,
         _selectedDate.month,
         _selectedDate.day,
-        _selectedTime.hour,
+        hour24,
         _selectedTime.minute,
       );
 

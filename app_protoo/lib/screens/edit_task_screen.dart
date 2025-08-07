@@ -33,15 +33,33 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = widget.task.date;
-    // DateTime을 TimeOfDay로 변환
+    _selectedDate = DateTime(
+      widget.task.date.year,
+      widget.task.date.month,
+      widget.task.date.day,
+    );
+    // DateTime을 TimeOfDay로 변환 (12시간 형식으로)
+    int displayHour = widget.task.date.hour;
+    bool isAM = true;
+
+    if (widget.task.date.hour == 0) {
+      displayHour = 12;
+      isAM = true;
+    } else if (widget.task.date.hour <= 12) {
+      displayHour = widget.task.date.hour;
+      isAM = true;
+    } else {
+      displayHour = widget.task.date.hour - 12;
+      isAM = false;
+    }
+
     _selectedTime = TimeOfDay(
-      hour: widget.task.date.hour,
+      hour: displayHour,
       minute: widget.task.date.minute,
     );
     _titleController.text = widget.task.title;
     _isImportant = widget.task.isImportant;
-    _isAM = _selectedTime.hour < 12;
+    _isAM = isAM;
     _updateTimeControllers();
   }
 
@@ -261,14 +279,34 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
 
   void _updateTask() {
     if (_formKey.currentState!.validate()) {
+      // 디버깅을 위한 로그 추가
+      print('🔍 _updateTask 디버깅:');
+      print('  원본 task.date: ${widget.task.date}');
+      print('  _selectedDate: $_selectedDate');
+      print('  _selectedTime: $_selectedTime');
+      print('  _isAM: $_isAM');
+      print('  _isImportant: $_isImportant');
+
+      // 12시간 형식을 24시간 형식으로 변환
+      int hour24 = _selectedTime.hour;
+      if (!_isAM && _selectedTime.hour != 12) {
+        hour24 = _selectedTime.hour + 12;
+      } else if (_isAM && _selectedTime.hour == 12) {
+        hour24 = 0;
+      }
+
+      print('  변환된 hour24: $hour24');
+
       // 선택된 날짜와 시간으로 DateTime 객체 생성
       final selectedDateTime = DateTime(
         _selectedDate.year,
         _selectedDate.month,
         _selectedDate.day,
-        _selectedTime.hour,
+        hour24,
         _selectedTime.minute,
       );
+
+      print('  생성된 selectedDateTime: $selectedDateTime');
 
       // 현재 시간과 비교
       final now = DateTime.now();
