@@ -8,9 +8,17 @@ server:
   allowed_origins: "*"
 
 ai_models:
-  stt_model: "small"
+  stt_model: "default"  # Google STT 모델: default, phone_call, video, command_and_search
+  stt_provider: "google"  # STT 제공자: google
   llm_type: "gemini"
   device: "auto"
+
+google_stt_settings:
+  language_code: "ko-KR"
+  enable_automatic_punctuation: true
+  enable_word_time_offsets: true
+  enable_word_confidence: true
+  use_enhanced: true
 
 elderly_settings:
   speech_rate: 0.8

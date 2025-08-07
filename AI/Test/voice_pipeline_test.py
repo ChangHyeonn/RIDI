@@ -17,7 +17,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from Models.STT import WhisperSTT
+from Models.STT_Google import GoogleSTT
 from Models.LLM import LLMFactory
 from Models.TTS import TTS
 from Config.settings import Settings
@@ -36,29 +36,34 @@ class VoicePipelineTest:
         """AI 컴포넌트 초기화"""
         print("🤖 AI 컴포넌트 초기화 중...")
         
-        # STT 초기화
+        # STT 초기화 (Google Cloud Speech-to-Text)
         try:
-            # 메모리 사용량을 줄이기 위한 설정
-            os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
-            os.environ['OMP_NUM_THREADS'] = '1'
+            # Google STT는 클라우드 기반이므로 메모리 최적화 불필요
+            self.stt = GoogleSTT(model_name="default")
+            print(f"✅ Google STT 초기화 완료: 클라우드 기반")
             
-            # 메모리 정리
-            import gc
-            gc.collect()
+            # 모델 정보 출력
+            model_info = self.stt.get_model_info()
+            print(f"📊 모델 정보: {model_info['model_name']}, 처리 방식: {model_info['device']}")
             
-            self.stt = WhisperSTT(
-                model_name=Settings.STT_MODEL,  # 설정 파일의 모델 사용
-                device="cpu"  # 안전한 CPU 사용
-            )
-            print(f"✅ STT 초기화 완료: {Settings.STT_MODEL} (CPU)")
-            
-            # 양자화 정보 출력
-            quantization_info = self.stt.get_quantization_info()
-            print(f"📊 양자화 정보: {quantization_info['precision']}, 메모리 절약: {quantization_info['memory_savings']}")
+            # 사용량 정보 출력
+            usage_info = self.stt.get_usage_info()
+            print(f"💰 사용량 정보: {usage_info['free_tier_limit']}, 가격: {usage_info['pricing']}")
             
         except Exception as e:
-            print(f"❌ STT 초기화 실패: {e}")
-            self.stt = None
+            print(f"❌ Google STT 초기화 실패: {e}")
+            print("⚠️  Google Cloud 인증이 필요합니다.")
+            print("💡 해결 방법:")
+            print("   1. Google Cloud Console에서 서비스 계정 키 생성")
+            print("   2. 환경 변수 설정: export GOOGLE_APPLICATION_CREDENTIALS='path/to/key.json'")
+            print("🔄 Whisper STT로 fallback 시도...")
+            try:
+                from Models.STT import WhisperSTT
+                self.stt = WhisperSTT(model_name="tiny", device="cpu")
+                print("✅ Whisper STT 초기화 완료 (fallback)")
+            except Exception as e2:
+                print(f"❌ Whisper STT도 실패: {e2}")
+                self.stt = None
         
         # LLM 초기화
         try:
@@ -82,7 +87,7 @@ class VoicePipelineTest:
             import pyaudio
             self.audio = pyaudio.PyAudio()
             self.sample_rate = 16000
-            self.chunk_size = 1024
+            self.chunk_size = 512  # 1024에서 512로 줄여서 메모리 사용량 감소
             self.channels = 1
             self.format = pyaudio.paInt16
             print("✅ 오디오 시스템 초기화 완료")
@@ -158,8 +163,17 @@ class VoicePipelineTest:
     
     def _record_audio_thread(self):
         """녹음 스레드"""
+        start_time = time.time()
+        max_recording_time = 15  # 최대 15초 녹음 제한
+        
         while self.recording:
             try:
+                # 녹음 시간 제한 확인
+                if time.time() - start_time > max_recording_time:
+                    print("⏰ 최대 녹음 시간(15초)에 도달했습니다.")
+                    self.recording = False
+                    break
+                
                 data = self.stream.read(self.chunk_size, exception_on_overflow=False)
                 self.recorded_frames.append(data)
             except Exception as e:
@@ -186,6 +200,11 @@ class VoicePipelineTest:
             stt_time = time.time() - start_time
             print(f"✅ STT 결과: {text}")
             print(f"⏱️  STT 처리 시간: {stt_time:.2f}초")
+            
+            # STT 처리 후 메모리 정리
+            import gc
+            gc.collect()
+            
         except Exception as e:
             print(f"❌ STT 처리 실패: {e}")
             return None
@@ -224,10 +243,19 @@ class VoicePipelineTest:
         print("🔊 TTS 처리 중...")
         start_time = time.time()
         try:
+            # TTS 처리 전 메모리 정리
+            import gc
+            gc.collect()
+            
+            # 더 안전한 TTS 처리
             audio_data = self.tts.generate_from_llm_response(response)
             tts_time = time.time() - start_time
             print(f"✅ TTS 처리 완료")
             print(f"⏱️  TTS 처리 시간: {tts_time:.2f}초")
+            
+            # TTS 처리 후 메모리 정리
+            gc.collect()
+            
         except Exception as e:
             print(f"❌ TTS 처리 실패: {e}")
             audio_data = None
@@ -257,51 +285,50 @@ class VoicePipelineTest:
         print("🔊 음성 재생 중...")
         
         try:
+            # 메모리 정리
+            import gc
+            gc.collect()
+            
             # 임시 MP3 파일로 저장
             temp_mp3 = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
             temp_mp3.write(audio_data)
             temp_mp3.close()
             
-            # 시스템 명령어로 MP3 재생 (macOS)
+            # 시스템 명령어로 MP3 재생 (macOS) - 더 안전한 방법
             import subprocess
             try:
-                subprocess.run(['afplay', temp_mp3.name], check=True)
+                # timeout 설정으로 안전하게 재생
+                subprocess.run(['afplay', temp_mp3.name], check=True, timeout=30)
                 print("✅ 음성 재생 완료")
-            except subprocess.CalledProcessError:
-                print("⚠️  afplay 명령어 실패, 다른 방법 시도...")
-                # 대안: pydub 사용
-                from pydub import AudioSegment
-                audio = AudioSegment.from_mp3(temp_mp3.name)
-                temp_wav = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-                audio.export(temp_wav.name, format="wav")
-                temp_wav.close()
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+                print(f"⚠️  afplay 명령어 실패: {e}")
+                print("🔄 다른 방법으로 재생 시도...")
                 
-                # PyAudio로 재생
-                stream = self.audio.open(
-                    format=self.format,
-                    channels=self.channels,
-                    rate=self.sample_rate,
-                    output=True
-                )
-                
-                with wave.open(temp_wav.name, 'rb') as wf:
-                    data = wf.readframes(wf.getnframes())
-                    stream.write(data)
-                
-                stream.stop_stream()
-                stream.close()
-                
-                # 임시 WAV 파일 삭제
-                if os.path.exists(temp_wav.name):
-                    os.unlink(temp_wav.name)
-                print("✅ 음성 재생 완료")
+                # 대안: pydub 사용 (더 안전한 방법)
+                try:
+                    from pydub import AudioSegment
+                    from pydub.playback import play
+                    
+                    audio = AudioSegment.from_mp3(temp_mp3.name)
+                    play(audio)
+                    print("✅ 음성 재생 완료 (pydub)")
+                    
+                except Exception as pydub_error:
+                    print(f"⚠️  pydub 재생도 실패: {pydub_error}")
+                    print("ℹ️  오디오 파일은 생성되었지만 재생할 수 없습니다.")
             
             # 임시 MP3 파일 삭제
             if os.path.exists(temp_mp3.name):
                 os.unlink(temp_mp3.name)
             
+            # 재생 후 메모리 정리
+            gc.collect()
+            
         except Exception as e:
             print(f"❌ 음성 재생 실패: {e}")
+            # 임시 파일 정리
+            if 'temp_mp3' in locals() and os.path.exists(temp_mp3.name):
+                os.unlink(temp_mp3.name)
     
     def run_interactive_test(self):
         """대화형 테스트 실행"""
@@ -428,6 +455,17 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     
     print("🎯 음성 파이프라인 테스트 프로그램")
+    print("=" * 50)
+    
+    # 시스템 메모리 상태 확인
+    try:
+        import psutil
+        memory = psutil.virtual_memory()
+        print(f"💾 시스템 메모리: {memory.available / (1024**3):.1f}GB 사용 가능 / {memory.total / (1024**3):.1f}GB 전체")
+        if memory.available < 2 * (1024**3):  # 2GB 미만
+            print("⚠️  사용 가능한 메모리가 부족합니다. small 모델 사용에 주의하세요.")
+    except ImportError:
+        print("ℹ️  psutil이 설치되지 않아 메모리 상태를 확인할 수 없습니다.")
     print("=" * 50)
     
     # 테스트 모드 선택
