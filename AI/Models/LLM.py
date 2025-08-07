@@ -73,8 +73,11 @@ class GPTLLM(BaseLLM):
 class GeminiLLM(BaseLLM):
     def __init__(self, **kwargs):
         self._setup_logging()
-        self.model_name = "gemini-pro"
+        self.model_name = "gemini-1.5-flash"  # 최신 모델로 업데이트
         self.api_key = os.getenv('GOOGLE_API_KEY')
+        
+        # 한국어 프롬프트 설정 (API 키와 관계없이)
+        self._setup_korean_prompt()
         
         if not self.api_key:
             self.logger.warning("Google API key not found. LLM will be disabled.")
@@ -84,9 +87,29 @@ class GeminiLLM(BaseLLM):
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
-            self._setup_korean_prompt()
-            self.logger.info("Gemini LLM initialized successfully")
+            
+            # 사용 가능한 모델 목록 확인
+            models = genai.list_models()
+            available_models = [model.name for model in models]
+            self.logger.info(f"Available models: {available_models}")
+            
+            # gemini-1.5-pro 또는 gemini-1.5-flash 사용
+            if 'models/gemini-1.5-pro' in available_models:
+                self.model = genai.GenerativeModel('gemini-1.5-pro')
+            elif 'models/gemini-1.5-flash' in available_models:
+                self.model = genai.GenerativeModel('gemini-1.5-flash')
+            else:
+                # 기본값으로 gemini-1.5-flash 시도
+                self.model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            # 간단한 테스트로 모델 상태 확인
+            test_response = self.model.generate_content("테스트")
+            if test_response and test_response.text:
+                self.logger.info("Gemini LLM initialized successfully")
+            else:
+                self.logger.warning("Gemini model test failed")
+                self.model = None
+                
         except Exception as e:
             self.logger.error(f"Failed to initialize Gemini LLM: {e}")
             self.model = None
@@ -111,12 +134,17 @@ class GeminiLLM(BaseLLM):
             raise
     
     def generate_response(self, user_input: str) -> str:
+        # 모델이 초기화되지 않았는지 확인
+        if not self.model:
+            self.logger.warning("Gemini model is not initialized. API key may be missing.")
+            return "죄송합니다. AI 모델이 초기화되지 않았습니다. API 키를 확인해주세요."
+        
         try:
             full_prompt = f"{self.korean_system_prompt}\n\n사용자: {user_input}"
             
             response = self.model.generate_content(full_prompt)
             
-            if response.text:
+            if response and response.text:
                 return response.text.strip()
             else:
                 return "죄송합니다. 응답을 생성할 수 없습니다."
