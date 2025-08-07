@@ -19,7 +19,7 @@ class Settings:
     ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS', '*').split(',')
     
     # AI 모델 설정
-    STT_MODEL = os.getenv('STT_MODEL', 'small')
+    STT_MODEL = 'default'
     LLM_TYPE = os.getenv('LLM_TYPE', 'gemini')
     DEVICE = os.getenv('DEVICE', 'auto')
     
