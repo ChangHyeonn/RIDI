@@ -15,6 +15,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime
 from Server.utils.response_utils import create_response, create_error_response
+from Server.utils.app_response_utils import (
+    create_app_action_response, create_schedule_action_response,
+    create_settings_action_response, create_voice_only_response,
+    create_error_action_response, create_health_action_response
+)
 from Server.utils.validation import validate_audio_file, validate_schedule_data, validate_accessibility_settings
 from Server.utils.auth import require_api_key
 from Config.settings import Settings
@@ -28,10 +33,10 @@ def health_check():
     """서버 상태 확인"""
     try:
         health_info = current_app.ai_service.get_health_info()
-        return create_response(health_info)
+        return create_health_action_response(health_info)
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return create_error_response("서버 상태 확인 중 오류가 발생했습니다", 500)
+        return create_error_action_response("서버 상태 확인 중 오류가 발생했습니다", "health_check")
 
 @api_bp.route('/process_voice', methods=['POST'])
 def process_voice():
@@ -57,7 +62,59 @@ def process_voice():
         try:
             # AI 처리
             result = current_app.ai_service.process_voice_command(audio_path, user_id)
-            return create_response(result)
+            
+            # 액션 기반 응답으로 변환
+            if result.get('success'):
+                command_type = result.get('command_classification', {}).get('type', 'unknown')
+                
+                if command_type == "add_schedule":
+                    schedule_result = result.get('schedule_result', {})
+                    return create_schedule_action_response(
+                        action_type="schedule_add",
+                        schedule_data=schedule_result.get('schedule', {}),
+                        voice_text=result.get('ai_response', '일정이 추가되었습니다.'),
+                        highlight_date=schedule_result.get('schedule', {}).get('datetime', '').split('T')[0]
+                    )
+                elif command_type == "delete_schedule":
+                    delete_info = result.get('delete_info', {})
+                    return create_schedule_action_response(
+                        action_type="schedule_delete",
+                        schedule_data=delete_info,
+                        voice_text=result.get('ai_response', '일정이 삭제되었습니다.')
+                    )
+                elif command_type == "read_schedule":
+                    schedule_list = result.get('schedule_list', [])
+                    return create_app_action_response(
+                        action_type="schedule_list",
+                        data={"schedules": schedule_list},
+                        voice_response={
+                            "text": result.get('ai_response', '일정을 조회했습니다.'),
+                            "play_automatically": True,
+                            "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                        },
+                        ui_instructions={
+                            "screen": "schedule_list",
+                            "refresh_data": True
+                        }
+                    )
+                elif command_type == "accessibility":
+                    accessibility_info = result.get('accessibility_info', {})
+                    return create_settings_action_response(
+                        setting_type="accessibility",
+                        changes=accessibility_info,
+                        voice_text=result.get('ai_response', '설정이 변경되었습니다.')
+                    )
+                else:
+                    # 일반 음성 응답
+                    return create_voice_only_response(
+                        text=result.get('ai_response', ''),
+                        audio_data=result.get('audio_data')
+                    )
+            else:
+                return create_error_action_response(
+                    result.get('error', '음성 처리 중 오류가 발생했습니다'),
+                    "voice_processing"
+                )
         finally:
             # 임시 파일 정리
             if os.path.exists(audio_path):
