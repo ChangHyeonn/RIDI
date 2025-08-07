@@ -182,3 +182,21 @@ curl http://localhost:5000/api/v1/health
 ## 📞 지원
 
 문제가 있거나 질문이 있으시면 이슈를 생성해주세요. 
+## 🔐 Google Cloud 설정
+
+### 1. Google Cloud 서비스 계정 키 설정
+
+1. [Google Cloud Console](https://console.cloud.google.com/)에서 서비스 계정 키 생성
+2. 다운로드한 JSON 파일을 `AI/google-credentials.json`으로 저장
+3. 환경 변수 설정:
+   ```bash
+   export GOOGLE_APPLICATION_CREDENTIALS="AI/google-credentials.json"
+   ```
+
+### 2. Gemini API 키 설정
+
+1. [Google AI Studio](https://makersuite.google.com/app/apikey)에서 API 키 생성
+2. 환경 변수 설정:
+   ```bash
+   export GOOGLE_API_KEY="your_gemini_api_key"
+   ```
