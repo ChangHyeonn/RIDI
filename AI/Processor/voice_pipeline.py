@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 # AI 모듈 import
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from Models.STT import WhisperSTT
+from Models.STT_Google import GoogleSTT
 from Models.LLM import LLMFactory
 from Models.TTS import TTS
 
@@ -48,8 +48,7 @@ class VoicePipeline:
     def _initialize_components(self, stt_model: str):
 
         
-        self.stt = WhisperSTT(model_name=stt_model, device=self.device)
-        self.stt.optimize_for_korean(True)
+        self.stt = GoogleSTT(model_name=stt_model)
         
         self.llm = LLMFactory.create_llm(self.llm_type)
         
