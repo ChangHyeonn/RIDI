@@ -60,35 +60,40 @@ def process_voice():
             audio_path = tmp_file.name
         
         try:
-            # AI 처리
+            # AI 처리 (새로운 통합 파이프라인 사용)
             result = current_app.ai_service.process_voice_command(audio_path, user_id)
             
             # 액션 기반 응답으로 변환
             if result.get('success'):
-                command_type = result.get('command_classification', {}).get('type', 'unknown')
+                processing_result = result.get('processing_result', {})
+                analysis = processing_result.get('analysis', {})
+                result_data = processing_result.get('result', {})
                 
-                if command_type == "add_schedule":
-                    schedule_result = result.get('schedule_result', {})
+                category = analysis.get('category', 'other')
+                action = result_data.get('action', '')
+                
+                if category == "schedule_add" or action == "schedule_added":
+                    schedule_data = result_data.get('schedule', {})
                     return create_schedule_action_response(
                         action_type="schedule_add",
-                        schedule_data=schedule_result.get('schedule', {}),
-                        voice_text=result.get('ai_response', '일정이 추가되었습니다.'),
-                        highlight_date=schedule_result.get('schedule', {}).get('datetime', '').split('T')[0]
+                        schedule_data=schedule_data,
+                        voice_text=result_data.get('message', '일정이 추가되었습니다.'),
+                        highlight_date=schedule_data.get('datetime', '').split(' ')[0] if schedule_data.get('datetime') else ''
                     )
-                elif command_type == "delete_schedule":
-                    delete_info = result.get('delete_info', {})
+                elif category == "schedule_delete" or action == "schedule_delete":
+                    delete_info = result_data.get('delete_info', {})
                     return create_schedule_action_response(
                         action_type="schedule_delete",
                         schedule_data=delete_info,
-                        voice_text=result.get('ai_response', '일정이 삭제되었습니다.')
+                        voice_text=result_data.get('message', '일정이 삭제되었습니다.')
                     )
-                elif command_type == "read_schedule":
-                    schedule_list = result.get('schedule_list', [])
+                elif category == "schedule_read" or action == "schedule_read":
+                    schedules = result_data.get('schedules', [])
                     return create_app_action_response(
                         action_type="schedule_list",
-                        data={"schedules": schedule_list},
+                        data={"schedules": schedules},
                         voice_response={
-                            "text": result.get('ai_response', '일정을 조회했습니다.'),
+                            "text": result_data.get('message', '일정을 조회했습니다.'),
                             "play_automatically": True,
                             "elderly_optimized": {"slow_speech": True, "high_volume": True}
                         },
@@ -97,7 +102,7 @@ def process_voice():
                             "refresh_data": True
                         }
                     )
-                elif command_type == "accessibility":
+                elif category == "accessibility" or action == "accessibility_change":
                     accessibility_info = result.get('accessibility_info', {})
                     return create_settings_action_response(
                         setting_type="accessibility",
