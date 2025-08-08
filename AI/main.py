@@ -24,7 +24,7 @@ def main():
     parser.add_argument('--port', type=int, default=Settings.PORT, help='Server port (default: 5000)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     parser.add_argument('--device', default=Settings.DEVICE, help='Device for AI models (auto/cpu/cuda)')
-    parser.add_argument('--llm-type', default=Settings.LLM_TYPE, help='LLM type (gemini/gpt)')
+    parser.add_argument('--llm-type', default=Settings.LLM_TYPE, help='LLM type (gemini)')
     parser.add_argument('--stt-model', default=Settings.STT_MODEL, help='STT model Gemini/Google')
     
     args = parser.parse_args()
