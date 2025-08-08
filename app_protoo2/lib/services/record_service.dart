@@ -5,7 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/foundation.dart';
 
 class RecordService {
-  final _audioRecorder = AudioRecorder();
+  final _audioRecorder = Record();
   bool _isRecording = false;
   String? _currentRecordingPath;
 
@@ -50,15 +50,18 @@ class RecordService {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       _currentRecordingPath = '${tempDir.path}/recording_$timestamp.m4a';
 
-      // 녹음 시작
-      await _audioRecorder.start(
-        RecordConfig(
+      // iOS에서는 기본 설정으로 녹음 시작
+      if (Platform.isIOS) {
+        await _audioRecorder.start(path: _currentRecordingPath!);
+      } else {
+        // Android에서는 상세 설정 사용
+        await _audioRecorder.start(
+          path: _currentRecordingPath!,
           encoder: AudioEncoder.aacLc,
           bitRate: 128000,
-          sampleRate: 44100,
-        ),
-        path: _currentRecordingPath!,
-      );
+          samplingRate: 44100,
+        );
+      }
 
       _isRecording = true;
       return true;

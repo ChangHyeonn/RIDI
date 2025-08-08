@@ -593,18 +593,22 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                                 Expanded(
                                                                                   child: Row(
                                                                                     children: [
-                                                                                      if (task.isImportant) ...[
+                                                                                      // 별 아이콘 또는 빈 공간 (일관된 레이아웃을 위해)
+                                                                                      if (task.isImportant)
                                                                                         Icon(
                                                                                           Icons.star,
                                                                                           color: const Color(
                                                                                             0xFFfbbf24,
                                                                                           ),
                                                                                           size: 16,
-                                                                                        ),
+                                                                                        )
+                                                                                      else
                                                                                         const SizedBox(
-                                                                                          width: 4,
+                                                                                          width: 20, // 별 아이콘 + 간격과 동일한 공간
                                                                                         ),
-                                                                                      ],
+                                                                                      const SizedBox(
+                                                                                        width: 4,
+                                                                                      ),
                                                                                       Expanded(
                                                                                         child: Text(
                                                                                           task.title,
@@ -1136,18 +1140,22 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                                 Expanded(
                                                                                   child: Row(
                                                                                     children: [
-                                                                                      if (task.isImportant) ...[
+                                                                                      // 별 아이콘 또는 빈 공간 (일관된 레이아웃을 위해)
+                                                                                      if (task.isImportant)
                                                                                         Icon(
                                                                                           Icons.star,
                                                                                           color: const Color(
                                                                                             0xFFfbbf24,
                                                                                           ),
                                                                                           size: 16,
-                                                                                        ),
+                                                                                        )
+                                                                                      else
                                                                                         const SizedBox(
-                                                                                          width: 4,
+                                                                                          width: 20, // 별 아이콘 + 간격과 동일한 공간
                                                                                         ),
-                                                                                      ],
+                                                                                      const SizedBox(
+                                                                                        width: 4,
+                                                                                      ),
                                                                                       Expanded(
                                                                                         child: Text(
                                                                                           task.title,

@@ -15,6 +15,7 @@ class _RecordScreenState extends State<RecordScreen> {
   bool _isRecording = false;
   String? _recordingPath;
   bool _isSupportedPlatform = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -25,8 +26,12 @@ class _RecordScreenState extends State<RecordScreen> {
   void _checkPlatformSupport() {
     if (kIsWeb) {
       _isSupportedPlatform = false;
+      _errorMessage = '웹에서는 녹음 기능을 지원하지 않습니다.';
     } else {
       _isSupportedPlatform = Platform.isAndroid || Platform.isIOS;
+      if (!_isSupportedPlatform) {
+        _errorMessage = '현재 플랫폼에서 녹음 기능을 지원하지 않습니다.';
+      }
     }
   }
 
@@ -38,14 +43,7 @@ class _RecordScreenState extends State<RecordScreen> {
 
   Future<void> _startRecording() async {
     if (!_isSupportedPlatform) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '현재 플랫폼에서 녹음 기능을 지원하지 않습니다. Android 또는 iOS 기기에서 실행해주세요.',
-          ),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      _showErrorSnackBar(_errorMessage ?? '지원되지 않는 플랫폼입니다.');
       return;
     }
 
@@ -55,14 +53,11 @@ class _RecordScreenState extends State<RecordScreen> {
         setState(() {
           _isRecording = true;
         });
+      } else {
+        _showErrorSnackBar('녹음을 시작할 수 없습니다.');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('녹음을 시작할 수 없습니다: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showErrorSnackBar('녹음을 시작할 수 없습니다: $e');
     }
   }
 
@@ -75,20 +70,12 @@ class _RecordScreenState extends State<RecordScreen> {
       });
 
       if (path != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('녹음이 완료되었습니다.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        _showSuccessSnackBar('녹음이 완료되었습니다.');
+      } else {
+        _showErrorSnackBar('녹음 파일을 저장할 수 없습니다.');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('녹음을 중지할 수 없습니다: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showErrorSnackBar('녹음을 중지할 수 없습니다: $e');
     }
   }
 
@@ -99,14 +86,30 @@ class _RecordScreenState extends State<RecordScreen> {
         _isRecording = false;
         _recordingPath = null;
       });
+      _showSuccessSnackBar('녹음이 취소되었습니다.');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('녹음을 취소할 수 없습니다: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showErrorSnackBar('녹음을 취소할 수 없습니다: $e');
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -135,17 +138,17 @@ class _RecordScreenState extends State<RecordScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.orange),
                 ),
-                child: const Column(
+                child: Column(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.warning_amber_rounded,
                       color: Colors.orange,
                       size: 32,
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
-                      '녹음 기능은 Android 또는 iOS 기기에서만 지원됩니다.',
-                      style: TextStyle(
+                      _errorMessage ?? '녹음 기능은 Android 또는 iOS 기기에서만 지원됩니다.',
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Colors.orange,
