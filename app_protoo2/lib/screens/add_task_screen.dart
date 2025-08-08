@@ -922,6 +922,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 40), // 버튼 위치를 아래로 조정
               const Spacer(),
 
               // 하단 버튼들

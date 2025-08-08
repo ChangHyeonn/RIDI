@@ -4,6 +4,7 @@ import '../providers/task_provider.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
 import 'date_detail_screen.dart';
+import 'record_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -364,7 +365,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                     '${todayTasks.where((task) => task.isCompleted).length}/${todayTasks.length}',
                                                                     style: TextStyle(
                                                                       fontSize:
-                                                                          (10 +
+                                                                          (14 +
                                                                               2) *
                                                                           scaleFactor,
                                                                       fontWeight:
@@ -907,7 +908,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                     '${tomorrowTasks.where((task) => task.isCompleted).length}/${tomorrowTasks.length}',
                                                                     style: TextStyle(
                                                                       fontSize:
-                                                                          (10 +
+                                                                          (14 +
                                                                               2) *
                                                                           scaleFactor,
                                                                       fontWeight:
@@ -1282,39 +1283,50 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                             children: [
                               // 녹음 버튼
                               Expanded(
-                                child: Container(
-                                  height: 70,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.08),
-                                        blurRadius: 20,
-                                        offset: const Offset(0, 8),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const RecordScreen(),
                                       ),
-                                    ],
-                                  ),
-                                  child: Center(
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.mic,
-                                          color: Color(0xFFef4444),
-                                          size: 40,
-                                        ),
-                                        SizedBox(width: 12),
-                                        Text(
-                                          '녹음',
-                                          style: TextStyle(
-                                            color: Color(0xFF1f2937),
-                                            fontSize: 30 * (0.5 + fontSize),
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                    );
+                                  },
+                                  child: Container(
+                                    height: 70,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.08),
+                                          blurRadius: 20,
+                                          offset: const Offset(0, 8),
                                         ),
                                       ],
+                                    ),
+                                    child: Center(
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.mic,
+                                            color: Color(0xFFef4444),
+                                            size: 40,
+                                          ),
+                                          SizedBox(width: 12),
+                                          Text(
+                                            '녹음',
+                                            style: TextStyle(
+                                              color: Color(0xFF1f2937),
+                                              fontSize: 30 * (0.5 + fontSize),
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
