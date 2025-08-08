@@ -1,7 +1,12 @@
 import os
 import logging
+import sys
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
+
+# 프롬프트 매니저 import
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from Config.prompts import PromptManager
 
 class BaseLLM(ABC):
     @abstractmethod
@@ -12,72 +17,16 @@ class BaseLLM(ABC):
     def get_model_info(self) -> Dict[str, Any]:
         pass
 
-class GPTLLM(BaseLLM):
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-3.5-turbo"):
-        self.model = model
-        self.api_key = api_key or os.getenv('OPENAI_API_KEY')
-        
-        if not self.api_key:
-            raise ValueError("OpenAI API key is required. Set OPENAI_API_KEY environment variable.")
-        
+class LLM(BaseLLM):
+    """Gemini 기반 LLM 클래스"""
+    
+    def __init__(self, model_name: str = "gemini-1.5-flash", **kwargs):
         self._setup_logging()
-        self._setup_korean_prompt()
-        self.logger.info(f"GPT LLM initialized successfully with model: {self.model}")
-    
-    def _setup_logging(self):
-        logging.basicConfig(level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
-    
-    def _setup_korean_prompt(self):
-        """한국어 음성 명령 처리를 위한 시스템 프롬프트 설정"""
-        self.korean_system_prompt = """당신은 한국어 음성 명령을 처리하는 AI 어시스턴트입니다. 
-사용자의 음성 명령을 이해하고 적절한 응답을 제공하세요. 
-특히 일정 관리, 캘린더 관련 명령에 대해 도움을 주세요."""
-    
-    def generate_response(self, user_input: str) -> str:
-        """사용자 입력에 대한 응답 생성"""
-        try:
-            import openai
-            openai.api_key = self.api_key
-            
-            response = openai.ChatCompletion.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": self.korean_system_prompt},
-                    {"role": "user", "content": user_input}
-                ],
-                max_tokens=512,
-                temperature=0.7
-            )
-            
-            return response.choices[0].message.content.strip()
-            
-        except Exception as e:
-            self.logger.error(f"GPT response generation failed: {e}")
-            return "죄송합니다. 응답을 생성하는 중에 오류가 발생했습니다."
-    
-    def get_model_info(self) -> Dict[str, Any]:
-        """모델 정보 반환"""
-        return {
-            "model_name": self.model,
-            "provider": "OpenAI",
-            "supported_languages": ["ko", "en"],
-            "features": {
-                "korean_optimization": True,
-                "context_understanding": True,
-                "command_processing": True,
-                "response_generation": True
-            }
-        }
-
-class GeminiLLM(BaseLLM):
-    def __init__(self, **kwargs):
-        self._setup_logging()
-        self.model_name = "gemini-1.5-flash"  # 최신 모델로 업데이트
+        self.model_name = model_name
         self.api_key = os.getenv('GOOGLE_API_KEY')
         
-        # 한국어 프롬프트 설정 (API 키와 관계없이)
-        self._setup_korean_prompt()
+        # 한국어 프롬프트 설정
+        self.korean_system_prompt = PromptManager.get_korean_assistant_prompt()
         
         if not self.api_key:
             self.logger.warning("Google API key not found. LLM will be disabled.")
@@ -93,19 +42,24 @@ class GeminiLLM(BaseLLM):
             available_models = [model.name for model in models]
             self.logger.info(f"Available models: {available_models}")
             
-            # gemini-1.5-pro 또는 gemini-1.5-flash 사용
-            if 'models/gemini-1.5-pro' in available_models:
+            # 지정된 모델 또는 기본 모델 사용
+            if f'models/{self.model_name}' in available_models:
+                self.model = genai.GenerativeModel(self.model_name)
+            elif 'models/gemini-1.5-pro' in available_models:
                 self.model = genai.GenerativeModel('gemini-1.5-pro')
+                self.model_name = 'gemini-1.5-pro'
             elif 'models/gemini-1.5-flash' in available_models:
                 self.model = genai.GenerativeModel('gemini-1.5-flash')
+                self.model_name = 'gemini-1.5-flash'
             else:
                 # 기본값으로 gemini-1.5-flash 시도
                 self.model = genai.GenerativeModel('gemini-1.5-flash')
+                self.model_name = 'gemini-1.5-flash'
             
             # 간단한 테스트로 모델 상태 확인
             test_response = self.model.generate_content("테스트")
             if test_response and test_response.text:
-                self.logger.info("Gemini LLM initialized successfully")
+                self.logger.info(f"Gemini LLM ({self.model_name}) initialized successfully")
             else:
                 self.logger.warning("Gemini model test failed")
                 self.model = None
@@ -118,20 +72,7 @@ class GeminiLLM(BaseLLM):
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
     
-    def _setup_korean_prompt(self):
-        """한국어 음성 명령 처리를 위한 시스템 프롬프트 설정"""
-        self.korean_system_prompt = """당신은 한국어 음성 명령을 처리하는 AI 어시스턴트입니다. 
-사용자의 음성 명령을 이해하고 적절한 응답을 제공하세요. 
-특히 일정 관리, 캘린더 관련 명령에 대해 도움을 주세요."""
-    
-    def _initialize_model(self):
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel(self.model_name)
-        except Exception as e:
-            self.logger.error(f"Failed to initialize Gemini model: {e}")
-            raise
+
     
     def generate_response(self, user_input: str) -> str:
         # 모델이 초기화되지 않았는지 확인
@@ -183,10 +124,14 @@ class GeminiLLM(BaseLLM):
 class LLMFactory:
     @staticmethod
     def create_llm(model_type: str = "gemini", **kwargs) -> BaseLLM:
-        if model_type.lower() == "gpt":
-            return GPTLLM(**kwargs)
-        elif model_type.lower() == "gemini":
-            return GeminiLLM(**kwargs)
+        """LLM 인스턴스 생성 (Gemini만 지원)"""
+        if model_type.lower() == "gemini":
+            return LLM(**kwargs)
         else:
-            raise ValueError(f"Unsupported model type: {model_type}. Use 'gpt' or 'gemini'")
+            raise ValueError(f"Unsupported model type: {model_type}. Only 'gemini' is supported.")
+    
+    @staticmethod
+    def create_default_llm(**kwargs) -> BaseLLM:
+        """기본 LLM 인스턴스 생성"""
+        return LLM(**kwargs)
 
