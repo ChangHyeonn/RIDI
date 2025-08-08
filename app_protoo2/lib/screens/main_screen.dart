@@ -406,186 +406,184 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                     ],
                                                   ),
                                                   SizedBox(
-                                                    height:
-                                                        8 *
-                                                        scaleFactor, // 여백 줄임
+                                                    height: 8 * scaleFactor,
                                                   ),
-                                                  // 일정 목록
+                                                  // 일정 목록 (스크롤 가능하게 수정)
                                                   Expanded(
-                                                    child: todayTasks.isEmpty
-                                                        ? Center(
-                                                            child: Column(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .center,
-                                                              children: [
-                                                                Icon(
-                                                                  Icons
-                                                                      .event_note,
-                                                                  color: const Color(
-                                                                    0xFFd1d5db,
-                                                                  ),
-                                                                  size: 48,
-                                                                ),
-                                                                const SizedBox(
-                                                                  height: 16,
-                                                                ),
-                                                                Text(
-                                                                  '오늘 일정이 없습니다',
-                                                                  style: TextStyle(
+                                                    child: SingleChildScrollView(
+                                                      child: todayTasks.isEmpty
+                                                          ? Center(
+                                                              child: Column(
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .center,
+                                                                children: [
+                                                                  Icon(
+                                                                    Icons
+                                                                        .event_note,
                                                                     color: const Color(
-                                                                      0xFF9ca3af,
+                                                                      0xFFd1d5db,
                                                                     ),
-                                                                    fontSize:
-                                                                        taskFontSize,
-                                                                    fontStyle:
-                                                                        FontStyle
-                                                                            .italic,
+                                                                    size: 48,
                                                                   ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          )
-                                                        : Column(
-                                                            children:
-                                                                (_showTodayImportantOnly
-                                                                        ? todayTasks.where(
-                                                                            (
-                                                                              task,
-                                                                            ) =>
-                                                                                task.isImportant,
-                                                                          )
-                                                                        : todayTasks)
-                                                                    .take(
-                                                                      maxTasks,
-                                                                    )
-                                                                    .map(
-                                                                      (
-                                                                        task,
-                                                                      ) => Container(
-                                                                        margin: EdgeInsets.only(
-                                                                          bottom:
-                                                                              12 *
-                                                                              scaleFactor,
-                                                                        ),
-                                                                        child: Container(
-                                                                          padding: EdgeInsets.symmetric(
-                                                                            horizontal:
-                                                                                16 *
-                                                                                scaleFactor,
-                                                                            vertical:
+                                                                  const SizedBox(
+                                                                    height: 16,
+                                                                  ),
+                                                                  Text(
+                                                                    '오늘 일정이 없습니다',
+                                                                    style: TextStyle(
+                                                                      color: const Color(
+                                                                        0xFF9ca3af,
+                                                                      ),
+                                                                      fontSize:
+                                                                          taskFontSize,
+                                                                      fontStyle:
+                                                                          FontStyle
+                                                                              .italic,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            )
+                                                          : Column(
+                                                              children:
+                                                                  (_showTodayImportantOnly
+                                                                          ? todayTasks.where(
+                                                                              (
+                                                                                task,
+                                                                              ) => task.isImportant,
+                                                                            )
+                                                                          : todayTasks)
+                                                                      .take(
+                                                                        maxTasks,
+                                                                      )
+                                                                      .map(
+                                                                        (
+                                                                          task,
+                                                                        ) => Container(
+                                                                          margin: EdgeInsets.only(
+                                                                            bottom:
                                                                                 12 *
                                                                                 scaleFactor,
                                                                           ),
-                                                                          decoration: BoxDecoration(
-                                                                            color:
-                                                                                task.isCompleted
-                                                                                ? const Color(
-                                                                                    0xFFdcfce7,
-                                                                                  )
-                                                                                : const Color(
-                                                                                    0xFFfef2f2,
-                                                                                  ),
-                                                                            borderRadius: BorderRadius.circular(
-                                                                              16,
+                                                                          child: Container(
+                                                                            padding: EdgeInsets.symmetric(
+                                                                              horizontal:
+                                                                                  16 *
+                                                                                  scaleFactor,
+                                                                              vertical:
+                                                                                  12 *
+                                                                                  scaleFactor,
                                                                             ),
-                                                                            border: Border.all(
+                                                                            decoration: BoxDecoration(
                                                                               color: task.isCompleted
                                                                                   ? const Color(
-                                                                                      0xFF22c55e,
+                                                                                      0xFFdcfce7,
                                                                                     )
                                                                                   : const Color(
-                                                                                      0xFFef4444,
+                                                                                      0xFFfef2f2,
                                                                                     ),
-                                                                              width: 1,
+                                                                              borderRadius: BorderRadius.circular(
+                                                                                16,
+                                                                              ),
+                                                                              border: Border.all(
+                                                                                color: task.isCompleted
+                                                                                    ? const Color(
+                                                                                        0xFF22c55e,
+                                                                                      )
+                                                                                    : const Color(
+                                                                                        0xFFef4444,
+                                                                                      ),
+                                                                                width: 1,
+                                                                              ),
                                                                             ),
-                                                                          ),
-                                                                          child: Row(
-                                                                            children: [
-                                                                              // 상태 아이콘
-                                                                              Container(
-                                                                                padding: const EdgeInsets.all(
-                                                                                  6,
-                                                                                ),
-                                                                                decoration: BoxDecoration(
-                                                                                  color: task.isCompleted
-                                                                                      ? const Color(
-                                                                                          0xFF22c55e,
-                                                                                        )
-                                                                                      : const Color(
-                                                                                          0xFFef4444,
-                                                                                        ),
-                                                                                  borderRadius: BorderRadius.circular(
-                                                                                    8,
+                                                                            child: Row(
+                                                                              children: [
+                                                                                // 상태 아이콘
+                                                                                Container(
+                                                                                  padding: const EdgeInsets.all(
+                                                                                    6,
+                                                                                  ),
+                                                                                  decoration: BoxDecoration(
+                                                                                    color: task.isCompleted
+                                                                                        ? const Color(
+                                                                                            0xFF22c55e,
+                                                                                          )
+                                                                                        : const Color(
+                                                                                            0xFFef4444,
+                                                                                          ),
+                                                                                    borderRadius: BorderRadius.circular(
+                                                                                      8,
+                                                                                    ),
+                                                                                  ),
+                                                                                  child: Icon(
+                                                                                    task.isCompleted
+                                                                                        ? Icons.check
+                                                                                        : Icons.schedule,
+                                                                                    color: Colors.white,
+                                                                                    size: 16,
                                                                                   ),
                                                                                 ),
-                                                                                child: Icon(
-                                                                                  task.isCompleted
-                                                                                      ? Icons.check
-                                                                                      : Icons.schedule,
-                                                                                  color: Colors.white,
-                                                                                  size: 16,
+                                                                                const SizedBox(
+                                                                                  width: 12,
                                                                                 ),
-                                                                              ),
-                                                                              const SizedBox(
-                                                                                width: 12,
-                                                                              ),
-                                                                              // 일정 제목
-                                                                              Expanded(
-                                                                                child: Row(
-                                                                                  children: [
-                                                                                    if (task.isImportant) ...[
-                                                                                      Icon(
-                                                                                        Icons.star,
-                                                                                        color: const Color(
-                                                                                          0xFFfbbf24,
+                                                                                // 일정 제목
+                                                                                Expanded(
+                                                                                  child: Row(
+                                                                                    children: [
+                                                                                      if (task.isImportant) ...[
+                                                                                        Icon(
+                                                                                          Icons.star,
+                                                                                          color: const Color(
+                                                                                            0xFFfbbf24,
+                                                                                          ),
+                                                                                          size: 16,
                                                                                         ),
-                                                                                        size: 16,
-                                                                                      ),
-                                                                                      const SizedBox(
-                                                                                        width: 4,
+                                                                                        const SizedBox(
+                                                                                          width: 4,
+                                                                                        ),
+                                                                                      ],
+                                                                                      Expanded(
+                                                                                        child: Text(
+                                                                                          task.title,
+                                                                                          style: TextStyle(
+                                                                                            color: const Color(
+                                                                                              0xFF1f2937,
+                                                                                            ),
+                                                                                            fontSize: taskFontSize,
+                                                                                            fontWeight: FontWeight.w600,
+                                                                                          ),
+                                                                                          overflow: TextOverflow.ellipsis,
+                                                                                        ),
                                                                                       ),
                                                                                     ],
-                                                                                    Expanded(
-                                                                                      child: Text(
-                                                                                        task.title,
-                                                                                        style: TextStyle(
-                                                                                          color: const Color(
-                                                                                            0xFF1f2937,
-                                                                                          ),
-                                                                                          fontSize: taskFontSize,
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                        ),
-                                                                                        overflow: TextOverflow.ellipsis,
-                                                                                      ),
-                                                                                    ),
-                                                                                  ],
-                                                                                ),
-                                                                              ),
-                                                                              const SizedBox(
-                                                                                width: 8,
-                                                                              ),
-                                                                              // 시간 표시 (오른쪽으로 이동)
-                                                                              Text(
-                                                                                _formatTime(
-                                                                                  task.date,
-                                                                                ),
-                                                                                style: TextStyle(
-                                                                                  color: const Color(
-                                                                                    0xFF6b7280,
                                                                                   ),
-                                                                                  fontSize:
-                                                                                      taskFontSize -
-                                                                                      2,
                                                                                 ),
-                                                                              ),
-                                                                            ],
+                                                                                const SizedBox(
+                                                                                  width: 8,
+                                                                                ),
+                                                                                // 시간 표시 (오른쪽으로 이동)
+                                                                                Text(
+                                                                                  _formatTime(
+                                                                                    task.date,
+                                                                                  ),
+                                                                                  style: TextStyle(
+                                                                                    color: const Color(
+                                                                                      0xFF6b7280,
+                                                                                    ),
+                                                                                    fontSize:
+                                                                                        taskFontSize -
+                                                                                        2,
+                                                                                  ),
+                                                                                ),
+                                                                              ],
+                                                                            ),
                                                                           ),
                                                                         ),
-                                                                      ),
-                                                                    )
-                                                                    .toList(),
-                                                          ),
+                                                                      )
+                                                                      .toList(),
+                                                            ),
+                                                    ),
                                                   ),
                                                 ],
                                               );
@@ -890,186 +888,185 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                     ],
                                                   ),
                                                   SizedBox(
-                                                    height:
-                                                        8 *
-                                                        scaleFactor, // 여백 줄임
+                                                    height: 8 * scaleFactor,
                                                   ),
-                                                  // 일정 목록
+                                                  // 일정 목록 (스크롤 가능하게 수정)
                                                   Expanded(
-                                                    child: tomorrowTasks.isEmpty
-                                                        ? Center(
-                                                            child: Column(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .center,
-                                                              children: [
-                                                                Icon(
-                                                                  Icons
-                                                                      .event_note,
-                                                                  color: const Color(
-                                                                    0xFFd1d5db,
-                                                                  ),
-                                                                  size: 48,
-                                                                ),
-                                                                const SizedBox(
-                                                                  height: 16,
-                                                                ),
-                                                                Text(
-                                                                  '내일 일정이 없습니다',
-                                                                  style: TextStyle(
+                                                    child: SingleChildScrollView(
+                                                      child:
+                                                          tomorrowTasks.isEmpty
+                                                          ? Center(
+                                                              child: Column(
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .center,
+                                                                children: [
+                                                                  Icon(
+                                                                    Icons
+                                                                        .event_note,
                                                                     color: const Color(
-                                                                      0xFF9ca3af,
+                                                                      0xFFd1d5db,
                                                                     ),
-                                                                    fontSize:
-                                                                        taskFontSize,
-                                                                    fontStyle:
-                                                                        FontStyle
-                                                                            .italic,
+                                                                    size: 48,
                                                                   ),
-                                                                ),
-                                                              ],
-                                                            ),
-                                                          )
-                                                        : Column(
-                                                            children:
-                                                                (_showTomorrowImportantOnly
-                                                                        ? tomorrowTasks.where(
-                                                                            (
-                                                                              task,
-                                                                            ) =>
-                                                                                task.isImportant,
-                                                                          )
-                                                                        : tomorrowTasks)
-                                                                    .take(
-                                                                      maxTasks,
-                                                                    )
-                                                                    .map(
-                                                                      (
-                                                                        task,
-                                                                      ) => Container(
-                                                                        margin: EdgeInsets.only(
-                                                                          bottom:
-                                                                              12 *
-                                                                              scaleFactor,
-                                                                        ),
-                                                                        child: Container(
-                                                                          padding: EdgeInsets.symmetric(
-                                                                            horizontal:
-                                                                                16 *
-                                                                                scaleFactor,
-                                                                            vertical:
+                                                                  const SizedBox(
+                                                                    height: 16,
+                                                                  ),
+                                                                  Text(
+                                                                    '내일 일정이 없습니다',
+                                                                    style: TextStyle(
+                                                                      color: const Color(
+                                                                        0xFF9ca3af,
+                                                                      ),
+                                                                      fontSize:
+                                                                          taskFontSize,
+                                                                      fontStyle:
+                                                                          FontStyle
+                                                                              .italic,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            )
+                                                          : Column(
+                                                              children:
+                                                                  (_showTomorrowImportantOnly
+                                                                          ? tomorrowTasks.where(
+                                                                              (
+                                                                                task,
+                                                                              ) => task.isImportant,
+                                                                            )
+                                                                          : tomorrowTasks)
+                                                                      .take(
+                                                                        maxTasks,
+                                                                      )
+                                                                      .map(
+                                                                        (
+                                                                          task,
+                                                                        ) => Container(
+                                                                          margin: EdgeInsets.only(
+                                                                            bottom:
                                                                                 12 *
                                                                                 scaleFactor,
                                                                           ),
-                                                                          decoration: BoxDecoration(
-                                                                            color:
-                                                                                task.isCompleted
-                                                                                ? const Color(
-                                                                                    0xFFdcfce7,
-                                                                                  )
-                                                                                : const Color(
-                                                                                    0xFFfef2f2,
-                                                                                  ),
-                                                                            borderRadius: BorderRadius.circular(
-                                                                              16,
+                                                                          child: Container(
+                                                                            padding: EdgeInsets.symmetric(
+                                                                              horizontal:
+                                                                                  16 *
+                                                                                  scaleFactor,
+                                                                              vertical:
+                                                                                  12 *
+                                                                                  scaleFactor,
                                                                             ),
-                                                                            border: Border.all(
+                                                                            decoration: BoxDecoration(
                                                                               color: task.isCompleted
                                                                                   ? const Color(
-                                                                                      0xFF22c55e,
+                                                                                      0xFFdcfce7,
                                                                                     )
                                                                                   : const Color(
-                                                                                      0xFFef4444,
+                                                                                      0xFFfef2f2,
                                                                                     ),
-                                                                              width: 1,
+                                                                              borderRadius: BorderRadius.circular(
+                                                                                16,
+                                                                              ),
+                                                                              border: Border.all(
+                                                                                color: task.isCompleted
+                                                                                    ? const Color(
+                                                                                        0xFF22c55e,
+                                                                                      )
+                                                                                    : const Color(
+                                                                                        0xFFef4444,
+                                                                                      ),
+                                                                                width: 1,
+                                                                              ),
                                                                             ),
-                                                                          ),
-                                                                          child: Row(
-                                                                            children: [
-                                                                              // 상태 아이콘
-                                                                              Container(
-                                                                                padding: const EdgeInsets.all(
-                                                                                  6,
-                                                                                ),
-                                                                                decoration: BoxDecoration(
-                                                                                  color: task.isCompleted
-                                                                                      ? const Color(
-                                                                                          0xFF22c55e,
-                                                                                        )
-                                                                                      : const Color(
-                                                                                          0xFFef4444,
-                                                                                        ),
-                                                                                  borderRadius: BorderRadius.circular(
-                                                                                    8,
+                                                                            child: Row(
+                                                                              children: [
+                                                                                // 상태 아이콘
+                                                                                Container(
+                                                                                  padding: const EdgeInsets.all(
+                                                                                    6,
+                                                                                  ),
+                                                                                  decoration: BoxDecoration(
+                                                                                    color: task.isCompleted
+                                                                                        ? const Color(
+                                                                                            0xFF22c55e,
+                                                                                          )
+                                                                                        : const Color(
+                                                                                            0xFFef4444,
+                                                                                          ),
+                                                                                    borderRadius: BorderRadius.circular(
+                                                                                      8,
+                                                                                    ),
+                                                                                  ),
+                                                                                  child: Icon(
+                                                                                    task.isCompleted
+                                                                                        ? Icons.check
+                                                                                        : Icons.schedule,
+                                                                                    color: Colors.white,
+                                                                                    size: 16,
                                                                                   ),
                                                                                 ),
-                                                                                child: Icon(
-                                                                                  task.isCompleted
-                                                                                      ? Icons.check
-                                                                                      : Icons.schedule,
-                                                                                  color: Colors.white,
-                                                                                  size: 16,
+                                                                                const SizedBox(
+                                                                                  width: 12,
                                                                                 ),
-                                                                              ),
-                                                                              const SizedBox(
-                                                                                width: 12,
-                                                                              ),
-                                                                              // 일정 제목
-                                                                              Expanded(
-                                                                                child: Row(
-                                                                                  children: [
-                                                                                    if (task.isImportant) ...[
-                                                                                      Icon(
-                                                                                        Icons.star,
-                                                                                        color: const Color(
-                                                                                          0xFFfbbf24,
+                                                                                // 일정 제목
+                                                                                Expanded(
+                                                                                  child: Row(
+                                                                                    children: [
+                                                                                      if (task.isImportant) ...[
+                                                                                        Icon(
+                                                                                          Icons.star,
+                                                                                          color: const Color(
+                                                                                            0xFFfbbf24,
+                                                                                          ),
+                                                                                          size: 16,
                                                                                         ),
-                                                                                        size: 16,
-                                                                                      ),
-                                                                                      const SizedBox(
-                                                                                        width: 4,
+                                                                                        const SizedBox(
+                                                                                          width: 4,
+                                                                                        ),
+                                                                                      ],
+                                                                                      Expanded(
+                                                                                        child: Text(
+                                                                                          task.title,
+                                                                                          style: TextStyle(
+                                                                                            color: const Color(
+                                                                                              0xFF1f2937,
+                                                                                            ),
+                                                                                            fontSize: taskFontSize,
+                                                                                            fontWeight: FontWeight.w600,
+                                                                                          ),
+                                                                                          overflow: TextOverflow.ellipsis,
+                                                                                        ),
                                                                                       ),
                                                                                     ],
-                                                                                    Expanded(
-                                                                                      child: Text(
-                                                                                        task.title,
-                                                                                        style: TextStyle(
-                                                                                          color: const Color(
-                                                                                            0xFF1f2937,
-                                                                                          ),
-                                                                                          fontSize: taskFontSize,
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                        ),
-                                                                                        overflow: TextOverflow.ellipsis,
-                                                                                      ),
-                                                                                    ),
-                                                                                  ],
-                                                                                ),
-                                                                              ),
-                                                                              const SizedBox(
-                                                                                width: 8,
-                                                                              ),
-                                                                              // 시간 표시 (오른쪽으로 이동)
-                                                                              Text(
-                                                                                _formatTime(
-                                                                                  task.date,
-                                                                                ),
-                                                                                style: TextStyle(
-                                                                                  color: const Color(
-                                                                                    0xFF6b7280,
                                                                                   ),
-                                                                                  fontSize:
-                                                                                      taskFontSize -
-                                                                                      2,
                                                                                 ),
-                                                                              ),
-                                                                            ],
+                                                                                const SizedBox(
+                                                                                  width: 8,
+                                                                                ),
+                                                                                // 시간 표시 (오른쪽으로 이동)
+                                                                                Text(
+                                                                                  _formatTime(
+                                                                                    task.date,
+                                                                                  ),
+                                                                                  style: TextStyle(
+                                                                                    color: const Color(
+                                                                                      0xFF6b7280,
+                                                                                    ),
+                                                                                    fontSize:
+                                                                                        taskFontSize -
+                                                                                        2,
+                                                                                  ),
+                                                                                ),
+                                                                              ],
+                                                                            ),
                                                                           ),
                                                                         ),
-                                                                      ),
-                                                                    )
-                                                                    .toList(),
-                                                          ),
+                                                                      )
+                                                                      .toList(),
+                                                            ),
+                                                    ),
                                                   ),
                                                 ],
                                               );
@@ -1177,7 +1174,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                       ),
                                     ],
                                   ),
-                                  child: const Center(
+                                  child: Center(
                                     child: Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
@@ -1185,14 +1182,14 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                         Icon(
                                           Icons.mic,
                                           color: Color(0xFFef4444),
-                                          size: 28,
+                                          size: 40,
                                         ),
                                         SizedBox(width: 12),
                                         Text(
                                           '녹음',
                                           style: TextStyle(
                                             color: Color(0xFF1f2937),
-                                            fontSize: 20,
+                                            fontSize: 30 * (0.5 + fontSize),
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
@@ -1227,14 +1224,14 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                         ),
                                       ],
                                     ),
-                                    child: const Center(
+                                    child: Center(
                                       child: Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
                                           Icon(
                                             Icons.settings,
-                                            size: 28,
+                                            size: 40,
                                             color: Color(0xFF6366f1),
                                           ),
                                           SizedBox(width: 12),
@@ -1242,7 +1239,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                             '설정',
                                             style: TextStyle(
                                               color: Color(0xFF1f2937),
-                                              fontSize: 20,
+                                              fontSize: 30 * (0.5 + fontSize),
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
