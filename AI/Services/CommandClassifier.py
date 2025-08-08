@@ -6,8 +6,14 @@ Command Classifier
 
 import logging
 import re
+import sys
+import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+
+# 프롬프트 매니저 import
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from Config.prompts import PromptManager
 
 class CommandClassifier:
     """음성 명령 분류 클래스"""
@@ -100,23 +106,7 @@ class CommandClassifier:
         """LLM을 사용한 명령 분류"""
         try:
             # 간단한 규칙 기반 분류 (LLM 없이)
-            prompt = f"""
-다음 음성 명령을 5가지 카테고리로 분류해주세요:
-1. add_schedule (일정 추가)
-2. delete_schedule (일정 삭제)
-3. read_schedule (일정 읽기)
-4. important_schedule (중요 일정)
-5. accessibility (접근성 설정)
-
-명령: {text}
-
-JSON 형식으로 응답:
-{{
-    "type": "카테고리명",
-    "confidence": 0.0-1.0,
-    "extracted_info": {{추출된 정보}}
-}}
-"""
+            prompt = PromptManager.get_command_classification_prompt(text)
             
             # 실제로는 LLM 호출
             # 현재는 간단한 키워드 기반 분류
