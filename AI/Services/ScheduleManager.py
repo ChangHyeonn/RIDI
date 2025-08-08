@@ -13,89 +13,54 @@ class ScheduleManager:
     """일정 관리 전담 클래스"""
     
     def __init__(self):
-        self.schedules = defaultdict(list)  # user_id -> schedules
+        from Config.settings import Settings
+        from Repositories.schedule_repository import (
+            InMemoryScheduleRepository,
+            MySQLScheduleRepository,
+            BaseScheduleRepository,
+        )
+
+        self.schedules = defaultdict(list)  # legacy in-memory cache
         self.user_settings = defaultdict(dict)  # user_id -> settings
         self._setup_logging()
+        # Repository 선택
+        if getattr(Settings, 'DB_ENGINE', 'inmemory') == 'mysql':
+            self.repo: BaseScheduleRepository = MySQLScheduleRepository(
+                host=Settings.MYSQL_HOST,
+                port=Settings.MYSQL_PORT,
+                user=Settings.MYSQL_USER,
+                password=Settings.MYSQL_PASSWORD,
+                db=Settings.MYSQL_DB,
+            )
+        else:
+            self.repo = InMemoryScheduleRepository()
     
     def _setup_logging(self):
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
     
     def add_schedule(self, user_id: str, schedule_data: Dict[str, Any]) -> Dict[str, Any]:
-        """일정 추가"""
+        """일정 추가 (Repository 위임)"""
         try:
-            schedule_id = f"schedule_{datetime.now().timestamp()}"
-            schedule = {
-                'id': schedule_id,
-                'user_id': user_id,
-                'data': schedule_data,
-                'created_at': datetime.now().isoformat(),
-                'updated_at': datetime.now().isoformat()
-            }
-            
-            self.schedules[user_id].append(schedule)
-            
-            # 최대 일정 수 제한
-            if len(self.schedules[user_id]) > 100:
-                self.schedules[user_id] = self.schedules[user_id][-100:]
-            
-            self.logger.info(f"Schedule added for user {user_id}: {schedule_id}")
-            
-            return {
-                "success": True,
-                "schedule_id": schedule_id,
-                "message": "일정이 성공적으로 추가되었습니다.",
-                "schedule": schedule_data
-            }
-            
+            result = self.repo.add_schedule(user_id, schedule_data)
+            return result
         except Exception as e:
             self.logger.error(f"Failed to add schedule: {e}")
-            return {
-                "success": False,
-                "error": f"일정 추가 중 오류가 발생했습니다: {str(e)}"
-            }
+            return {"success": False, "error": f"일정 추가 중 오류가 발생했습니다: {str(e)}"}
     
     def delete_schedule(self, user_id: str, schedule_id: str) -> Dict[str, Any]:
-        """일정 삭제"""
+        """일정 삭제 (Repository 위임)"""
         try:
-            user_schedules = self.schedules[user_id]
-            
-            # 일정 찾기
-            schedule_to_delete = None
-            for schedule in user_schedules:
-                if schedule['id'] == schedule_id:
-                    schedule_to_delete = schedule
-                    break
-            
-            if not schedule_to_delete:
-                return {
-                    "success": False,
-                    "error": "해당 일정을 찾을 수 없습니다."
-                }
-            
-            # 일정 삭제
-            user_schedules.remove(schedule_to_delete)
-            
-            self.logger.info(f"Schedule deleted for user {user_id}: {schedule_id}")
-            
-            return {
-                "success": True,
-                "message": "일정이 성공적으로 삭제되었습니다.",
-                "deleted_schedule": schedule_to_delete['data']
-            }
-            
+            return self.repo.delete_schedule(user_id, schedule_id)
         except Exception as e:
             self.logger.error(f"Failed to delete schedule: {e}")
-            return {
-                "success": False,
-                "error": f"일정 삭제 중 오류가 발생했습니다: {str(e)}"
-            }
+            return {"success": False, "error": f"일정 삭제 중 오류가 발생했습니다: {str(e)}"}
     
     def get_schedules(self, user_id: str) -> List[Dict[str, Any]]:
         """전체 일정 조회"""
         try:
+            # Repository에 전체 목록 API가 없으므로 기존 캐시 반환 (선택사항)
             schedules = self.schedules[user_id]
-            # 최신순으로 정렬
             schedules.sort(key=lambda x: x.get('created_at', ''), reverse=True)
             return schedules
         except Exception as e:
@@ -103,28 +68,20 @@ class ScheduleManager:
             return []
     
     def get_schedules_by_date(self, user_id: str, target_date: str) -> List[Dict[str, Any]]:
-        """특정 날짜 일정 조회"""
+        """특정 날짜 일정 조회 (Repository 위임)"""
         try:
-            target_date_obj = datetime.strptime(target_date, "%Y-%m-%d").date()
-            user_schedules = self.schedules[user_id]
-            
-            date_schedules = []
-            for schedule in user_schedules:
-                schedule_data = schedule.get('data', {})
-                schedule_datetime = schedule_data.get('datetime')
-                
-                if schedule_datetime:
-                    try:
-                        schedule_date = datetime.strptime(schedule_datetime, "%Y-%m-%d %H:%M").date()
-                        if schedule_date == target_date_obj:
-                            date_schedules.append(schedule)
-                    except ValueError:
-                        continue
-            
-            return date_schedules
-            
+            return self.repo.get_schedules_by_date(user_id, target_date)
         except Exception as e:
             self.logger.error(f"Failed to get schedules by date: {e}")
+            return []
+
+    def find_schedules(self, user_id: str, title: Optional[str] = None,
+                       date: Optional[str] = None, time: Optional[str] = None) -> List[Dict[str, Any]]:
+        """제목/날짜/시간으로 후보 일정 검색 (Repository 위임)"""
+        try:
+            return self.repo.find_schedules(user_id, title=title, date_str=date, time_str=time)
+        except Exception as e:
+            self.logger.error(f"Failed to find schedules: {e}")
             return []
     
     def get_important_schedules(self, user_id: str) -> List[Dict[str, Any]]:

@@ -168,6 +168,7 @@ class UnifiedRequestProcessor:
             return {
                 'success': False,
                 'requires_clarification': True,
+                'missing_fields': ['title'],
                 'message': '일정 내용을 말씀해 주시겠어요?'
             }
         
@@ -175,13 +176,23 @@ class UnifiedRequestProcessor:
             return {
                 'success': False,
                 'requires_clarification': True,
-                'message': '언제 일정을 잡으시겠어요?'
+                'missing_fields': ['date'],
+                'message': '언제 일정을 잡으시겠어요? 날짜를 말씀해 주세요.'
+            }
+
+        # 시간 정보 누락 시 질문 (기본값 사용 대신 명확화 요구)
+        if not extracted_info.get('time'):
+            return {
+                'success': False,
+                'requires_clarification': True,
+                'missing_fields': ['time'],
+                'message': '몇 시로 설정할까요? 오전/오후와 함께 말씀해 주세요.'
             }
         
         # 일정 추가
         schedule_data = {
             'title': extracted_info.get('title', ''),
-            'datetime': f"{extracted_info.get('date', '')} {extracted_info.get('time', '09:00')}",
+            'datetime': f"{extracted_info.get('date', '')} {extracted_info.get('time', '')}",
             'category': extracted_info.get('category', '일반'),
             'priority': extracted_info.get('priority', 'normal'),
             'location': extracted_info.get('location', ''),
@@ -189,10 +200,12 @@ class UnifiedRequestProcessor:
         }
         
         if user_id:
-            result = self.schedule_manager.add_schedule(user_id, schedule_data)
+            add_result = self.schedule_manager.add_schedule(user_id, schedule_data)
+            schedule_id = add_result.get('schedule_id')
             return {
                 'success': True,
                 'action': 'schedule_added',
+                'schedule_id': schedule_id,
                 'schedule': schedule_data,
                 'message': '일정이 성공적으로 추가되었습니다.'
             }
@@ -228,24 +241,77 @@ class UnifiedRequestProcessor:
         extracted_info = analysis.get('extracted_info', {})
         
         # 삭제할 일정 식별 필요
-        if not extracted_info.get('title'):
+        title = extracted_info.get('title')
+        date = extracted_info.get('date')
+        time = extracted_info.get('time')
+
+        if not title:
             return {
                 'success': False,
                 'requires_clarification': True,
-                'message': '어떤 일정을 삭제하시겠어요?'
+                'missing_fields': ['title'],
+                'message': '어떤 일정을 삭제하시겠어요? 일정 제목을 말씀해 주세요.'
             }
-        
+
+        # 사용자 식별 필요
+        if not user_id:
+            return {
+                'success': False,
+                'requires_clarification': True,
+                'message': '삭제할 일정을 찾기 위해 사용자를 식별할 수 없어 확인이 필요합니다.'
+            }
+
+        # 후보 검색 및 모호성 해소
+        candidates = self.schedule_manager.find_schedules(user_id, title=title, date=date, time=time)
+
+        if len(candidates) == 0:
+            return {
+                'success': False,
+                'requires_clarification': True,
+                'message': f"'{title}' 일정이 보이지 않습니다. 날짜나 시간을 함께 말씀해 주세요."
+            }
+
+        if len(candidates) > 1:
+            brief = [
+                {
+                    'id': s.get('id'),
+                    'title': s.get('data', {}).get('title'),
+                    'datetime': s.get('data', {}).get('datetime')
+                }
+                for s in candidates
+            ]
+            return {
+                'success': False,
+                'requires_clarification': True,
+                'candidates': brief,
+                'message': f"'{title}' 일정이 여러 개 있습니다. 삭제할 일정의 날짜/시간을 말씀해 주세요."
+            }
+
+        only = candidates[0]
         return {
             'success': True,
             'action': 'schedule_delete',
-            'delete_info': extracted_info,
+            'delete_info': {
+                'id': only.get('id'),
+                'title': only.get('data', {}).get('title'),
+                'datetime': only.get('data', {}).get('datetime')
+            },
             'message': '일정 삭제를 진행하겠습니다.'
         }
     
     def _handle_schedule_read(self, analysis: Dict[str, Any], user_id: Optional[str]) -> Dict[str, Any]:
         """일정 조회 처리"""
         extracted_info = analysis.get('extracted_info', {})
-        date = extracted_info.get('date', datetime.now().strftime("%Y-%m-%d"))
+        date = extracted_info.get('date')
+
+        # 날짜 정보 누락 시 질문
+        if not date:
+            return {
+                'success': False,
+                'requires_clarification': True,
+                'missing_fields': ['date'],
+                'message': '언제 일정을 조회할까요? 날짜를 말씀해 주세요.'
+            }
         
         if user_id:
             schedules = self.schedule_manager.get_schedules_by_date(user_id, date)

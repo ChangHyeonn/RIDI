@@ -70,6 +70,14 @@ class Settings:
     
     # 일정 관리 설정
     DEFAULT_REMINDER_MINUTES = int(os.getenv('DEFAULT_REMINDER_MINUTES', 30))
+
+    # Database (MySQL)
+    DB_ENGINE = os.getenv('DB_ENGINE', 'inmemory')  # inmemory | mysql
+    MYSQL_HOST = os.getenv('MYSQL_HOST', '127.0.0.1')
+    MYSQL_PORT = int(os.getenv('MYSQL_PORT', 3306))
+    MYSQL_USER = os.getenv('MYSQL_USER', 'root')
+    MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '')
+    MYSQL_DB = os.getenv('MYSQL_DB', 'ridi_ai')
     
     @classmethod
     def get_device(cls) -> str:

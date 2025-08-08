@@ -71,12 +71,40 @@ def process_voice():
                 
                 category = analysis.get('category', 'other')
                 action = result_data.get('action', '')
+
+                # 추가 정보 필요 시 명확화 요청 응답
+                if result_data.get('requires_clarification'):
+                    msg = result_data.get('message', '추가 정보가 필요합니다.')
+                    candidates = result_data.get('candidates', [])
+                    payload = {"message": msg}
+                    if candidates:
+                        payload["candidates"] = candidates
+                    return create_app_action_response(
+                        action_type="clarification_request",
+                        data=payload,
+                        voice_response={
+                            "text": msg,
+                            "play_automatically": True,
+                            "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                        },
+                        ui_instructions={
+                            "screen": "conversation",
+                            "show_candidates": bool(candidates)
+                        }
+                    )
                 
                 if category == "schedule_add" or action == "schedule_added":
                     schedule_data = result_data.get('schedule', {})
+                    schedule_id = result_data.get('schedule_id')
+                    # 최소 페이로드만 앱으로 전달 (id, title, datetime)
+                    minimal_payload = {
+                        "id": schedule_id,
+                        "title": schedule_data.get("title"),
+                        "datetime": schedule_data.get("datetime")
+                    }
                     return create_schedule_action_response(
                         action_type="schedule_add",
-                        schedule_data=schedule_data,
+                        schedule_data=minimal_payload,
                         voice_text=result_data.get('message', '일정이 추가되었습니다.'),
                         highlight_date=schedule_data.get('datetime', '').split(' ')[0] if schedule_data.get('datetime') else ''
                     )
