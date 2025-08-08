@@ -20,7 +20,6 @@ from Processor.integrated_pipeline import IntegratedPipeline
 from Services.Memory import MemoryManager
 from Services.ScheduleManager import ScheduleManager
 from Services.AccessibilityManager import AccessibilityManager
-from Services.CommandClassifier import CommandClassifier
 
 class AIService:
     """AI 서비스 클래스"""
@@ -47,7 +46,6 @@ class AIService:
             # 새로운 매니저들
             self.schedule_manager = ScheduleManager()
             self.accessibility_manager = AccessibilityManager()
-            self.command_classifier = CommandClassifier(llm_type=Settings.LLM_TYPE)
             
             self.logger.info("AI Service initialized successfully")
             
@@ -128,9 +126,9 @@ class AIService:
             }
     
     def process_voice_command(self, audio_path: str, user_id: Optional[str] = None) -> Dict[str, Any]:
-        """음성 명령 처리 (확장된 버전)"""
+        """음성 명령 처리 (LLM 중심 통합 처리)"""
         try:
-            # 기본 파이프라인 처리
+            # 통합 파이프라인으로 처리 (LLM이 모든 분류와 추출을 담당)
             result = self.pipeline.process_voice_command(audio_path, user_id)
             
             if not result:
@@ -139,45 +137,8 @@ class AIService:
                     "error": "음성 처리에 실패했습니다."
                 }
             
-            # 명령 분류
-            text = result.get('text', '')
-            command_result = self.command_classifier.classify_command(text)
-            
-            # 명령 타입에 따른 추가 처리
-            command_type = command_result.get('type', 'unknown')
-            
-            if command_type == "add_schedule":
-                # 일정 추가 처리
-                schedule_info = self.command_classifier.extract_command_info(text, command_type)
-                schedule_result = self.schedule_manager.add_schedule(user_id or 'default_user', schedule_info)
-                result['schedule_result'] = schedule_result
-                
-            elif command_type == "delete_schedule":
-                # 일정 삭제 처리
-                delete_info = self.command_classifier.extract_command_info(text, command_type)
-                # 여기서는 일정 ID가 필요하므로 추가 처리 필요
-                result['delete_info'] = delete_info
-                
-            elif command_type == "read_schedule":
-                # 일정 읽기 처리
-                date_info = self.command_classifier.extract_command_info(text, command_type)
-                schedules = self.schedule_manager.get_schedules_by_date(
-                    user_id or 'default_user', 
-                    date_info.get('date', 'today')
-                )
-                result['schedule_list'] = schedules
-                
-            elif command_type == "important_schedule":
-                # 중요 일정 처리
-                important_schedules = self.schedule_manager.get_important_schedules(user_id or 'default_user')
-                result['important_schedules'] = important_schedules
-                
-            elif command_type == "accessibility":
-                # 접근성 설정 처리
-                accessibility_info = self.command_classifier.extract_command_info(text, command_type)
-                result['accessibility_info'] = accessibility_info
-            
-            result['command_classification'] = command_result
+            # LLM 중심 처리로 모든 분류와 추출이 이미 완료됨
+            # 추가적인 명령 분류나 정보 추출은 불필요
             return result
             
         except Exception as e:
