@@ -68,11 +68,23 @@ class TaskProvider with ChangeNotifier {
 
   // 특정 날짜의 일정 가져오기
   List<Task> getTasksForDate(DateTime date) {
-    return _tasks.where((task) {
+    final tasks = _tasks.where((task) {
       return task.date.year == date.year &&
           task.date.month == date.month &&
           task.date.day == date.day;
     }).toList();
+
+    // 시간 순으로 정렬 (오전/오후, 시간, 분 순서)
+    tasks.sort((a, b) {
+      // 시간 비교
+      final hourComparison = a.date.hour.compareTo(b.date.hour);
+      if (hourComparison != 0) return hourComparison;
+
+      // 분 비교
+      return a.date.minute.compareTo(b.date.minute);
+    });
+
+    return tasks;
   }
 
   // 오늘의 일정 가져오기

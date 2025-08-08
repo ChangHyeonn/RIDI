@@ -933,13 +933,19 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF6366f1),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 20),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
                         elevation: 0,
                       ),
-                      child: const Text('추가'),
+                      child: const Text(
+                        '추가',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -949,14 +955,20 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: const Color(0xFF1f2937),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 20),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
                         elevation: 0,
                         side: const BorderSide(color: Color(0xFFd1d5db)),
                       ),
-                      child: const Text('취소'),
+                      child: const Text(
+                        '취소',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ],

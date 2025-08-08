@@ -317,6 +317,67 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                         .normal,
                                                               ),
                                                             ),
+                                                            const SizedBox(
+                                                              width: 12,
+                                                            ),
+                                                            // 일정 개수 배지
+                                                            Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                    vertical: 4,
+                                                                  ),
+                                                              decoration: BoxDecoration(
+                                                                color:
+                                                                    const Color(
+                                                                      0xFFf3f4f6,
+                                                                    ),
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      12,
+                                                                    ),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                    0xFFd1d5db,
+                                                                  ),
+                                                                  width: 1,
+                                                                ),
+                                                              ),
+                                                              child: Row(
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  Icon(
+                                                                    Icons
+                                                                        .check_circle,
+                                                                    size: 12,
+                                                                    color: const Color(
+                                                                      0xFF10b981,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    width: 4,
+                                                                  ),
+                                                                  Text(
+                                                                    '${todayTasks.where((task) => task.isCompleted).length}/${todayTasks.length}',
+                                                                    style: TextStyle(
+                                                                      fontSize:
+                                                                          (10 +
+                                                                              2) *
+                                                                          scaleFactor,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w600,
+                                                                      color: const Color(
+                                                                        0xFF6b7280,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
                                                           ],
                                                         ),
                                                       ),
@@ -410,42 +471,42 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                   ),
                                                   // 일정 목록 (스크롤 가능하게 수정)
                                                   Expanded(
-                                                    child: SingleChildScrollView(
-                                                      child: todayTasks.isEmpty
-                                                          ? Center(
-                                                              child: Column(
-                                                                mainAxisAlignment:
-                                                                    MainAxisAlignment
-                                                                        .center,
-                                                                children: [
-                                                                  Icon(
-                                                                    Icons
-                                                                        .event_note,
+                                                    child: todayTasks.isEmpty
+                                                        ? Center(
+                                                            child: Column(
+                                                              mainAxisAlignment:
+                                                                  MainAxisAlignment
+                                                                      .center,
+                                                              children: [
+                                                                Icon(
+                                                                  Icons
+                                                                      .event_note,
+                                                                  color: const Color(
+                                                                    0xFFd1d5db,
+                                                                  ),
+                                                                  size: 48,
+                                                                ),
+                                                                const SizedBox(
+                                                                  height: 16,
+                                                                ),
+                                                                Text(
+                                                                  '오늘 일정이 없습니다',
+                                                                  style: TextStyle(
                                                                     color: const Color(
-                                                                      0xFFd1d5db,
+                                                                      0xFF9ca3af,
                                                                     ),
-                                                                    size: 48,
+                                                                    fontSize:
+                                                                        taskFontSize,
+                                                                    fontStyle:
+                                                                        FontStyle
+                                                                            .italic,
                                                                   ),
-                                                                  const SizedBox(
-                                                                    height: 16,
-                                                                  ),
-                                                                  Text(
-                                                                    '오늘 일정이 없습니다',
-                                                                    style: TextStyle(
-                                                                      color: const Color(
-                                                                        0xFF9ca3af,
-                                                                      ),
-                                                                      fontSize:
-                                                                          taskFontSize,
-                                                                      fontStyle:
-                                                                          FontStyle
-                                                                              .italic,
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            )
-                                                          : Column(
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          )
+                                                        : SingleChildScrollView(
+                                                            child: Column(
                                                               children:
                                                                   (_showTodayImportantOnly
                                                                           ? todayTasks.where(
@@ -583,7 +644,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                       )
                                                                       .toList(),
                                                             ),
-                                                    ),
+                                                          ),
                                                   ),
                                                 ],
                                               );
@@ -799,6 +860,67 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                         .normal,
                                                               ),
                                                             ),
+                                                            const SizedBox(
+                                                              width: 12,
+                                                            ),
+                                                            // 일정 개수 배지
+                                                            Container(
+                                                              padding:
+                                                                  const EdgeInsets.symmetric(
+                                                                    horizontal:
+                                                                        8,
+                                                                    vertical: 4,
+                                                                  ),
+                                                              decoration: BoxDecoration(
+                                                                color:
+                                                                    const Color(
+                                                                      0xFFf3f4f6,
+                                                                    ),
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      12,
+                                                                    ),
+                                                                border: Border.all(
+                                                                  color: const Color(
+                                                                    0xFFd1d5db,
+                                                                  ),
+                                                                  width: 1,
+                                                                ),
+                                                              ),
+                                                              child: Row(
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  Icon(
+                                                                    Icons
+                                                                        .check_circle,
+                                                                    size: 12,
+                                                                    color: const Color(
+                                                                      0xFF10b981,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    width: 4,
+                                                                  ),
+                                                                  Text(
+                                                                    '${tomorrowTasks.where((task) => task.isCompleted).length}/${tomorrowTasks.length}',
+                                                                    style: TextStyle(
+                                                                      fontSize:
+                                                                          (10 +
+                                                                              2) *
+                                                                          scaleFactor,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w600,
+                                                                      color: const Color(
+                                                                        0xFF6b7280,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
                                                           ],
                                                         ),
                                                       ),
@@ -892,43 +1014,42 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                   ),
                                                   // 일정 목록 (스크롤 가능하게 수정)
                                                   Expanded(
-                                                    child: SingleChildScrollView(
-                                                      child:
-                                                          tomorrowTasks.isEmpty
-                                                          ? Center(
-                                                              child: Column(
-                                                                mainAxisAlignment:
-                                                                    MainAxisAlignment
-                                                                        .center,
-                                                                children: [
-                                                                  Icon(
-                                                                    Icons
-                                                                        .event_note,
+                                                    child: tomorrowTasks.isEmpty
+                                                        ? Center(
+                                                            child: Column(
+                                                              mainAxisAlignment:
+                                                                  MainAxisAlignment
+                                                                      .center,
+                                                              children: [
+                                                                Icon(
+                                                                  Icons
+                                                                      .event_note,
+                                                                  color: const Color(
+                                                                    0xFFd1d5db,
+                                                                  ),
+                                                                  size: 48,
+                                                                ),
+                                                                const SizedBox(
+                                                                  height: 16,
+                                                                ),
+                                                                Text(
+                                                                  '내일 일정이 없습니다',
+                                                                  style: TextStyle(
                                                                     color: const Color(
-                                                                      0xFFd1d5db,
+                                                                      0xFF9ca3af,
                                                                     ),
-                                                                    size: 48,
+                                                                    fontSize:
+                                                                        taskFontSize,
+                                                                    fontStyle:
+                                                                        FontStyle
+                                                                            .italic,
                                                                   ),
-                                                                  const SizedBox(
-                                                                    height: 16,
-                                                                  ),
-                                                                  Text(
-                                                                    '내일 일정이 없습니다',
-                                                                    style: TextStyle(
-                                                                      color: const Color(
-                                                                        0xFF9ca3af,
-                                                                      ),
-                                                                      fontSize:
-                                                                          taskFontSize,
-                                                                      fontStyle:
-                                                                          FontStyle
-                                                                              .italic,
-                                                                    ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                            )
-                                                          : Column(
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          )
+                                                        : SingleChildScrollView(
+                                                            child: Column(
                                                               children:
                                                                   (_showTomorrowImportantOnly
                                                                           ? tomorrowTasks.where(
@@ -1066,7 +1187,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                       )
                                                                       .toList(),
                                                             ),
-                                                    ),
+                                                          ),
                                                   ),
                                                 ],
                                               );

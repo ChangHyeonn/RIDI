@@ -33,8 +33,9 @@ class _AlarmScreenState extends State<AlarmScreen> {
           child: Padding(
             padding: EdgeInsets.all(20.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.start,
               children: [
+                SizedBox(height: 100), // 상단 여백 추가
                 // AM/PM indicator
                 Text(
                   widget.task.date.hour < 12 ? '오전' : '오후',

@@ -952,13 +952,19 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF6366f1),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 20),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
                         elevation: 0,
                       ),
-                      child: const Text('수정'),
+                      child: const Text(
+                        '수정',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -994,13 +1000,19 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFef4444),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 20),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
                         elevation: 0,
                       ),
-                      child: const Text('삭제'),
+                      child: const Text(
+                        '삭제',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ],
