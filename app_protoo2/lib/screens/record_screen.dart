@@ -16,11 +16,13 @@ class _RecordScreenState extends State<RecordScreen> {
   String? _recordingPath;
   bool _isSupportedPlatform = false;
   String? _errorMessage;
+  List<File> _recordedFiles = [];
 
   @override
   void initState() {
     super.initState();
     _checkPlatformSupport();
+    _loadRecordedFiles();
   }
 
   void _checkPlatformSupport() {
@@ -32,6 +34,17 @@ class _RecordScreenState extends State<RecordScreen> {
       if (!_isSupportedPlatform) {
         _errorMessage = '현재 플랫폼에서 녹음 기능을 지원하지 않습니다.';
       }
+    }
+  }
+
+  Future<void> _loadRecordedFiles() async {
+    try {
+      final files = await _recordService.getRecordedFiles();
+      setState(() {
+        _recordedFiles = files;
+      });
+    } catch (e) {
+      print('녹음 파일 목록 로드 실패: $e');
     }
   }
 
@@ -71,6 +84,8 @@ class _RecordScreenState extends State<RecordScreen> {
 
       if (path != null) {
         _showSuccessSnackBar('녹음이 완료되었습니다.');
+        // 녹음 파일 목록 새로고침
+        await _loadRecordedFiles();
       } else {
         _showErrorSnackBar('녹음 파일을 저장할 수 없습니다.');
       }
@@ -89,6 +104,20 @@ class _RecordScreenState extends State<RecordScreen> {
       _showSuccessSnackBar('녹음이 취소되었습니다.');
     } catch (e) {
       _showErrorSnackBar('녹음을 취소할 수 없습니다: $e');
+    }
+  }
+
+  Future<void> _deleteRecording(File file) async {
+    try {
+      final success = await _recordService.deleteRecording(file.path);
+      if (success) {
+        _showSuccessSnackBar('녹음 파일이 삭제되었습니다.');
+        await _loadRecordedFiles();
+      } else {
+        _showErrorSnackBar('녹음 파일 삭제에 실패했습니다.');
+      }
+    } catch (e) {
+      _showErrorSnackBar('녹음 파일 삭제 중 오류가 발생했습니다: $e');
     }
   }
 
@@ -260,32 +289,79 @@ class _RecordScreenState extends State<RecordScreen> {
 
             const SizedBox(height: 40),
 
-            // 녹음 파일 경로 표시 (디버그용)
-            if (_recordingPath != null)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      '녹음 파일 경로:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _recordingPath!,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+            // 저장된 녹음 파일 목록
+            if (_recordedFiles.isNotEmpty) ...[
+              const Text(
+                '저장된 녹음 파일',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1f2937),
                 ),
               ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _recordedFiles.length,
+                  itemBuilder: (context, index) {
+                    final file = _recordedFiles[index];
+                    final fileName = file.path.split('/').last;
+                    final fileSize = (file.lengthSync() / 1024).toStringAsFixed(
+                      1,
+                    );
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.audiotrack,
+                            color: Color(0xFF6366f1),
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  fileName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  '$fileSize KB',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => _deleteRecording(file),
+                            icon: const Icon(
+                              Icons.delete,
+                              color: Colors.red,
+                              size: 20,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -39,7 +39,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     child: Text(
                       '달력',
                       style: TextStyle(
-                        fontSize: 20 * (0.5 + fontSize),
+                        fontSize: 32 * (0.6 + fontSize * 0.4),
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
@@ -76,7 +76,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       Text(
                         '${_focusedDay.year}年',
                         style: TextStyle(
-                          fontSize: 14 * (0.5 + fontSize),
+                          fontSize: 22 * (0.6 + fontSize * 0.4),
                           fontWeight: FontWeight.w400,
                           color: const Color(0xFF6b7280),
                         ),
@@ -86,7 +86,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       Text(
                         '${_focusedDay.month}月',
                         style: TextStyle(
-                          fontSize: 28 * (0.5 + fontSize),
+                          fontSize: 44 * (0.6 + fontSize * 0.4),
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFF1f2937),
                         ),
@@ -156,26 +156,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     cellMargin: const EdgeInsets.symmetric(vertical: 38),
                     // 날짜 텍스트 스타일 명시적 설정
                     defaultTextStyle: TextStyle(
-                      fontSize: 16 * (0.5 + fontSize),
+                      fontSize: 26 * (0.6 + fontSize * 0.4),
                       color: Colors.black,
                     ),
                     selectedTextStyle: TextStyle(
-                      fontSize: 16 * (0.5 + fontSize),
+                      fontSize: 26 * (0.6 + fontSize * 0.4),
                       color: Colors.white,
                     ),
                     todayTextStyle: TextStyle(
-                      fontSize: 16 * (0.5 + fontSize),
+                      fontSize: 26 * (0.6 + fontSize * 0.4),
                       color: Colors.black,
                     ),
                   ),
                   daysOfWeekStyle: DaysOfWeekStyle(
                     weekdayStyle: TextStyle(
                       color: const Color(0xFF6b7280),
-                      fontSize: 12 * (0.5 + fontSize),
+                      fontSize: 20 * (0.6 + fontSize * 0.4),
                     ),
                     weekendStyle: TextStyle(
                       color: const Color(0xFF6b7280),
-                      fontSize: 12 * (0.5 + fontSize),
+                      fontSize: 20 * (0.6 + fontSize * 0.4),
                     ),
                   ),
                   // 요일을 한글로 변경
@@ -207,7 +207,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         child: Text(
                           '${date.day}',
                           style: TextStyle(
-                            fontSize: 18 * (0.5 + fontSize),
+                            fontSize: 26 * (0.6 + fontSize * 0.4),
                             color: Colors.black,
                           ),
                         ),
@@ -230,7 +230,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             child: Text(
                               '${date.day}',
                               style: TextStyle(
-                                fontSize: 18 * (0.5 + fontSize),
+                                fontSize: 26 * (0.6 + fontSize * 0.4),
                                 color: Colors.white,
                               ),
                             ),
@@ -251,7 +251,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             child: Text(
                               '${date.day}',
                               style: TextStyle(
-                                fontSize: 18 * (0.5 + fontSize),
+                                fontSize: 26 * (0.6 + fontSize * 0.4),
                                 color: Colors.black,
                               ),
                             ),
@@ -293,7 +293,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   child: Text(
                     '일정추가',
                     style: TextStyle(
-                      fontSize: 18 * (0.5 + fontSize),
+                      fontSize: 26 * (0.6 + fontSize * 0.4),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
