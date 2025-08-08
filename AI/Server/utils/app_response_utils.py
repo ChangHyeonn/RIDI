@@ -105,7 +105,7 @@ def create_settings_action_response(
         "text": voice_text,
         "play_automatically": True,
         "elderly_optimized": {
-            "slow_speech": True,
+            "slow_speech": False,
             "high_volume": True
         }
     }

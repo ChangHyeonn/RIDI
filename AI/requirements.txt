@@ -25,6 +25,9 @@ requests==2.31.0
 pyyaml==6.0.1
 python-dateutil==2.8.2
 
+# Database
+PyMySQL==1.1.0
+
 # Testing
 pytest==7.4.0
 pytest-cov==4.1.0 
