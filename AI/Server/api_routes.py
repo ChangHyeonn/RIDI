@@ -130,21 +130,34 @@ def add_schedule():
     try:
         data = request.get_json()
         if not data:
-            return create_error_response("일정 데이터가 제공되지 않았습니다", 400)
+            return create_error_action_response("일정 데이터가 제공되지 않았습니다", "validation_error")
         
         user_id = request.headers.get('X-User-ID', 'default_user')
         
         # 데이터 검증
         validation_result = validate_schedule_data(data)
         if not validation_result['valid']:
-            return create_error_response(validation_result['error'], 400)
+            return create_error_action_response(validation_result['error'], "validation_error")
         
         result = current_app.ai_service.add_schedule(data, user_id)
-        return create_response(result)
+        
+        if result.get('success'):
+            schedule_data = result.get('data', {})
+            return create_schedule_action_response(
+                action_type="schedule_add",
+                schedule_data=schedule_data,
+                voice_text=result.get('message', '일정이 추가되었습니다.'),
+                highlight_date=schedule_data.get('datetime', '').split('T')[0] if schedule_data.get('datetime') else None
+            )
+        else:
+            return create_error_action_response(
+                result.get('error', '일정 추가 중 오류가 발생했습니다'),
+                "schedule_add_error"
+            )
         
     except Exception as e:
         logger.error(f"Schedule addition failed: {e}")
-        return create_error_response("일정 추가 중 오류가 발생했습니다", 500)
+        return create_error_action_response("일정 추가 중 오류가 발생했습니다", "schedule_add_error")
 
 @api_bp.route('/schedule/list', methods=['GET'])
 def list_schedules():
@@ -152,11 +165,32 @@ def list_schedules():
     try:
         user_id = request.args.get('user_id', 'default_user')
         result = current_app.ai_service.get_schedules(user_id)
-        return create_response(result)
+        
+        if result.get('success'):
+            schedules = result.get('data', {}).get('schedules', [])
+            return create_app_action_response(
+                action_type="schedule_list",
+                data={"schedules": schedules},
+                voice_response={
+                    "text": f"총 {len(schedules)}개의 일정이 있습니다.",
+                    "play_automatically": True,
+                    "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                },
+                ui_instructions={
+                    "screen": "schedule_list",
+                    "refresh_data": True,
+                    "highlight_important": True
+                }
+            )
+        else:
+            return create_error_action_response(
+                result.get('error', '일정 목록 조회 중 오류가 발생했습니다'),
+                "schedule_list_error"
+            )
         
     except Exception as e:
         logger.error(f"Schedule list retrieval failed: {e}")
-        return create_error_response("일정 목록 조회 중 오류가 발생했습니다", 500)
+        return create_error_action_response("일정 목록 조회 중 오류가 발생했습니다", "schedule_list_error")
 
 @api_bp.route('/schedule/remind', methods=['GET'])
 def get_reminders():
@@ -223,7 +257,7 @@ def get_simple_response():
     try:
         data = request.get_json()
         if not data or 'message' not in data:
-            return create_error_response("메시지가 제공되지 않았습니다", 400)
+            return create_error_action_response("메시지가 제공되지 않았습니다", "validation_error")
         
         message = data['message']
         
@@ -232,14 +266,16 @@ def get_simple_response():
             'ai_response': message
         })
         
-        return create_response({
-            "original_message": message,
-            "simple_response": simple_response.get('ai_response', message)
-        })
+        simple_text = simple_response.get('ai_response', message)
+        
+        return create_voice_only_response(
+            text=simple_text,
+            simple_text=simple_text
+        )
         
     except Exception as e:
         logger.error(f"Simple response generation failed: {e}")
-        return create_error_response("간단 응답 생성 중 오류가 발생했습니다", 500)
+        return create_error_action_response("간단 응답 생성 중 오류가 발생했습니다", "simple_response_error")
 
 @api_bp.route('/elderly/repeat_important', methods=['POST'])
 def repeat_important_message():
@@ -247,7 +283,7 @@ def repeat_important_message():
     try:
         data = request.get_json()
         if not data or 'message' not in data:
-            return create_error_response("메시지가 제공되지 않았습니다", 400)
+            return create_error_action_response("메시지가 제공되지 않았습니다", "validation_error")
         
         message = data['message']
         repeat_count = data.get('repeat_count', 2)
@@ -255,15 +291,14 @@ def repeat_important_message():
         # 중요 메시지 반복
         repeated_message = f"{message} " * repeat_count
         
-        return create_response({
-            "original_message": message,
-            "repeated_message": repeated_message.strip(),
-            "repeat_count": repeat_count
-        })
+        return create_voice_only_response(
+            text=repeated_message.strip(),
+            simple_text=message
+        )
         
     except Exception as e:
         logger.error(f"Message repetition failed: {e}")
-        return create_error_response("메시지 반복 중 오류가 발생했습니다", 500)
+        return create_error_action_response("메시지 반복 중 오류가 발생했습니다", "repeat_message_error")
 
 @api_bp.route('/schedule/delete', methods=['DELETE'])
 def delete_schedule():
@@ -271,20 +306,36 @@ def delete_schedule():
     try:
         data = request.get_json()
         if not data:
-            return create_error_response("삭제할 일정 정보가 제공되지 않았습니다", 400)
+            return create_error_action_response("삭제할 일정 정보가 제공되지 않았습니다", "validation_error")
         
         user_id = request.headers.get('X-User-ID', 'default_user')
         schedule_id = data.get('schedule_id')
         
         if not schedule_id:
-            return create_error_response("일정 ID가 필요합니다", 400)
+            return create_error_action_response("일정 ID가 필요합니다", "validation_error")
         
         result = current_app.ai_service.delete_schedule(user_id, schedule_id)
-        return create_response(result)
+        
+        if result.get('success'):
+            schedule_data = {
+                "id": schedule_id,
+                "title": data.get('title', '일정'),
+                "date": data.get('date', '')
+            }
+            return create_schedule_action_response(
+                action_type="schedule_delete",
+                schedule_data=schedule_data,
+                voice_text=result.get('message', '일정이 삭제되었습니다.')
+            )
+        else:
+            return create_error_action_response(
+                result.get('error', '일정 삭제 중 오류가 발생했습니다'),
+                "schedule_delete_error"
+            )
         
     except Exception as e:
         logger.error(f"Schedule deletion failed: {e}")
-        return create_error_response("일정 삭제 중 오류가 발생했습니다", 500)
+        return create_error_action_response("일정 삭제 중 오류가 발생했습니다", "schedule_delete_error")
 
 @api_bp.route('/schedule/read', methods=['GET'])
 def read_schedules_by_date():
@@ -294,11 +345,36 @@ def read_schedules_by_date():
         target_date = request.args.get('date', 'today')
         
         result = current_app.ai_service.get_schedules_by_date(user_id, target_date)
-        return create_response(result)
+        
+        if result.get('success'):
+            schedules = result.get('data', {}).get('schedules', [])
+            return create_app_action_response(
+                action_type="schedule_list",
+                data={
+                    "schedules": schedules,
+                    "date": target_date
+                },
+                voice_response={
+                    "text": f"{target_date}에 {len(schedules)}개의 일정이 있습니다.",
+                    "play_automatically": True,
+                    "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                },
+                ui_instructions={
+                    "screen": "schedule_list",
+                    "refresh_data": True,
+                    "highlight_date": target_date,
+                    "highlight_important": True
+                }
+            )
+        else:
+            return create_error_action_response(
+                result.get('error', '일정 조회 중 오류가 발생했습니다'),
+                "schedule_read_error"
+            )
         
     except Exception as e:
         logger.error(f"Schedule reading failed: {e}")
-        return create_error_response("일정 조회 중 오류가 발생했습니다", 500)
+        return create_error_action_response("일정 조회 중 오류가 발생했습니다", "schedule_read_error")
 
 @api_bp.route('/schedule/important', methods=['GET'])
 def get_important_schedules():
@@ -306,11 +382,36 @@ def get_important_schedules():
     try:
         user_id = request.args.get('user_id', 'default_user')
         result = current_app.ai_service.get_important_schedules(user_id)
-        return create_response(result)
+        
+        if result.get('success'):
+            schedules = result.get('data', {}).get('schedules', [])
+            return create_app_action_response(
+                action_type="schedule_list",
+                data={
+                    "schedules": schedules,
+                    "filter": "important"
+                },
+                voice_response={
+                    "text": f"중요한 일정 {len(schedules)}개가 있습니다.",
+                    "play_automatically": True,
+                    "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                },
+                ui_instructions={
+                    "screen": "schedule_list",
+                    "refresh_data": True,
+                    "highlight_important": True,
+                    "filter_important": True
+                }
+            )
+        else:
+            return create_error_action_response(
+                result.get('error', '중요 일정 조회 중 오류가 발생했습니다'),
+                "important_schedule_error"
+            )
         
     except Exception as e:
         logger.error(f"Important schedule retrieval failed: {e}")
-        return create_error_response("중요 일정 조회 중 오류가 발생했습니다", 500)
+        return create_error_action_response("중요 일정 조회 중 오류가 발생했습니다", "important_schedule_error")
 
 @api_bp.route('/settings/accessibility', methods=['PUT'])
 def update_accessibility_settings():
@@ -318,21 +419,32 @@ def update_accessibility_settings():
     try:
         data = request.get_json()
         if not data:
-            return create_error_response("접근성 설정 데이터가 제공되지 않았습니다", 400)
+            return create_error_action_response("접근성 설정 데이터가 제공되지 않았습니다", "validation_error")
         
         user_id = request.headers.get('X-User-ID', 'default_user')
         
         # 설정 검증
         validation_result = validate_accessibility_settings(data)
         if not validation_result['valid']:
-            return create_error_response(validation_result['error'], 400)
+            return create_error_action_response(validation_result['error'], "validation_error")
         
         result = current_app.ai_service.update_accessibility_settings(user_id, data)
-        return create_response(result)
+        
+        if result.get('success'):
+            return create_settings_action_response(
+                setting_type="accessibility",
+                changes=data,
+                voice_text=result.get('message', '접근성 설정이 변경되었습니다.')
+            )
+        else:
+            return create_error_action_response(
+                result.get('error', '접근성 설정 업데이트 중 오류가 발생했습니다'),
+                "accessibility_update_error"
+            )
         
     except Exception as e:
         logger.error(f"Accessibility settings update failed: {e}")
-        return create_error_response("접근성 설정 업데이트 중 오류가 발생했습니다", 500)
+        return create_error_action_response("접근성 설정 업데이트 중 오류가 발생했습니다", "accessibility_update_error")
 
 @api_bp.route('/settings/accessibility', methods=['GET'])
 def get_accessibility_settings():
@@ -340,11 +452,35 @@ def get_accessibility_settings():
     try:
         user_id = request.args.get('user_id', 'default_user')
         result = current_app.ai_service.get_accessibility_settings(user_id)
-        return create_response(result)
+        
+        if result.get('success'):
+            settings = result.get('data', {}).get('settings', {})
+            return create_app_action_response(
+                action_type="settings_view",
+                data={
+                    "setting_type": "accessibility",
+                    "settings": settings
+                },
+                voice_response={
+                    "text": "접근성 설정을 조회했습니다.",
+                    "play_automatically": True,
+                    "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                },
+                ui_instructions={
+                    "screen": "settings",
+                    "show_settings": True,
+                    "highlight_accessibility": True
+                }
+            )
+        else:
+            return create_error_action_response(
+                result.get('error', '접근성 설정 조회 중 오류가 발생했습니다'),
+                "accessibility_retrieval_error"
+            )
         
     except Exception as e:
         logger.error(f"Accessibility settings retrieval failed: {e}")
-        return create_error_response("접근성 설정 조회 중 오류가 발생했습니다", 500)
+        return create_error_action_response("접근성 설정 조회 중 오류가 발생했습니다", "accessibility_retrieval_error")
 
 def setup_routes(app):
     """라우트 설정"""
