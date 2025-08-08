@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from Models.LLM import LLMFactory
+from Config.prompts import PromptManager
 
 class ScheduleClassifier:
     """일정 정보 분류기"""
@@ -20,7 +21,6 @@ class ScheduleClassifier:
         self.llm_type = llm_type
         self._setup_logging()
         self._initialize_llm()
-        self._setup_prompts()
         self.logger.info(f"Schedule Classifier initialized successfully with {llm_type}")
     
     def _setup_logging(self):
@@ -38,61 +38,14 @@ class ScheduleClassifier:
             self.logger.error(f"Failed to initialize LLM: {e}")
             raise
     
-    def _setup_prompts(self):
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        
-        self.system_prompt = f"""당신은 일정 관리 AI 어시스턴트입니다. 
-사용자의 음성 요청을 분석하여 구조화된 일정 정보를 추출하세요.
 
-현재 날짜: {current_date}
-
-시간 추출 규칙:
-- "내일" = 현재 날짜 + 1일
-- "어제" = 현재 날짜 - 1일
-- "모레" = 현재 날짜 + 2일
-- "그저께" = 현재 날짜 - 2일
-- "그제" = 현재 날짜 - 2일
-- "다음 주" = 현재 날짜 + 7일
-- "다음 달" = 현재 날짜 + 1개월
-- "오전 9시" = 09:00, "오후 2시" = 14:00, "저녁 7시" = 19:00
-- "아침 7시" = 07:00, "저녁 6시" = 18:00
-- "오늘" = 현재 날짜
-- "이번 주" = 현재 주의 해당 요일
-- 시간은 24시간 형식으로 변환 (오후 6시 = 18:00, 저녁 7시 = 19:00)
-
-주의: "오전", "오후" 등 구체적 시간이 없는 경우는 추출하지 마세요.
-
-카테고리 분류 기준:
-- 건강: 약, 병원, 운동, 건강검진, 복용, 치료, 상담
-- 경조사: 생일, 결혼식, 장례식, 기념일, 축하, 행사
-- 일반: 회의, 약속, 할 일, 업무, 개인일정
-
-중요도 분류 기준:
-- 중요: 건강 관련 일정 (약, 병원, 운동 등)은 무조건 중요
-- 그 외 일정: 사용자가 중요 여부를 직접 선택
-
-응답은 반드시 JSON 형식으로만 제공하세요. 다른 텍스트는 포함하지 마세요:
-
-{{
-    "title": "일정 제목",
-    "datetime": "YYYY-MM-DD HH:MM",
-    "category": "건강/경조사/일반",
-    "priority": "important/not_important",
-    "repeat": false,
-    "reminder": true,
-    "description": "상세 설명"
-}}"""
     
     def classify_schedule(self, text: str) -> Dict[str, Any]:
         try:
 
             
-            # 현재 날짜 정보 추가
-            current_date = datetime.now().strftime("%Y-%m-%d")
-            prompt = self.system_prompt.replace("{current_date}", current_date)
-            
-            # LLM에 분석 요청
-            full_prompt = f"{prompt}\n\n사용자 입력: {text}\n\n분석 결과 (JSON만):"
+            # 프롬프트 매니저에서 일정 분석 프롬프트 가져오기
+            full_prompt = PromptManager.get_schedule_analysis_prompt(text)
             response = self.llm.generate_response(full_prompt)
             
             # 응답 정리
