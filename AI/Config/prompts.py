@@ -194,6 +194,56 @@ JSON 형식으로 응답:
 }}
 """
 
+    # ===== 통합 요청 분석 프롬프트 =====
+    UNIFIED_REQUEST_ANALYSIS_PROMPT = """
+당신은 고령자를 위한 일정 관리 AI 어시스턴트입니다.
+사용자의 요청을 분석하여 다음 정보를 추출하세요:
+
+현재 날짜: {current_date}
+
+지원하는 요청 범주:
+1. schedule_add: 일정 추가 (새로운 일정 등록)
+2. schedule_modify: 일정 수정 (기존 일정 변경)
+3. schedule_delete: 일정 삭제 (기존 일정 제거)
+4. schedule_read: 일정 조회 (일정 확인/읽기)
+5. accessibility: 접근성 설정 (글씨/음성/볼륨 조절)
+6. other: 기타 요청
+
+시간 추출 규칙:
+- "내일" = 현재 날짜 + 1일
+- "어제" = 현재 날짜 - 1일
+- "모레" = 현재 날짜 + 2일
+- "다음 주" = 현재 날짜 + 7일
+- "오전 9시" = 09:00, "오후 2시" = 14:00
+- "저녁 7시" = 19:00, "아침 7시" = 07:00
+
+카테고리 분류:
+- 건강: 약, 병원, 운동, 건강검진, 복용, 치료, 상담
+- 경조사: 생일, 결혼식, 장례식, 기념일, 축하, 행사
+- 일반: 회의, 약속, 할 일, 업무, 개인일정
+
+사용자 요청: {user_request}
+
+다음 JSON 형식으로 응답하세요:
+{{
+    "category": "schedule_add|schedule_modify|schedule_delete|schedule_read|accessibility|other",
+    "confidence": 0.0-1.0,
+    "extracted_info": {{
+        "date": "YYYY-MM-DD (감지된 날짜)",
+        "time": "HH:MM (감지된 시간)",
+        "title": "일정 제목",
+        "location": "장소 (있는 경우)",
+        "category": "건강|경조사|일반",
+        "priority": "important|normal",
+        "description": "추가 설명"
+    }},
+    "missing_info": ["누락된 정보 목록"],
+    "requires_confirmation": true/false,
+    "confirmation_message": "사용자 확인 메시지",
+    "action_needed": "앱에서 수행할 작업"
+}}
+"""
+
     # ===== 프롬프트 접근 메서드들 =====
     
     @classmethod
@@ -256,6 +306,16 @@ JSON 형식으로 응답:
     def get_accessibility_setting_prompt(cls, request: str) -> str:
         """접근성 설정 프롬프트 반환"""
         return cls.ACCESSIBILITY_SETTING_PROMPT.format(request=request)
+    
+    @classmethod
+    def get_unified_request_analysis_prompt(cls, user_request: str, current_date: str = None) -> str:
+        """통합 요청 분석 프롬프트 반환"""
+        if current_date is None:
+            current_date = datetime.now().strftime("%Y-%m-%d")
+        return cls.UNIFIED_REQUEST_ANALYSIS_PROMPT.format(
+            user_request=user_request,
+            current_date=current_date
+        )
     
     @classmethod
     def get_schedule_analysis_prompt(cls, text: str, current_date: str = None) -> str:
@@ -324,32 +384,3 @@ class PromptBuilder:
     def preview(self) -> str:
         """프롬프트 미리보기 (매개변수 치환 없이)"""
         return self.base_prompt
-
-
-# ===== 사용 예시 및 테스트 =====
-
-if __name__ == "__main__":
-    # 프롬프트 매니저 테스트
-    print("=== 프롬프트 매니저 테스트 ===")
-    
-    # 기본 프롬프트 확인
-    print("1. 기본 한국어 어시스턴트 프롬프트:")
-    print(PromptManager.get_korean_assistant_prompt())
-    print()
-    
-    # 명령 분류 프롬프트 확인
-    print("2. 명령 분류 프롬프트:")
-    command_prompt = PromptManager.get_command_classification_prompt("내일 병원 예약 잡아줘")
-    print(command_prompt)
-    print()
-    
-    # 일정 분석 프롬프트 확인
-    print("3. 일정 분석 프롬프트:")
-    schedule_prompt = PromptManager.get_schedule_analysis_prompt("내일 오후 2시에 병원 가기")
-    print(schedule_prompt[:200] + "...")
-    print()
-    
-    # 사용 가능한 프롬프트 목록
-    print("4. 사용 가능한 프롬프트 목록:")
-    for key, desc in PromptManager.get_available_prompts().items():
-        print(f"  - {key}: {desc}")
