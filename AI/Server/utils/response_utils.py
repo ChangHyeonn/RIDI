@@ -38,7 +38,6 @@ def create_elderly_response(data: Dict[str, Any], status_code: int = 200) -> tup
         "success": True,
         "data": data,
         "timestamp": datetime.now().isoformat(),
-        "elderly_optimized": True,
         "simple_message": _extract_simple_message(data)
     }
     return jsonify(response), status_code
@@ -123,31 +122,24 @@ def create_command_classification_response(classification: Dict[str, Any], text:
 def create_voice_response(voice_result: Dict[str, Any]) -> tuple:
     """음성 처리 응답 생성"""
     response = {
-        "success": voice_result.get('success', False),
-        "user_message": voice_result.get('user_message', ''),
-        "ai_response": voice_result.get('ai_response', ''),
-        "audio_response": voice_result.get('audio_response', ''),
-        "schedule_result": voice_result.get('schedule_result', {}),
-        "processing_time": voice_result.get('processing_time', 0),
+        "success": True,
+        "voice_response": {
+            "text": voice_result.get('text', ''),
+            "audio_response": voice_result.get('audio_response', ''),
+            "play_automatically": True
+        },
         "timestamp": datetime.now().isoformat()
     }
-    
-    # 고령자 특화 처리
-    if response.get('success'):
-        response['elderly_optimized'] = True
-        response['simple_response'] = _extract_simple_message(response)
-    
     return jsonify(response), 200
 
 def create_voice_response_with_audio(voice_result: Dict[str, Any]) -> tuple:
     """음성 데이터가 base64로 인코딩된 응답 생성"""
     response = {
-        "success": voice_result.get('success', False),
-        "user_message": voice_result.get('user_message', ''),
-        "ai_response": voice_result.get('ai_response', ''),
-        "schedule_result": voice_result.get('schedule_result', {}),
-        "command_type": voice_result.get('command_type', 'unknown'),
-        "processing_time": voice_result.get('processing_time', 0),
+        "success": True,
+        "voice_response": {
+            "text": voice_result.get('text', ''),
+            "play_automatically": True
+        },
         "timestamp": datetime.now().isoformat()
     }
     
@@ -161,11 +153,6 @@ def create_voice_response_with_audio(voice_result: Dict[str, Any]) -> tuple:
             response['audio_encoding'] = 'base64'
         except Exception as e:
             response['audio_error'] = f"음성 인코딩 실패: {str(e)}"
-    
-    # 고령자 특화 처리
-    if response.get('success'):
-        response['elderly_optimized'] = True
-        response['simple_response'] = _extract_simple_message(response)
     
     return jsonify(response), 200
 

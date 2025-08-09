@@ -39,7 +39,8 @@ def create_schedule_action_response(
     schedule_data: Dict[str, Any],
     voice_text: str,
     ui_screen: str = "calendar",
-    highlight_date: Optional[str] = None
+    highlight_date: Optional[str] = None,
+    audio_data: Optional[bytes] = None
 ) -> tuple:
     """일정 관련 액션 응답 생성"""
     
@@ -68,12 +69,10 @@ def create_schedule_action_response(
     
     voice_response = {
         "text": voice_text,
-        "play_automatically": True,
-        "elderly_optimized": {
-            "slow_speech": True,
-            "high_volume": True
-        }
+        "play_automatically": True
     }
+    if audio_data:
+        voice_response["audio_url"] = f"data:audio/mp3;base64,{base64.b64encode(audio_data).decode()}"
     
     return create_app_action_response(
         action_type=action_type,
@@ -103,11 +102,7 @@ def create_settings_action_response(
     
     voice_response = {
         "text": voice_text,
-        "play_automatically": True,
-        "elderly_optimized": {
-            "slow_speech": False,
-            "high_volume": True
-        }
+        "play_automatically": True
     }
     
     return create_app_action_response(
@@ -130,11 +125,7 @@ def create_voice_only_response(
     
     voice_response = {
         "text": text,
-        "play_automatically": True,
-        "elderly_optimized": {
-            "slow_speech": True,
-            "high_volume": True
-        }
+        "play_automatically": True
     }
     
     if simple_text:
