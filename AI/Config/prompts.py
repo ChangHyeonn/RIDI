@@ -204,7 +204,7 @@ JSON 형식으로 응답:
 지원하는 요청 범주:
 1. schedule_add: 일정 추가 (새로운 일정 등록)
 2. schedule_modify: 일정 수정 (기존 일정 변경)
-3. schedule_delete: 일정 삭제 (기존 일정 제거)
+3. schedule_delete: 일정 삭제 (기존 일정 제거 - 단일 또는 일괄)
 4. schedule_read: 일정 조회 (일정 확인/읽기)
 5. accessibility: 접근성 설정 (글씨/음성/볼륨 조절)
 6. other: 기타 요청
@@ -222,6 +222,11 @@ JSON 형식으로 응답:
 - 경조사: 생일, 결혼식, 장례식, 기념일, 축하, 행사
 - 일반: 회의, 약속, 할 일, 업무, 개인일정
 
+일정 삭제 분석 규칙:
+- 단일 삭제: 특정 일정 제목이 명시된 경우
+- 일괄 삭제: "모든 일정", "전부", "다 지워줘" 등이 포함된 경우
+- 날짜 기반 삭제: "3일 뒤에 있는 모든 일정", "내일 일정 전부" 등
+
 사용자 요청: {user_request}
 
 다음 JSON 형식으로 응답하세요:
@@ -236,6 +241,12 @@ JSON 형식으로 응답:
         "category": "건강|경조사|일반",
         "priority": "important|normal",
         "description": "추가 설명"
+    }},
+    "delete_scope": "single|bulk (schedule_delete인 경우만)",
+    "delete_criteria": {{
+        "date": "YYYY-MM-DD (삭제 기준 날짜)",
+        "time_range": "HH:MM-HH:MM (시간 범위, 옵션)",
+        "title_contains": "키워드 (옵션)"
     }},
     "missing_info": ["누락된 정보 목록"],
     "requires_confirmation": true/false,
