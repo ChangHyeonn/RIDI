@@ -18,6 +18,27 @@ class RecordService {
     return Platform.isAndroid || Platform.isIOS;
   }
 
+  // 녹음 파일 저장 디렉토리 가져오기
+  Future<Directory> _getRecordingsDirectory() async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      // 모바일에서는 앱 문서 디렉토리 내에 recordings 폴더 생성
+      final appDir = await getApplicationDocumentsDirectory();
+      final recordingsDir = Directory('${appDir.path}/recordings');
+      if (!await recordingsDir.exists()) {
+        await recordingsDir.create(recursive: true);
+      }
+      return recordingsDir;
+    } else {
+      // 데스크톱에서는 현재 프로젝트 디렉토리의 recordings 폴더 사용
+      final currentDir = Directory.current;
+      final recordingsDir = Directory('${currentDir.path}/recordings');
+      if (!await recordingsDir.exists()) {
+        await recordingsDir.create(recursive: true);
+      }
+      return recordingsDir;
+    }
+  }
+
   // 권한 요청
   Future<bool> _requestPermission() async {
     if (!_isSupportedPlatform) {
@@ -45,10 +66,12 @@ class RecordService {
     }
 
     try {
-      // 임시 디렉토리 가져오기
-      final tempDir = await getTemporaryDirectory();
+      // 녹음 파일 저장 디렉토리 가져오기
+      final recordingsDir = await _getRecordingsDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      _currentRecordingPath = '${tempDir.path}/recording_$timestamp.m4a';
+      final fileName =
+          'recording_${DateTime.now().year}_${DateTime.now().month.toString().padLeft(2, '0')}_${DateTime.now().day.toString().padLeft(2, '0')}_${DateTime.now().hour.toString().padLeft(2, '0')}_${DateTime.now().minute.toString().padLeft(2, '0')}_${DateTime.now().second.toString().padLeft(2, '0')}.m4a';
+      _currentRecordingPath = '${recordingsDir.path}/$fileName';
 
       // iOS에서는 기본 설정으로 녹음 시작
       if (Platform.isIOS) {
@@ -103,6 +126,42 @@ class RecordService {
   Future<bool> checkRecordingStatus() async {
     if (!_isSupportedPlatform) return false;
     return await _audioRecorder.isRecording();
+  }
+
+  // 저장된 녹음 파일 목록 가져오기
+  Future<List<File>> getRecordedFiles() async {
+    try {
+      final recordingsDir = await _getRecordingsDirectory();
+      final files = recordingsDir
+          .listSync()
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.m4a'))
+          .toList();
+
+      // 최신 파일부터 정렬
+      files.sort(
+        (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()),
+      );
+      return files;
+    } catch (e) {
+      print('녹음 파일 목록 가져오기 실패: $e');
+      return [];
+    }
+  }
+
+  // 녹음 파일 삭제
+  Future<bool> deleteRecording(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        await file.delete();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('녹음 파일 삭제 실패: $e');
+      return false;
+    }
   }
 
   // 리소스 해제

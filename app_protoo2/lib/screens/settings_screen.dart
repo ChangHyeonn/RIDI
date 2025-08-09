@@ -35,7 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: Text(
                           '설정',
                           style: TextStyle(
-                            fontSize: 24,
+                            fontSize: 28,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1f2937),
                           ),
@@ -58,7 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Text(
                         '소리크기: ${(taskProvider.soundVolume * 100).toInt()}%',
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1f2937),
                         ),
@@ -97,7 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Text(
                         '글씨크기: ${(taskProvider.fontSize * 100).toInt()}%',
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1f2937),
                         ),
