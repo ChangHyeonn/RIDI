@@ -97,9 +97,9 @@ class Settings:
         """설정 유효성 검사"""
         errors = []
         
-        # 필수 설정 검사
-        if not cls.API_KEY:
-            errors.append("API_KEY가 설정되지 않았습니다.")
+        # API_KEY는 개발 환경에서는 선택사항 (프로덕션에서만 필수)
+        if not cls.API_KEY and not cls.DEBUG:
+            errors.append("API_KEY가 설정되지 않았습니다. (프로덕션 환경에서는 필수)")
         
         # 데이터베이스 설정 검사
         if cls.DB_ENGINE == 'mongodb':
