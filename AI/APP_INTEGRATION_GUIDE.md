@@ -517,12 +517,272 @@ db.users.createIndex({"user_id": 1})
 ## 🚀 배포 및 운영
 
 ### **1. AI 서버 실행**
+
+#### **기본 실행**
 ```bash
 cd AI
-python main.py --llm-type gemini
+python main.py
 ```
 
-### **2. MongoDB 실행**
+#### **실행 결과 예시**
+============================================================
+ 고령층 일정 메모 관리 AI 서버
+============================================================
+ 서버 주소: 0.0.0.0:5000
+🔧 디버그 모드: False
+🤖 AI 모델: gemini
+ STT 모델: default
+ 디바이스: cpu
+️  데이터베이스: inmemory
+ 고령자 설정:
+   - 음성 속도: 1.0
+   - 볼륨 레벨: 1.0
+   - 간단한 응답: True
+   - 중요 정보 반복: True
+🔒 보안 설정:
+   - API 키 필요: False
+   - 최대 오디오 크기: 10.0MB
+   - 최대 요청 크기: 16.0MB
+============================================================
+✅ 모든 컴포넌트 초기화 완료
+ 서버 시작: 2024-01-15 15:30:00
+ * Running on http://0.0.0.0:5000
+```
+
+#### **고급 실행 옵션**
+```bash
+# 특정 포트로 실행
+python main.py --port 8080
+
+# 특정 호스트로 실행
+python main.py --host 127.0.0.1 --port 3000
+
+# 디버그 모드로 실행
+python main.py --debug
+
+# MongoDB 사용
+python main.py --db-engine mongodb --mongo-uri mongodb://localhost:27017/
+
+# 접근성 설정
+python main.py --speech-rate 0.8 --volume-level 1.2
+```
+
+### **2. 서버 접근 방법**
+
+#### **로컬 접근 (같은 컴퓨터)**
+- **브라우저**: `http://localhost:5000/api/v1/health`
+- **API 테스트**: `http://127.0.0.1:5000/api/v1/health`
+
+#### **네트워크 접근 (다른 기기)**
+- **IP 주소**: `http://[서버_IP]:5000/api/v1/health`
+- **예시**: `http://192.168.1.100:5000/api/v1/health`
+
+#### **IP 주소 확인 방법**
+```bash
+# macOS/Linux
+ifconfig | grep "inet "
+
+# Windows
+ipconfig | findstr "IPv4"
+
+# 또는
+hostname -I
+```
+
+### **3. Flutter 앱에서 서버 연결**
+
+#### **개발 환경 설정**
+
+```dart
+// lib/services/ai_service.dart
+class AIService {
+  // 개발 환경별 서버 URL 설정
+  static const String baseUrl = _getBaseUrl();
+  
+  static String _getBaseUrl() {
+    // 디버그 모드에서 플랫폼별 다른 URL 사용
+    if (kDebugMode) {
+      if (Platform.isAndroid) {
+        // Android 에뮬레이터에서 로컬 서버 접근
+        return 'http://10.0.2.2:5000';
+      } else if (Platform.isIOS) {
+        // iOS 시뮬레이터에서 로컬 서버 접근
+        return 'http://localhost:5000';
+      }
+    }
+    
+    // 실제 기기나 릴리즈 모드에서는 실제 IP 사용
+    return 'http://192.168.1.100:5000';  // 실제 서버 IP
+  }
+  
+  static Future<AIResponse> processVoice(String audioPath) async {
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/api/v1/process_voice'),
+      );
+      
+      request.files.add(
+        await http.MultipartFile.fromPath('audio', audioPath),
+      );
+      request.fields['user_id'] = 'user123';
+      
+      var response = await request.send();
+      var responseData = await response.stream.bytesToString();
+      
+      if (response.statusCode == 200) {
+        return AIResponse.fromJson(json.decode(responseData));
+      } else {
+        throw Exception('서버 오류: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('네트워크 오류: $e');
+    }
+  }
+}
+```
+
+#### **환경별 설정 파일**
+
+```dart
+// lib/config/app_config.dart
+class AppConfig {
+  static const Map<String, String> _environments = {
+    'development': 'http://10.0.2.2:5000',      // Android 에뮬레이터
+    'development_ios': 'http://localhost:5000',  // iOS 시뮬레이터
+    'development_device': 'http://192.168.1.100:5000', // 실제 기기
+    'production': 'https://your-production-server.com',
+  };
+  
+  static String get baseUrl {
+    if (kDebugMode) {
+      if (Platform.isAndroid) {
+        return _environments['development']!;
+      } else if (Platform.isIOS) {
+        return _environments['development_ios']!;
+      }
+      return _environments['development_device']!;
+    }
+    return _environments['production']!;
+  }
+}
+```
+
+#### **연결 테스트 함수**
+
+```dart
+class AIService {
+  // ... existing code ...
+  
+  static Future<bool> testConnection() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/v1/health'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      print('서버 연결 테스트 실패: $e');
+      return false;
+    }
+  }
+  
+  static Future<void> checkServerStatus() async {
+    final isConnected = await testConnection();
+    if (!isConnected) {
+      throw Exception('AI 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.');
+    }
+  }
+}
+```
+
+### **4. 서버 상태 모니터링**
+
+#### **Health Check API**
+```bash
+curl http://localhost:5000/api/v1/health
+```
+
+#### **응답 예시**
+```json
+{
+  "success": true,
+  "action": {
+    "type": "health_check",
+    "priority": "low",
+    "data": {
+      "status": "healthy",
+      "timestamp": "2024-01-15T15:30:00Z",
+      "version": "1.0.0",
+      "components": {
+        "llm": "active",
+        "stt": "active",
+        "tts": "active",
+        "database": "connected"
+      }
+    }
+  }
+}
+```
+
+### **5. 서버 종료**
+
+#### **정상 종료**
+- 터미널에서 `Ctrl + C`
+- 서버가 안전하게 종료됨
+
+#### **강제 종료**
+```bash
+# 프로세스 찾기
+lsof -i :5000
+
+# 프로세스 종료
+kill -9 [PID]
+```
+
+### **6. 문제 해결**
+
+#### **연결 실패 시 확인사항**
+
+1. **서버 실행 확인**
+   ```bash
+   # 서버가 실행 중인지 확인
+   curl http://localhost:5000/api/v1/health
+   ```
+
+2. **포트 확인**
+   ```bash
+   # 포트 사용 중인지 확인
+   lsof -i :5000
+   ```
+
+3. **방화벽 설정**
+   - macOS: 시스템 환경설정 > 보안 및 개인 정보 보호 > 방화벽
+   - Windows: Windows Defender 방화벽
+   - Linux: `sudo ufw allow 5000`
+
+4. **네트워크 연결 확인**
+   ```bash
+   # 같은 네트워크에서 ping 테스트
+   ping 192.168.1.100
+   ```
+
+#### **일반적인 오류**
+
+| 오류 | 원인 | 해결방법 |
+|------|------|----------|
+| `Connection refused` | 서버가 실행되지 않음 | `python main.py` 실행 |
+| `Timeout` | 네트워크 문제 | IP 주소 확인, 방화벽 설정 |
+| `CORS error` | 브라우저 보안 정책 | 서버 CORS 설정 확인 |
+| `Port already in use` | 포트 충돌 | 다른 포트 사용 (`--port 8080`) |
+
+### **7. MongoDB 실행**
+
 ```bash
 # Docker로 실행
 docker run -d -p 27017:27017 --name mongodb mongo:latest
@@ -530,13 +790,6 @@ docker run -d -p 27017:27017 --name mongodb mongo:latest
 # 또는 로컬 설치
 brew install mongodb-community  # macOS
 sudo systemctl start mongod     # Linux
-```
-
-### **3. Flutter 앱 빌드**
-```bash
-cd app_protoo
-flutter build apk --release
-flutter build ios --release
 ```
 
 ## 📊 성능 최적화
