@@ -321,79 +321,127 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                             const SizedBox(
                                                               width: 12,
                                                             ),
-                                                            // 일정 개수 배지 (오버플로우 시 숨김)
-                                                            LayoutBuilder(
-                                                              builder: (context, constraints) {
-                                                                return Builder(
-                                                                  builder: (context) {
-                                                                    // 배지 위젯을 미리 렌더링해서 크기 확인
-                                                                    final badgeWidget = Container(
-                                                                      padding: const EdgeInsets.symmetric(
-                                                                        horizontal: 8,
-                                                                        vertical: 4,
+                                                            // 일정 개수 배지 (공간 부족시 숨김)
+                                                            Builder(
+                                                              builder: (context) {
+                                                                final screenWidth =
+                                                                    MediaQuery.of(
+                                                                      context,
+                                                                    ).size.width;
+                                                                final availableWidth =
+                                                                    screenWidth -
+                                                                    40; // 패딩 제외
+
+                                                                // 배지가 들어갈 수 있는 공간 계산
+                                                                final titleWidth =
+                                                                    (titleFontSize +
+                                                                        5) *
+                                                                    2; // "오늘" 텍스트
+                                                                final dateWidth =
+                                                                    (titleFontSize -
+                                                                        6) *
+                                                                    4; // 날짜 텍스트
+                                                                final dashWidth =
+                                                                    (titleFontSize -
+                                                                        2) *
+                                                                    1; // "-" 텍스트
+                                                                final spacingWidth =
+                                                                    8 +
+                                                                    8 +
+                                                                    12; // 간격들
+                                                                final importantButtonWidth =
+                                                                    60; // 중요 버튼
+                                                                final iconWidth =
+                                                                    44; // 아이콘 컨테이너
+                                                                final iconSpacing =
+                                                                    16; // 아이콘과 텍스트 간격
+
+                                                                // 배지가 들어갈 수 있는 공간
+                                                                final spaceForBadge =
+                                                                    availableWidth -
+                                                                    titleWidth -
+                                                                    dateWidth -
+                                                                    dashWidth -
+                                                                    spacingWidth -
+                                                                    importantButtonWidth -
+                                                                    iconWidth -
+                                                                    iconSpacing;
+
+                                                                // 배지 대략적 너비
+                                                                final estimatedBadgeWidth =
+                                                                    8 +
+                                                                    8 +
+                                                                    12 +
+                                                                    4 +
+                                                                    ((14 + 2) *
+                                                                        scaleFactor *
+                                                                        3);
+
+                                                                // 공간이 충분한지 확인
+                                                                if (spaceForBadge >=
+                                                                    estimatedBadgeWidth) {
+                                                                  return Container(
+                                                                    padding: const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          8,
+                                                                      vertical:
+                                                                          4,
+                                                                    ),
+                                                                    decoration: BoxDecoration(
+                                                                      color: const Color(
+                                                                        0xFFf3f4f6,
                                                                       ),
-                                                                      decoration: BoxDecoration(
-                                                                        color: const Color(0xFFf3f4f6),
-                                                                        borderRadius: BorderRadius.circular(12),
-                                                                        border: Border.all(
-                                                                          color: const Color(0xFFd1d5db),
-                                                                          width: 1,
-                                                                        ),
-                                                                      ),
-                                                                      child: Row(
-                                                                        mainAxisSize: MainAxisSize.min,
-                                                                        children: [
-                                                                          Icon(
-                                                                            Icons.check_circle,
-                                                                            size: 12,
-                                                                            color: const Color(0xFF10b981),
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            12,
                                                                           ),
-                                                                          const SizedBox(width: 4),
-                                                                          Text(
-                                                                            '${todayTasks.where((task) => task.isCompleted).length}/${todayTasks.length}',
-                                                                            style: TextStyle(
-                                                                              fontSize: (14 + 2) * scaleFactor,
-                                                                              fontWeight: FontWeight.w600,
-                                                                              color: const Color(0xFF6b7280),
+                                                                      border: Border.all(
+                                                                        color: const Color(
+                                                                          0xFFd1d5db,
+                                                                        ),
+                                                                        width:
+                                                                            1,
+                                                                      ),
+                                                                    ),
+                                                                    child: Row(
+                                                                      mainAxisSize:
+                                                                          MainAxisSize
+                                                                              .min,
+                                                                      children: [
+                                                                        Icon(
+                                                                          Icons
+                                                                              .check_circle,
+                                                                          size:
+                                                                              12,
+                                                                          color: const Color(
+                                                                            0xFF10b981,
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          width:
+                                                                              4,
+                                                                        ),
+                                                                        Text(
+                                                                          '${todayTasks.where((task) => task.isCompleted).length}/${todayTasks.length}',
+                                                                          style: TextStyle(
+                                                                            fontSize:
+                                                                                (14 +
+                                                                                    2) *
+                                                                                scaleFactor,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                            color: const Color(
+                                                                              0xFF6b7280,
                                                                             ),
                                                                           ),
-                                                                        ],
-                                                                      ),
-                                                                    );
-
-                                                                    // 현재 Row의 사용 가능한 공간 계산
-                                                                    final availableWidth = constraints.maxWidth;
-                                                                    final titleWidth = (titleFontSize + 5) * 2; // "오늘" 텍스트
-                                                                    final dateWidth = (titleFontSize - 6) * 4; // 날짜 텍스트
-                                                                    final dashWidth = (titleFontSize - 2) * 1; // "-" 텍스트
-                                                                    final spacingWidth = 8 + 8 + 12; // 간격들
-                                                                    final importantButtonWidth = 60; // 중요 버튼
-                                                                    final iconWidth = 44; // 아이콘 컨테이너
-                                                                    final iconSpacing = 16; // 아이콘과 텍스트 간격
-
-                                                                    // 배지가 들어갈 수 있는 공간
-                                                                    final spaceForBadge = availableWidth - 
-                                                                                        titleWidth - 
-                                                                                        dateWidth - 
-                                                                                        dashWidth - 
-                                                                                        spacingWidth - 
-                                                                                        importantButtonWidth - 
-                                                                                        iconWidth - 
-                                                                                        iconSpacing;
-
-                                                                    // 배지 대략적 너비 (패딩 + 아이콘 + 텍스트 + 간격)
-                                                                    final estimatedBadgeWidth = 8 + 8 + 12 + 4 + 
-                                                                                              ((14 + 2) * scaleFactor * 3); // 텍스트 대략적 너비
-
-                                                                    // 공간이 충분한지 확인
-                                                                    if (spaceForBadge >= estimatedBadgeWidth) {
-                                                                      return badgeWidget;
-                                                                    } else {
-                                                                      // 공간이 부족하면 완전히 숨김
-                                                                      return const SizedBox.shrink();
-                                                                    }
-                                                                  },
-                                                                );
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  );
+                                                                } else {
+                                                                  // 공간이 부족하면 완전히 숨김
+                                                                  return const SizedBox.shrink();
+                                                                }
                                                               },
                                                             ),
                                                           ],
@@ -885,79 +933,127 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                             const SizedBox(
                                                               width: 12,
                                                             ),
-                                                                                                                        // 일정 개수 배지 (오버플로우 시 숨김)
-                                                            LayoutBuilder(
-                                                              builder: (context, constraints) {
-                                                                return Builder(
-                                                                  builder: (context) {
-                                                                    // 배지 위젯을 미리 렌더링해서 크기 확인
-                                                                    final badgeWidget = Container(
-                                                                      padding: const EdgeInsets.symmetric(
-                                                                        horizontal: 8,
-                                                                        vertical: 4,
+                                                            // 일정 개수 배지 (공간 부족시 숨김)
+                                                            Builder(
+                                                              builder: (context) {
+                                                                final screenWidth =
+                                                                    MediaQuery.of(
+                                                                      context,
+                                                                    ).size.width;
+                                                                final availableWidth =
+                                                                    screenWidth -
+                                                                    40; // 패딩 제외
+
+                                                                // 배지가 들어갈 수 있는 공간 계산
+                                                                final titleWidth =
+                                                                    (titleFontSize +
+                                                                        5) *
+                                                                    2; // "내일" 텍스트
+                                                                final dateWidth =
+                                                                    (titleFontSize -
+                                                                        6) *
+                                                                    4; // 날짜 텍스트
+                                                                final dashWidth =
+                                                                    (titleFontSize -
+                                                                        2) *
+                                                                    1; // "-" 텍스트
+                                                                final spacingWidth =
+                                                                    8 +
+                                                                    8 +
+                                                                    12; // 간격들
+                                                                final importantButtonWidth =
+                                                                    60; // 중요 버튼
+                                                                final iconWidth =
+                                                                    44; // 아이콘 컨테이너
+                                                                final iconSpacing =
+                                                                    16; // 아이콘과 텍스트 간격
+
+                                                                // 배지가 들어갈 수 있는 공간
+                                                                final spaceForBadge =
+                                                                    availableWidth -
+                                                                    titleWidth -
+                                                                    dateWidth -
+                                                                    dashWidth -
+                                                                    spacingWidth -
+                                                                    importantButtonWidth -
+                                                                    iconWidth -
+                                                                    iconSpacing;
+
+                                                                // 배지 대략적 너비
+                                                                final estimatedBadgeWidth =
+                                                                    8 +
+                                                                    8 +
+                                                                    12 +
+                                                                    4 +
+                                                                    ((14 + 2) *
+                                                                        scaleFactor *
+                                                                        3);
+
+                                                                // 공간이 충분한지 확인
+                                                                if (spaceForBadge >=
+                                                                    estimatedBadgeWidth) {
+                                                                  return Container(
+                                                                    padding: const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          8,
+                                                                      vertical:
+                                                                          4,
+                                                                    ),
+                                                                    decoration: BoxDecoration(
+                                                                      color: const Color(
+                                                                        0xFFf3f4f6,
                                                                       ),
-                                                                      decoration: BoxDecoration(
-                                                                        color: const Color(0xFFf3f4f6),
-                                                                        borderRadius: BorderRadius.circular(12),
-                                                                        border: Border.all(
-                                                                          color: const Color(0xFFd1d5db),
-                                                                          width: 1,
-                                                                        ),
-                                                                      ),
-                                                                      child: Row(
-                                                                        mainAxisSize: MainAxisSize.min,
-                                                                        children: [
-                                                                          Icon(
-                                                                            Icons.check_circle,
-                                                                            size: 12,
-                                                                            color: const Color(0xFF10b981),
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            12,
                                                                           ),
-                                                                          const SizedBox(width: 4),
-                                                                          Text(
-                                                                            '${tomorrowTasks.where((task) => task.isCompleted).length}/${tomorrowTasks.length}',
-                                                                            style: TextStyle(
-                                                                              fontSize: (14 + 2) * scaleFactor,
-                                                                              fontWeight: FontWeight.w600,
-                                                                              color: const Color(0xFF6b7280),
+                                                                      border: Border.all(
+                                                                        color: const Color(
+                                                                          0xFFd1d5db,
+                                                                        ),
+                                                                        width:
+                                                                            1,
+                                                                      ),
+                                                                    ),
+                                                                    child: Row(
+                                                                      mainAxisSize:
+                                                                          MainAxisSize
+                                                                              .min,
+                                                                      children: [
+                                                                        Icon(
+                                                                          Icons
+                                                                              .check_circle,
+                                                                          size:
+                                                                              12,
+                                                                          color: const Color(
+                                                                            0xFF10b981,
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          width:
+                                                                              4,
+                                                                        ),
+                                                                        Text(
+                                                                          '${tomorrowTasks.where((task) => task.isCompleted).length}/${tomorrowTasks.length}',
+                                                                          style: TextStyle(
+                                                                            fontSize:
+                                                                                (14 +
+                                                                                    2) *
+                                                                                scaleFactor,
+                                                                            fontWeight:
+                                                                                FontWeight.w600,
+                                                                            color: const Color(
+                                                                              0xFF6b7280,
                                                                             ),
                                                                           ),
-                                                                        ],
-                                                                      ),
-                                                                    );
-
-                                                                    // 현재 Row의 사용 가능한 공간 계산
-                                                                    final availableWidth = constraints.maxWidth;
-                                                                    final titleWidth = (titleFontSize + 5) * 2; // "내일" 텍스트
-                                                                    final dateWidth = (titleFontSize - 6) * 4; // 날짜 텍스트
-                                                                    final dashWidth = (titleFontSize - 2) * 1; // "-" 텍스트
-                                                                    final spacingWidth = 8 + 8 + 12; // 간격들
-                                                                    final importantButtonWidth = 60; // 중요 버튼
-                                                                    final iconWidth = 44; // 아이콘 컨테이너
-                                                                    final iconSpacing = 16; // 아이콘과 텍스트 간격
-
-                                                                    // 배지가 들어갈 수 있는 공간
-                                                                    final spaceForBadge = availableWidth - 
-                                                                                        titleWidth - 
-                                                                                        dateWidth - 
-                                                                                        dashWidth - 
-                                                                                        spacingWidth - 
-                                                                                        importantButtonWidth - 
-                                                                                        iconWidth - 
-                                                                                        iconSpacing;
-
-                                                                    // 배지 대략적 너비 (패딩 + 아이콘 + 텍스트 + 간격)
-                                                                    final estimatedBadgeWidth = 8 + 8 + 12 + 4 + 
-                                                                                              ((14 + 2) * scaleFactor * 3); // 텍스트 대략적 너비
-
-                                                                    // 공간이 충분한지 확인
-                                                                    if (spaceForBadge >= estimatedBadgeWidth) {
-                                                                      return badgeWidget;
-                                                                    } else {
-                                                                      // 공간이 부족하면 완전히 숨김
-                                                                      return const SizedBox.shrink();
-                                                                    }
-                                                                  },
-                                                                );
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  );
+                                                                } else {
+                                                                  // 공간이 부족하면 완전히 숨김
+                                                                  return const SizedBox.shrink();
+                                                                }
                                                               },
                                                             ),
                                                           ],

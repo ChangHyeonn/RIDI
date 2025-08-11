@@ -134,17 +134,30 @@ class RecordService {
           break;
       }
 
-      // 권한 요청 (iOS에서는 약간의 지연 후 요청)
+      // iOS에서 권한 요청 전에 추가 확인
+      print('iOS 마이크 권한 요청 전 확인...');
+      
+      // 권한 요청 (iOS에서는 더 긴 지연 후 요청)
       print('iOS 마이크 권한 요청 시도...');
-      await Future.delayed(const Duration(milliseconds: 500));
-      final status = await Permission.microphone.request();
-      print('iOS 마이크 권한 요청 결과: $status');
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      try {
+        final status = await Permission.microphone.request();
+        print('iOS 마이크 권한 요청 결과: $status');
 
-      if (status == PermissionStatus.granted) {
-        print('iOS 마이크 권한 허용됨');
-        return true;
-      } else {
-        print('iOS 마이크 권한 거부됨: $status');
+        if (status == PermissionStatus.granted) {
+          print('iOS 마이크 권한 허용됨');
+          return true;
+        } else if (status == PermissionStatus.permanentlyDenied) {
+          print('iOS 마이크 권한이 영구적으로 거부됨. 설정으로 이동합니다.');
+          await openAppSettings();
+          return false;
+        } else {
+          print('iOS 마이크 권한 거부됨: $status');
+          return false;
+        }
+      } catch (e) {
+        print('iOS 마이크 권한 요청 중 오류 발생: $e');
         return false;
       }
     } else {
