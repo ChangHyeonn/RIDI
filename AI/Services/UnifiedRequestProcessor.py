@@ -237,21 +237,15 @@ class UnifiedRequestProcessor:
         }
     
     def _handle_schedule_delete(self, analysis: Dict[str, Any], user_id: Optional[str]) -> Dict[str, Any]:
-        """일정 삭제 처리"""
+        """일정 삭제 처리 (단일/일괄 삭제 지원)"""
         extracted_info = analysis.get('extracted_info', {})
+        delete_scope = analysis.get('delete_scope', 'single')
+        delete_criteria = analysis.get('delete_criteria', {})
         
-        # 삭제할 일정 식별 필요
+        # 삭제할 일정 식별 정보
         title = extracted_info.get('title')
-        date = extracted_info.get('date')
+        date = extracted_info.get('date') or delete_criteria.get('date')
         time = extracted_info.get('time')
-
-        if not title:
-            return {
-                'success': False,
-                'requires_clarification': True,
-                'missing_fields': ['title'],
-                'message': '어떤 일정을 삭제하시겠어요? 일정 제목을 말씀해 주세요.'
-            }
 
         # 사용자 식별 필요
         if not user_id:
@@ -261,43 +255,103 @@ class UnifiedRequestProcessor:
                 'message': '삭제할 일정을 찾기 위해 사용자를 식별할 수 없어 확인이 필요합니다.'
             }
 
-        # 후보 검색 및 모호성 해소
-        candidates = self.schedule_manager.find_schedules(user_id, title=title, date=date, time=time)
-
-        if len(candidates) == 0:
-            return {
-                'success': False,
-                'requires_clarification': True,
-                'message': f"'{title}' 일정이 보이지 않습니다. 날짜나 시간을 함께 말씀해 주세요."
-            }
-
-        if len(candidates) > 1:
-            brief = [
-                {
-                    'id': s.get('id'),
-                    'title': s.get('data', {}).get('title'),
-                    'datetime': s.get('data', {}).get('datetime')
+        # 일괄 삭제 처리
+        if delete_scope == 'bulk':
+            if not date:
+                return {
+                    'success': False,
+                    'requires_clarification': True,
+                    'missing_fields': ['date'],
+                    'message': '어느 날짜의 일정을 삭제하시겠어요? 날짜를 말씀해 주세요.'
                 }
-                for s in candidates
-            ]
-            return {
-                'success': False,
-                'requires_clarification': True,
-                'candidates': brief,
-                'message': f"'{title}' 일정이 여러 개 있습니다. 삭제할 일정의 날짜/시간을 말씀해 주세요."
-            }
+            
+            # 날짜 기반 일괄 삭제 후보 검색
+            candidates = self.schedule_manager.get_schedules_by_date(user_id, date)
+            
+            if len(candidates) == 0:
+                return {
+                    'success': False,
+                    'requires_clarification': True,
+                    'message': f'{date}에 등록된 일정이 없습니다.'
+                }
+            
+            if len(candidates) == 1:
+                # 단일 일정인 경우 바로 삭제
+                schedule = candidates[0]
+                return {
+                    'success': True,
+                    'action': 'schedule_delete',
+                    'delete_info': {
+                        'id': schedule.get('id'),
+                        'title': schedule.get('data', {}).get('title'),
+                        'datetime': schedule.get('data', {}).get('datetime')
+                    },
+                    'message': f'{date}의 일정을 삭제하겠습니다.'
+                }
+            else:
+                # 여러 일정인 경우 확인 요청
+                brief = [
+                    {
+                        'id': s.get('id'),
+                        'title': s.get('data', {}).get('title'),
+                        'datetime': s.get('data', {}).get('datetime')
+                    }
+                    for s in candidates
+                ]
+                return {
+                    'success': False,
+                    'requires_clarification': True,
+                    'candidates': brief,
+                    'message': f'{date}에 {len(candidates)}개의 일정이 있습니다. 모두 삭제하시겠어요?'
+                }
 
-        only = candidates[0]
-        return {
-            'success': True,
-            'action': 'schedule_delete',
-            'delete_info': {
-                'id': only.get('id'),
-                'title': only.get('data', {}).get('title'),
-                'datetime': only.get('data', {}).get('datetime')
-            },
-            'message': '일정 삭제를 진행하겠습니다.'
-        }
+        # 단일 삭제 처리
+        else:
+            if not title:
+                return {
+                    'success': False,
+                    'requires_clarification': True,
+                    'missing_fields': ['title'],
+                    'message': '어떤 일정을 삭제하시겠어요? 일정 제목을 말씀해 주세요.'
+                }
+
+            # 후보 검색 및 모호성 해소
+            candidates = self.schedule_manager.find_schedules(user_id, title=title, date=date, time=time)
+
+            if len(candidates) == 0:
+                return {
+                    'success': False,
+                    'requires_clarification': True,
+                    'message': f"'{title}' 일정이 보이지 않습니다. 날짜나 시간을 함께 말씀해 주세요."
+                }
+
+            if len(candidates) > 1:
+                brief = [
+                    {
+                        'id': s.get('id'),
+                        'title': s.get('data', {}).get('title'),
+                        'datetime': s.get('data', {}).get('datetime')
+                    }
+                    for s in candidates
+                ]
+                return {
+                    'success': False,
+                    'requires_clarification': True,
+                    'candidates': brief,
+                    'message': f"'{title}' 일정이 여러 개 있습니다. 삭제할 일정의 날짜/시간을 말씀해 주세요."
+                }
+
+            only = candidates[0]
+            return {
+                'success': True,
+                'action': 'schedule_delete',
+                'delete_info': {
+                    'id': only.get('id'),
+                    'title': only.get('data', {}).get('title'),
+                    'datetime': only.get('data', {}).get('datetime')
+                },
+                'message': '일정 삭제를 진행하겠습니다.'
+            }
     
     def _handle_schedule_read(self, analysis: Dict[str, Any], user_id: Optional[str]) -> Dict[str, Any]:
         """일정 조회 처리"""

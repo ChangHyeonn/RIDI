@@ -71,13 +71,12 @@ class Settings:
     # 일정 관리 설정
     DEFAULT_REMINDER_MINUTES = int(os.getenv('DEFAULT_REMINDER_MINUTES', 30))
 
-    # Database (MySQL)
-    DB_ENGINE = os.getenv('DB_ENGINE', 'inmemory')  # inmemory | mysql
-    MYSQL_HOST = os.getenv('MYSQL_HOST', '127.0.0.1')
-    MYSQL_PORT = int(os.getenv('MYSQL_PORT', 3306))
-    MYSQL_USER = os.getenv('MYSQL_USER', 'root')
-    MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '')
-    MYSQL_DB = os.getenv('MYSQL_DB', 'ridi_ai')
+    # Database Settings
+    DB_ENGINE = os.getenv('DB_ENGINE', 'inmemory')  # inmemory | mongodb
+    
+    # MongoDB Settings
+    MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
+    MONGO_DB = os.getenv('MONGO_DB', 'ridi_ai')
     
     @classmethod
     def get_device(cls) -> str:
@@ -98,6 +97,16 @@ class Settings:
         """설정 유효성 검사"""
         errors = []
         
+        # 필수 설정 검사
+        if not cls.API_KEY:
+            errors.append("API_KEY가 설정되지 않았습니다.")
+        
+        # 데이터베이스 설정 검사
+        if cls.DB_ENGINE == 'mongodb':
+            if not cls.MONGO_URI:
+                errors.append("MongoDB URI가 설정되지 않았습니다.")
+        
+        # 기타 설정 검사
         if cls.PORT < 1 or cls.PORT > 65535:
             errors.append("PORT must be between 1 and 65535")
         
@@ -110,4 +119,4 @@ class Settings:
         if cls.MAX_AUDIO_SIZE <= 0:
             errors.append("MAX_AUDIO_SIZE must be positive")
         
-        return errors 
+        return errors

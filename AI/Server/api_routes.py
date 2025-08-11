@@ -8,6 +8,7 @@ import sys
 import os
 import tempfile
 import logging
+import base64
 
 # 프로젝트 루트를 Python 경로에 추가
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -68,6 +69,7 @@ def process_voice():
                 processing_result = result.get('processing_result', {})
                 analysis = processing_result.get('analysis', {})
                 result_data = processing_result.get('result', {})
+                audio_bytes = result.get('audio_response')
                 
                 category = analysis.get('category', 'other')
                 action = result_data.get('action', '')
@@ -84,8 +86,7 @@ def process_voice():
                         data=payload,
                         voice_response={
                             "text": msg,
-                            "play_automatically": True,
-                            "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                            "play_automatically": True
                         },
                         ui_instructions={
                             "screen": "conversation",
@@ -106,14 +107,16 @@ def process_voice():
                         action_type="schedule_add",
                         schedule_data=minimal_payload,
                         voice_text=result_data.get('message', '일정이 추가되었습니다.'),
-                        highlight_date=schedule_data.get('datetime', '').split(' ')[0] if schedule_data.get('datetime') else ''
+                        highlight_date=schedule_data.get('datetime', '').split(' ')[0] if schedule_data.get('datetime') else '',
+                        audio_data=audio_bytes
                     )
                 elif category == "schedule_delete" or action == "schedule_delete":
                     delete_info = result_data.get('delete_info', {})
                     return create_schedule_action_response(
                         action_type="schedule_delete",
                         schedule_data=delete_info,
-                        voice_text=result_data.get('message', '일정이 삭제되었습니다.')
+                        voice_text=result_data.get('message', '일정이 삭제되었습니다.'),
+                        audio_data=audio_bytes
                     )
                 elif category == "schedule_read" or action == "schedule_read":
                     schedules = result_data.get('schedules', [])
@@ -123,7 +126,7 @@ def process_voice():
                         voice_response={
                             "text": result_data.get('message', '일정을 조회했습니다.'),
                             "play_automatically": True,
-                            "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                            **({"audio_url": f"data:audio/mp3;base64,{base64.b64encode(audio_bytes).decode()}"} if audio_bytes else {})
                         },
                         ui_instructions={
                             "screen": "schedule_list",
@@ -141,7 +144,7 @@ def process_voice():
                     # 일반 음성 응답
                     return create_voice_only_response(
                         text=result.get('ai_response', ''),
-                        audio_data=result.get('audio_data')
+                        audio_data=audio_bytes
                     )
             else:
                 return create_error_action_response(
@@ -206,8 +209,7 @@ def list_schedules():
                 data={"schedules": schedules},
                 voice_response={
                     "text": f"총 {len(schedules)}개의 일정이 있습니다.",
-                    "play_automatically": True,
-                    "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                    "play_automatically": True
                 },
                 ui_instructions={
                     "screen": "schedule_list",
@@ -303,7 +305,7 @@ def get_simple_response():
         
         return create_voice_only_response(
             text=simple_text,
-            simple_text=simple_text
+            audio_data=None # elderly_optimized 제거
         )
         
     except Exception as e:
@@ -326,7 +328,7 @@ def repeat_important_message():
         
         return create_voice_only_response(
             text=repeated_message.strip(),
-            simple_text=message
+            audio_data=None # elderly_optimized 제거
         )
         
     except Exception as e:
@@ -389,8 +391,7 @@ def read_schedules_by_date():
                 },
                 voice_response={
                     "text": f"{target_date}에 {len(schedules)}개의 일정이 있습니다.",
-                    "play_automatically": True,
-                    "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                    "play_automatically": True
                 },
                 ui_instructions={
                     "screen": "schedule_list",
@@ -426,8 +427,7 @@ def get_important_schedules():
                 },
                 voice_response={
                     "text": f"중요한 일정 {len(schedules)}개가 있습니다.",
-                    "play_automatically": True,
-                    "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                    "play_automatically": True
                 },
                 ui_instructions={
                     "screen": "schedule_list",
@@ -496,8 +496,7 @@ def get_accessibility_settings():
                 },
                 voice_response={
                     "text": "접근성 설정을 조회했습니다.",
-                    "play_automatically": True,
-                    "elderly_optimized": {"slow_speech": True, "high_volume": True}
+                    "play_automatically": True
                 },
                 ui_instructions={
                     "screen": "settings",
@@ -529,7 +528,5 @@ def setup_routes(app):
         return create_error_response("허용되지 않는 HTTP 메서드입니다", 405)
     
     @app.errorhandler(500)
-    def internal_error(error):
-        return create_error_response("서버 내부 오류가 발생했습니다", 500) 
     def internal_error(error):
         return create_error_response("서버 내부 오류가 발생했습니다", 500) 

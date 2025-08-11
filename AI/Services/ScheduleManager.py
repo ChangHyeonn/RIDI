@@ -16,21 +16,21 @@ class ScheduleManager:
         from Config.settings import Settings
         from Repositories.schedule_repository import (
             InMemoryScheduleRepository,
-            MySQLScheduleRepository,
+            MongoDBScheduleRepository,
             BaseScheduleRepository,
         )
 
         self.schedules = defaultdict(list)  # legacy in-memory cache
         self.user_settings = defaultdict(dict)  # user_id -> settings
         self._setup_logging()
+        
         # Repository 선택
-        if getattr(Settings, 'DB_ENGINE', 'inmemory') == 'mysql':
-            self.repo: BaseScheduleRepository = MySQLScheduleRepository(
-                host=Settings.MYSQL_HOST,
-                port=Settings.MYSQL_PORT,
-                user=Settings.MYSQL_USER,
-                password=Settings.MYSQL_PASSWORD,
-                db=Settings.MYSQL_DB,
+        db_engine = getattr(Settings, 'DB_ENGINE', 'inmemory')
+        
+        if db_engine == 'mongodb':
+            self.repo: BaseScheduleRepository = MongoDBScheduleRepository(
+                connection_string=Settings.MONGO_URI,
+                db_name=Settings.MONGO_DB,
             )
         else:
             self.repo = InMemoryScheduleRepository()
@@ -143,4 +143,4 @@ class ScheduleManager:
             "total_users": total_users,
             "total_schedules": total_schedules,
             "memory_usage": len(self.schedules) + len(self.user_settings)
-        } 
+        }
