@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:provider/provider.dart';
+import '../providers/task_provider.dart';
 import '../services/record_service.dart';
 import '../services/ai_service.dart';
 import '../services/action_handler.dart';
@@ -249,16 +251,35 @@ class _RecordScreenState extends State<RecordScreen> {
     }
   }
 
+  Future<void> _testAIConnection() async {
+    try {
+      final isConnected = await AIService.testConnection();
+      if (isConnected) {
+        _showSuccessSnackBar('AI 서버에 연결되었습니다!');
+      } else {
+        _showErrorSnackBar('AI 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.');
+      }
+    } catch (e) {
+      _showErrorSnackBar('AI 서버 연결 테스트 중 오류가 발생했습니다: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFfafafa),
       appBar: AppBar(
         title: const Text('음성 녹음'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1f2937),
-        elevation: 0,
-        shadowColor: Colors.black.withValues(alpha: 0.08),
+        backgroundColor: const Color(0xFF10b981),
+        foregroundColor: Colors.white,
+        actions: [
+          // AI 서버 연결 상태 확인 버튼
+          IconButton(
+            onPressed: _testAIConnection,
+            icon: const Icon(Icons.wifi),
+            tooltip: 'AI 서버 연결 확인',
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),

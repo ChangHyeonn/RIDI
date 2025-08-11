@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/ai_response.dart';
@@ -26,50 +27,259 @@ class AIService {
   }
 
   static Future<AIResponse> processVoice(String audioPath) async {
+    print('=== AI 음성 처리 시작 ===');
+    print('서버 URL: $baseUrl');
+    print('오디오 파일 경로: $audioPath');
+    
     try {
+      // 서버 연결 상태 먼저 확인
+      print('서버 연결 상태 확인 중...');
+      final isConnected = await testConnection();
+      if (!isConnected) {
+        print('❌ 서버 연결 실패 - 서버가 실행 중인지 확인하세요');
+        throw Exception('AI 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.');
+      }
+      print('✅ 서버 연결 성공');
+
       var request = http.MultipartRequest(
         'POST',
         Uri.parse('$baseUrl/api/v1/process_voice'),
       );
 
+      print('📤 요청 준비 중...');
       request.files.add(await http.MultipartFile.fromPath('audio', audioPath));
       request.fields['user_id'] = 'user123';
-
+      
+      print('📡 서버에 요청 전송 중...');
+      final startTime = DateTime.now();
       var response = await request.send();
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+      
+      print('📥 서버 응답 수신 완료');
+      print('응답 상태 코드: ${response.statusCode}');
+      print('응답 시간: ${duration.inMilliseconds}ms');
+      
       var responseData = await response.stream.bytesToString();
+      print('응답 데이터 크기: ${responseData.length} bytes');
 
       if (response.statusCode == 200) {
-        return AIResponse.fromJson(json.decode(responseData));
+        print('✅ AI 처리 성공');
+        print('응답 데이터: $responseData');
+        
+        final aiResponse = AIResponse.fromJson(json.decode(responseData));
+        print('=== AI 응답 분석 ===');
+        print('응답 성공 여부: ${aiResponse.success}');
+        print('응답 타임스탬프: ${aiResponse.timestamp}');
+        if (aiResponse.action != null) {
+          print('액션 타입: ${aiResponse.action!.type}');
+          print('액션 우선순위: ${aiResponse.action!.priority}');
+          print('액션 데이터: ${aiResponse.action!.data}');
+        }
+        if (aiResponse.voiceResponse != null) {
+          print('음성 응답 텍스트: ${aiResponse.voiceResponse!.text}');
+          print('자동 재생: ${aiResponse.voiceResponse!.playAutomatically}');
+          print('오디오 URL: ${aiResponse.voiceResponse!.audioUrl}');
+        }
+        print('====================');
+        
+        return aiResponse;
       } else {
-        throw Exception('서버 오류: ${response.statusCode}');
+        print('❌ 서버 오류 발생');
+        print('오류 상태 코드: ${response.statusCode}');
+        print('오류 응답: $responseData');
+        throw Exception('서버 오류: ${response.statusCode} - $responseData');
       }
     } catch (e) {
+      print('❌ AI 음성 처리 실패');
+      print('오류 내용: $e');
+      print('오류 타입: ${e.runtimeType}');
+      
+      if (e is SocketException) {
+        print('네트워크 연결 오류 - 서버가 실행 중인지 확인하세요');
+      } else if (e is TimeoutException) {
+        print('요청 시간 초과 - 서버 응답이 너무 느립니다');
+      }
+      
       throw Exception('네트워크 오류: $e');
     }
   }
 
   static Future<bool> testConnection() async {
+    print('=== 서버 연결 테스트 시작 ===');
+    print('테스트 URL: $baseUrl/api/v1/health');
+    
     try {
+      final startTime = DateTime.now();
       final response = await http.get(
         Uri.parse('$baseUrl/api/v1/health'),
         headers: {'Content-Type': 'application/json'},
-      );
+      ).timeout(const Duration(seconds: 10));
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+      
+      print('연결 테스트 응답 시간: ${duration.inMilliseconds}ms');
+      print('응답 상태 코드: ${response.statusCode}');
+      print('응답 헤더: ${response.headers}');
+      print('응답 본문: ${response.body}');
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['success'] == true;
+        try {
+          final data = json.decode(response.body);
+          final success = data['success'] == true;
+          print('서버 상태: ${success ? "정상" : "오류"}');
+          print('서버 정보: $data');
+          return success;
+        } catch (e) {
+          print('응답 파싱 오류: $e');
+          return false;
+        }
+      } else {
+        print('서버 응답 오류: ${response.statusCode}');
+        return false;
       }
-      return false;
     } catch (e) {
       print('서버 연결 테스트 실패: $e');
+      print('오류 타입: ${e.runtimeType}');
+      
+      if (e is SocketException) {
+        print('소켓 오류 - 서버가 실행되지 않았거나 네트워크 문제');
+      } else if (e is TimeoutException) {
+        print('시간 초과 - 서버 응답이 너무 느림');
+      }
+      
       return false;
     }
   }
 
   static Future<void> checkServerStatus() async {
+    print('=== 서버 상태 확인 ===');
     final isConnected = await testConnection();
     if (!isConnected) {
+      print('❌ 서버 연결 실패');
       throw Exception('AI 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.');
+    }
+    print('✅ 서버 연결 성공');
+  }
+
+  // 서버 상태 상세 정보 조회
+  static Future<Map<String, dynamic>> getServerInfo() async {
+    print('=== 서버 상세 정보 조회 ===');
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/v1/health'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('서버 정보: $data');
+        return data;
+      } else {
+        print('서버 정보 조회 실패: ${response.statusCode}');
+        return {'error': '서버 정보 조회 실패'};
+      }
+    } catch (e) {
+      print('서버 정보 조회 오류: $e');
+      return {'error': '서버 정보 조회 오류: $e'};
+    }
+  }
+
+  // 네트워크 상태 진단
+  static Future<void> diagnoseNetwork() async {
+    print('=== 네트워크 진단 시작 ===');
+    print('현재 플랫폼: ${Platform.operatingSystem}');
+    print('서버 URL: $baseUrl');
+    
+    try {
+      // DNS 확인
+      print('DNS 확인 중...');
+      final uri = Uri.parse(baseUrl);
+      print('호스트: ${uri.host}');
+      print('포트: ${uri.port}');
+      
+      // 연결 테스트
+      await checkServerStatus();
+      print('✅ 네트워크 진단 완료 - 정상');
+    } catch (e) {
+      print('❌ 네트워크 진단 실패: $e');
+      print('해결 방법:');
+      print('1. AI 서버가 실행 중인지 확인');
+      print('2. 방화벽 설정 확인');
+      print('3. 네트워크 연결 상태 확인');
+    }
+  }
+
+  // 간단한 연결 테스트 (UI에서 호출용)
+  static Future<Map<String, dynamic>> quickConnectionTest() async {
+    print('=== 빠른 연결 테스트 ===');
+    final result = <String, dynamic>{};
+    
+    try {
+      final startTime = DateTime.now();
+      final isConnected = await testConnection();
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+      
+      result['success'] = isConnected;
+      result['responseTime'] = duration.inMilliseconds;
+      result['timestamp'] = DateTime.now().toIso8601String();
+      
+      if (isConnected) {
+        result['message'] = '서버 연결 성공';
+        result['status'] = 'connected';
+      } else {
+        result['message'] = '서버 연결 실패';
+        result['status'] = 'disconnected';
+      }
+      
+      print('연결 테스트 결과: $result');
+      return result;
+    } catch (e) {
+      result['success'] = false;
+      result['error'] = e.toString();
+      result['message'] = '연결 테스트 중 오류 발생';
+      result['status'] = 'error';
+      result['timestamp'] = DateTime.now().toIso8601String();
+      
+      print('연결 테스트 오류: $result');
+      return result;
+    }
+  }
+
+  // 서버 정보 요약 (UI 표시용)
+  static Future<Map<String, dynamic>> getServerSummary() async {
+    print('=== 서버 정보 요약 ===');
+    try {
+      final serverInfo = await getServerInfo();
+      
+      if (serverInfo.containsKey('error')) {
+        return {
+          'status': 'error',
+          'message': serverInfo['error'],
+          'details': '서버 정보를 가져올 수 없습니다'
+        };
+      }
+      
+      final status = serverInfo['status'] ?? 'unknown';
+      final device = serverInfo['device'] ?? 'unknown';
+      final llmType = serverInfo['llm_type'] ?? 'unknown';
+      final sttModel = serverInfo['stt_model'] ?? 'unknown';
+      
+      return {
+        'status': status,
+        'device': device,
+        'llmType': llmType,
+        'sttModel': sttModel,
+        'message': status == 'healthy' ? '서버 정상 작동 중' : '서버 상태 불량',
+        'timestamp': serverInfo['timestamp'] ?? 'unknown'
+      };
+    } catch (e) {
+      return {
+        'status': 'error',
+        'message': '서버 정보 조회 실패',
+        'details': e.toString()
+      };
     }
   }
 }
