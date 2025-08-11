@@ -23,6 +23,7 @@ class _RecordScreenState extends State<RecordScreen> {
   List<File> _recordedFiles = [];
   bool _isProcessingAI = false;
   String? _aiResponseText;
+  String? _currentlyPlayingPath;
 
   @override
   void initState() {
@@ -127,6 +128,52 @@ class _RecordScreenState extends State<RecordScreen> {
       }
     } catch (e) {
       _showErrorSnackBar('녹음 파일 삭제 중 오류가 발생했습니다: $e');
+    }
+  }
+
+  Future<void> _playRecording(File file) async {
+    try {
+      // 현재 재생 중인 파일이 있다면 중지
+      if (_currentlyPlayingPath != null) {
+        await _recordService.stopPlaying();
+        setState(() {
+          _currentlyPlayingPath = null;
+        });
+      }
+
+      // 새 파일 재생
+      final success = await _recordService.playRecording(file.path);
+      if (success) {
+        setState(() {
+          _currentlyPlayingPath = file.path;
+        });
+        _showSuccessSnackBar('녹음 파일을 재생합니다.');
+      } else {
+        _showErrorSnackBar('녹음 파일 재생에 실패했습니다.');
+      }
+    } catch (e) {
+      _showErrorSnackBar('녹음 파일 재생 중 오류가 발생했습니다: $e');
+    }
+  }
+
+  Future<void> _stopPlaying() async {
+    try {
+      await _recordService.stopPlaying();
+      setState(() {
+        _currentlyPlayingPath = null;
+      });
+      _showSuccessSnackBar('재생이 중지되었습니다.');
+    } catch (e) {
+      _showErrorSnackBar('재생 중지 중 오류가 발생했습니다: $e');
+    }
+  }
+
+  Future<void> _printFileInfo(File file) async {
+    try {
+      await _recordService.printFileInfo(file.path);
+      _showSuccessSnackBar('파일 정보가 콘솔에 출력되었습니다.');
+    } catch (e) {
+      _showErrorSnackBar('파일 정보 출력 중 오류가 발생했습니다: $e');
     }
   }
 
@@ -467,6 +514,35 @@ class _RecordScreenState extends State<RecordScreen> {
                               ],
                             ),
                           ),
+                          // 재생/중지 버튼
+                          IconButton(
+                            onPressed: () {
+                              if (_currentlyPlayingPath == file.path) {
+                                _stopPlaying();
+                              } else {
+                                _playRecording(file);
+                              }
+                            },
+                            icon: Icon(
+                              _currentlyPlayingPath == file.path
+                                  ? Icons.stop
+                                  : Icons.play_arrow,
+                              color: _currentlyPlayingPath == file.path
+                                  ? Colors.red
+                                  : const Color(0xFF6366f1),
+                              size: 20,
+                            ),
+                          ),
+                          // 파일 정보 출력 버튼
+                          IconButton(
+                            onPressed: () => _printFileInfo(file),
+                            icon: const Icon(
+                              Icons.info,
+                              color: Colors.blue,
+                              size: 20,
+                            ),
+                          ),
+                          // 삭제 버튼
                           IconButton(
                             onPressed: () => _deleteRecording(file),
                             icon: const Icon(

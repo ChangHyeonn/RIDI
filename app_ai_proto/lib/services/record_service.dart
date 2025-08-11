@@ -1,16 +1,22 @@
 import 'dart:io';
-import 'package:flutter_sound/flutter_sound.dart';
+import 'package:flutter_sound/flutter_sound.dart' as flutter_sound;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/foundation.dart';
+import 'package:just_audio/just_audio.dart';
 
 class RecordService {
-  final _audioRecorder = FlutterSoundRecorder();
+  final _audioRecorder = flutter_sound.FlutterSoundRecorder();
+  final _audioPlayer = AudioPlayer();
   bool _isRecording = false;
+  bool _isPlaying = false;
   String? _currentRecordingPath;
+  String? _currentPlayingPath;
 
   bool get isRecording => _isRecording;
+  bool get isPlaying => _isPlaying;
   String? get currentRecordingPath => _currentRecordingPath;
+  String? get currentPlayingPath => _currentPlayingPath;
 
   // 플랫폼 지원 확인
   bool get _isSupportedPlatform {
@@ -164,7 +170,9 @@ class RecordService {
         if (Platform.isAndroid) {
           throw Exception('마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
         } else if (Platform.isIOS) {
-          throw Exception('마이크 권한이 필요합니다. 설정 > 개인정보 보호 및 보안 > 마이크에서 권한을 허용해주세요.');
+          throw Exception(
+            '마이크 권한이 필요합니다. 설정 > 개인정보 보호 및 보안 > 마이크에서 권한을 허용해주세요.',
+          );
         } else {
           throw Exception('마이크 권한이 필요합니다.');
         }
@@ -183,7 +191,7 @@ class RecordService {
         print('녹음 디렉토리 생성 완료');
       }
 
-      final extension = '.wav'; // 모든 플랫폼에서 .wav 사용
+      final extension = '.aac'; // AAC 코덱 사용 (더 안정적)
       final fileName =
           'recording_${DateTime.now().year}_${DateTime.now().month.toString().padLeft(2, '0')}_${DateTime.now().day.toString().padLeft(2, '0')}_${DateTime.now().hour.toString().padLeft(2, '0')}_${DateTime.now().minute.toString().padLeft(2, '0')}_${DateTime.now().second.toString().padLeft(2, '0')}$extension';
       _currentRecordingPath = '${recordingsDir.path}/$fileName';
@@ -198,7 +206,10 @@ class RecordService {
 
       await _audioRecorder.startRecorder(
         toFile: _currentRecordingPath!,
-        codec: Codec.pcm16WAV,
+        codec: flutter_sound.Codec.aacADTS, // AAC 코덱 사용
+        bitRate: 128000, // 128kbps
+        sampleRate: 44100, // 44.1kHz
+        numChannels: 1, // 모노 채널
       );
 
       print('녹음 시작 완료');
@@ -263,7 +274,7 @@ class RecordService {
   Future<List<File>> getRecordedFiles() async {
     try {
       final recordingsDir = await _getRecordingsDirectory();
-      
+
       if (!await recordingsDir.exists()) {
         print('녹음 디렉토리가 존재하지 않습니다: ${recordingsDir.path}');
         return [];
@@ -272,13 +283,17 @@ class RecordService {
       final files = recordingsDir
           .listSync()
           .whereType<File>()
-          .where((file) => file.path.endsWith('.wav'))
+          .where(
+            (file) => file.path.endsWith('.aac') || file.path.endsWith('.wav'),
+          )
           .toList();
 
       print('발견된 녹음 파일 수: ${files.length}');
       for (var file in files) {
         final size = await file.length();
-        print('파일: ${file.path.split('/').last} (${(size / 1024).toStringAsFixed(1)} KB)');
+        print(
+          '파일: ${file.path.split('/').last} (${(size / 1024).toStringAsFixed(1)} KB)',
+        );
       }
 
       // 최신 파일부터 정렬
@@ -306,6 +321,111 @@ class RecordService {
       return false;
     }
   }
+
+  // 녹음 파일 재생
+  Future<bool> playRecording(String filePath) async {
+    try {
+      if (_isPlaying) {
+        await stopPlaying();
+      }
+
+      print('녹음 파일 재생 시작: $filePath');
+
+      final file = File(filePath);
+      if (!await file.exists()) {
+        print('재생할 파일이 존재하지 않습니다: $filePath');
+        return false;
+      }
+
+      // 파일 크기 확인
+      final fileSize = await file.length();
+      print('재생할 파일 크기: ${(fileSize / 1024).toStringAsFixed(1)} KB');
+
+      _currentPlayingPath = filePath;
+
+      // 오디오 플레이어 설정
+      await _audioPlayer.setFilePath(filePath);
+
+      // 볼륨을 최대로 설정
+      await _audioPlayer.setVolume(1.0);
+
+      // 오디오 세션 설정 (에뮬레이터 호환성)
+      await _audioPlayer.setAudioSource(
+        ProgressiveAudioSource(Uri.file(filePath)),
+      );
+
+      // 재생 시작
+      await _audioPlayer.play();
+      _isPlaying = true;
+
+      print('녹음 파일 재생 중...');
+
+      // 재생 상태 모니터링
+      _audioPlayer.playerStateStream.listen((state) {
+        print('재생 상태 변경: $state');
+        if (state.processingState == ProcessingState.completed) {
+          print('재생 완료됨');
+          _isPlaying = false;
+          _currentPlayingPath = null;
+        }
+      });
+
+      return true;
+    } catch (e) {
+      print('녹음 파일 재생 실패: $e');
+      _isPlaying = false;
+      _currentPlayingPath = null;
+      return false;
+    }
+  }
+
+  // 재생 중지
+  Future<void> stopPlaying() async {
+    try {
+      if (_isPlaying) {
+        await _audioPlayer.stop();
+        _isPlaying = false;
+        _currentPlayingPath = null;
+        print('녹음 파일 재생 중지');
+      }
+    } catch (e) {
+      print('재생 중지 실패: $e');
+    }
+  }
+
+  // 재생 일시정지
+  Future<void> pausePlaying() async {
+    try {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+        print('녹음 파일 재생 일시정지');
+      }
+    } catch (e) {
+      print('재생 일시정지 실패: $e');
+    }
+  }
+
+  // 재생 재개
+  Future<void> resumePlaying() async {
+    try {
+      if (!_isPlaying && _currentPlayingPath != null) {
+        await _audioPlayer.play();
+        _isPlaying = true;
+        print('녹음 파일 재생 재개');
+      }
+    } catch (e) {
+      print('재생 재개 실패: $e');
+    }
+  }
+
+  // 재생 상태 스트림
+  Stream<PlayerState> get playerStateStream => _audioPlayer.playerStateStream;
+
+  // 재생 위치 스트림
+  Stream<Duration?> get positionStream => _audioPlayer.positionStream;
+
+  // 재생 시간 스트림
+  Stream<Duration?> get durationStream => _audioPlayer.durationStream;
 
   // 파일 정보 출력 (디버깅용)
   Future<void> _printFileInfo(String sourcePath) async {
@@ -345,8 +465,80 @@ class RecordService {
     }
   }
 
+  // 녹음 파일 정보 출력 (테스트용)
+  Future<void> printFileInfo(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) {
+        print('파일이 존재하지 않습니다: $filePath');
+        return;
+      }
+
+      final fileSize = await file.length();
+      final fileName = filePath.split('/').last;
+      final filePathInfo = filePath.substring(0, filePath.lastIndexOf('/'));
+
+      print('=== 녹음 파일 정보 ===');
+      print('파일명: $fileName');
+      print('파일 크기: ${(fileSize / 1024).toStringAsFixed(1)} KB');
+      print('파일 경로: $filePath');
+      print('디렉토리: $filePathInfo');
+      print('=====================');
+
+      // 디렉토리 내 모든 파일 정보 출력
+      final dir = Directory(filePathInfo);
+      if (await dir.exists()) {
+        final files = await dir.list().toList();
+        print('디렉토리 내 파일 수: ${files.length}');
+        for (var f in files) {
+          if (f is File) {
+            final size = await f.length();
+            print(
+              '  - ${f.path.split('/').last} (${(size / 1024).toStringAsFixed(1)} KB)',
+            );
+          }
+        }
+      }
+
+      // 파일 내용의 첫 100바이트 출력 (헤더 확인용)
+      final bytes = await file.openRead(0, 100).first;
+      print(
+        '파일 헤더 (16진수): ${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
+      );
+    } catch (e) {
+      print('파일 정보 출력 실패: $e');
+    }
+  }
+
+  // 테스트용 비프음 생성 (디버깅용)
+  Future<bool> playTestBeep() async {
+    try {
+      print('테스트 비프음 재생 시작...');
+
+      // 간단한 비프음 생성 (440Hz, 1초)
+      await _audioPlayer.setVolume(1.0);
+
+      // 테스트용 오디오 소스 생성
+      await _audioPlayer.setAudioSource(
+        ProgressiveAudioSource(
+          Uri.parse('https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'),
+        ),
+      );
+
+      await _audioPlayer.play();
+      _isPlaying = true;
+
+      print('테스트 비프음 재생 중...');
+      return true;
+    } catch (e) {
+      print('테스트 비프음 재생 실패: $e');
+      return false;
+    }
+  }
+
   // 리소스 해제
   void dispose() {
     _audioRecorder.closeRecorder();
+    _audioPlayer.dispose();
   }
 }
