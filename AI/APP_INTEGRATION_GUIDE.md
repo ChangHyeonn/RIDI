@@ -301,7 +301,7 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 
 class AIService {
-  static const String baseUrl = 'http://your-ai-server:5000';
+  static const String baseUrl = 'http://your-ai-server:8080';
   
   static Future<AIResponse> processVoice(String audioPath) async {
     var request = http.MultipartRequest(
@@ -494,7 +494,7 @@ STT_MODEL=default
 
 # 서버 설정
 HOST=0.0.0.0
-PORT=5000
+PORT=8080
 DEBUG=true  # 개발 환경에서는 true로 설정
 
 # 보안 설정 (개발 환경에서는 선택사항)
@@ -546,7 +546,7 @@ python3 main.py --debug
 ============================================================
  고령층 일정 메모 관리 AI 서버
 ============================================================
- 서버 주소: 0.0.0.0:5000
+ 서버 주소: 0.0.0.0:8080
 🔧 디버그 모드: False
 🤖 AI 모델: gemini
  STT 모델: default
@@ -564,7 +564,7 @@ python3 main.py --debug
 ============================================================
 ✅ 모든 컴포넌트 초기화 완료
  서버 시작: 2024-01-15 15:30:00
- * Running on http://0.0.0.0:5000
+ * Running on http://0.0.0.0:8080
 ```
 
 #### **고급 실행 옵션**
@@ -588,12 +588,12 @@ python3 main.py --speech-rate 0.8 --volume-level 1.2
 ### **2. 서버 접근 방법**
 
 #### **로컬 접근 (같은 컴퓨터)**
-- **브라우저**: `http://localhost:5000/api/v1/health`
-- **API 테스트**: `http://127.0.0.1:5000/api/v1/health`
+- **브라우저**: `http://localhost:8080/api/v1/health`
+- **API 테스트**: `http://127.0.0.1:8080/api/v1/health`
 
 #### **네트워크 접근 (다른 기기)**
-- **IP 주소**: `http://[서버_IP]:5000/api/v1/health`
-- **예시**: `http://192.168.1.100:5000/api/v1/health`
+- **IP 주소**: `http://[서버_IP]:8080/api/v1/health`
+- **예시**: `http://192.168.1.100:8080/api/v1/health`
 
 #### **IP 주소 확인 방법**
 ```bash
@@ -622,15 +622,15 @@ class AIService {
     if (kDebugMode) {
       if (Platform.isAndroid) {
         // Android 에뮬레이터에서 로컬 서버 접근
-        return 'http://10.0.2.2:5000';
+                return 'http://10.0.2.2:8080';
       } else if (Platform.isIOS) {
         // iOS 시뮬레이터에서 로컬 서버 접근
-        return 'http://localhost:5000';
+        return 'http://localhost:8080';
       }
     }
-    
+
     // 실제 기기나 릴리즈 모드에서는 실제 IP 사용
-    return 'http://192.168.1.100:5000';  // 실제 서버 IP
+    return 'http://192.168.1.100:8080';  // 실제 서버 IP
   }
   
   static Future<AIResponse> processVoice(String audioPath) async {
@@ -666,9 +666,9 @@ class AIService {
 // lib/config/app_config.dart
 class AppConfig {
   static const Map<String, String> _environments = {
-    'development': 'http://10.0.2.2:5000',      // Android 에뮬레이터
-    'development_ios': 'http://localhost:5000',  // iOS 시뮬레이터
-    'development_device': 'http://192.168.1.100:5000', // 실제 기기
+    'development': 'http://10.0.2.2:8080',      // Android 에뮬레이터
+'development_ios': 'http://localhost:8080',  // iOS 시뮬레이터
+'development_device': 'http://192.168.1.100:8080', // 실제 기기
     'production': 'https://your-production-server.com',
   };
   
@@ -723,7 +723,7 @@ class AIService {
 
 #### **Health Check API**
 ```bash
-curl http://localhost:5000/api/v1/health
+curl http://localhost:8080/api/v1/health
 ```
 
 #### **응답 예시**
@@ -757,7 +757,7 @@ curl http://localhost:5000/api/v1/health
 #### **강제 종료**
 ```bash
 # 프로세스 찾기
-lsof -i :5000
+lsof -i :8080
 
 # 프로세스 종료
 kill -9 [PID]
@@ -770,13 +770,13 @@ kill -9 [PID]
 1. **서버 실행 확인**
    ```bash
    # 서버가 실행 중인지 확인
-   curl http://localhost:5000/api/v1/health
+   curl http://localhost:8080/api/v1/health
    ```
 
 2. **포트 확인**
    ```bash
    # 포트 사용 중인지 확인
-   lsof -i :5000
+   lsof -i :8080
    ```
 
 3. **방화벽 설정**
@@ -797,7 +797,7 @@ kill -9 [PID]
 | `Connection refused` | 서버가 실행되지 않음 | `python main.py` 실행 |
 | `Timeout` | 네트워크 문제 | IP 주소 확인, 방화벽 설정 |
 | `CORS error` | 브라우저 보안 정책 | 서버 CORS 설정 확인 |
-| `Port already in use` | 포트 충돌 | 다른 포트 사용 (`--port 8080`) |
+| `Port already in use` | 포트 충돌 | 다른 포트 사용 (`--port 8081`) |
 
 ### **7. MongoDB 실행**
 
