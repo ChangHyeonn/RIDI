@@ -323,7 +323,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1f2937),
         elevation: 0,
-        shadowColor: Colors.black.withOpacity(0.08),
+        shadowColor: Colors.black.withValues(alpha: 0.08),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -382,7 +382,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                     border: Border.all(color: const Color(0xFFd1d5db)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 20,
                         offset: const Offset(0, 8),
                       ),
@@ -418,7 +418,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                   border: Border.all(color: const Color(0xFFd1d5db)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),

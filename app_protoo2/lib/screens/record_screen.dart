@@ -150,7 +150,7 @@ class _RecordScreenState extends State<RecordScreen> {
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF1f2937),
         elevation: 0,
-        shadowColor: Colors.black.withOpacity(0.08),
+        shadowColor: Colors.black.withValues(alpha: 0.08),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -163,7 +163,7 @@ class _RecordScreenState extends State<RecordScreen> {
                 padding: const EdgeInsets.all(16),
                 margin: const EdgeInsets.only(bottom: 24),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.orange),
                 ),
@@ -194,8 +194,8 @@ class _RecordScreenState extends State<RecordScreen> {
               height: 200,
               decoration: BoxDecoration(
                 color: _isRecording
-                    ? Colors.red.withOpacity(0.1)
-                    : Colors.grey.withOpacity(0.1),
+                    ? Colors.red.withValues(alpha: 0.1)
+                    : Colors.grey.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: _isRecording ? Colors.red : Colors.grey,
@@ -252,7 +252,7 @@ class _RecordScreenState extends State<RecordScreen> {
                                 (_isRecording
                                         ? Colors.red
                                         : const Color(0xFF6366f1))
-                                    .withOpacity(0.3),
+                                    .withValues(alpha: 0.3),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
