@@ -495,10 +495,10 @@ STT_MODEL=default
 # 서버 설정
 HOST=0.0.0.0
 PORT=5000
-DEBUG=False
+DEBUG=true  # 개발 환경에서는 true로 설정
 
-# 보안 설정
-API_KEY=your_api_key_here
+# 보안 설정 (개발 환경에서는 선택사항)
+API_KEY=your_api_key_here  # 프로덕션에서만 필수
 MAX_AUDIO_SIZE=10485760  # 10MB
 ```
 
@@ -518,10 +518,28 @@ db.users.createIndex({"user_id": 1})
 
 ### **1. AI 서버 실행**
 
-#### **기본 실행**
+#### **기본 실행 (In-Memory 모드)**
 ```bash
 cd AI
-python main.py
+python3 main.py --debug
+```
+
+#### **MongoDB 연동 실행**
+```bash
+cd AI
+DB_ENGINE=mongodb MONGO_URI=mongodb://localhost:27017/ MONGO_DB=ridi_ai DEBUG=true python3 main.py --debug --port 8080
+```
+
+#### **환경 변수 파일 사용 (.env)**
+```bash
+# .env 파일 생성
+echo "DB_ENGINE=mongodb" > .env
+echo "MONGO_URI=mongodb://localhost:27017/" >> .env
+echo "MONGO_DB=ridi_ai" >> .env
+echo "DEBUG=true" >> .env
+
+# 서버 실행
+python3 main.py --debug
 ```
 
 #### **실행 결과 예시**
@@ -552,19 +570,19 @@ python main.py
 #### **고급 실행 옵션**
 ```bash
 # 특정 포트로 실행
-python main.py --port 8080
+python3 main.py --port 8080
 
 # 특정 호스트로 실행
-python main.py --host 127.0.0.1 --port 3000
+python3 main.py --host 127.0.0.1 --port 3000
 
 # 디버그 모드로 실행
-python main.py --debug
+python3 main.py --debug
 
-# MongoDB 사용
-python main.py --db-engine mongodb --mongo-uri mongodb://localhost:27017/
+# MongoDB 사용 (환경 변수로 설정)
+DB_ENGINE=mongodb MONGO_URI=mongodb://localhost:27017/ python3 main.py --debug
 
 # 접근성 설정
-python main.py --speech-rate 0.8 --volume-level 1.2
+python3 main.py --speech-rate 0.8 --volume-level 1.2
 ```
 
 ### **2. 서버 접근 방법**
