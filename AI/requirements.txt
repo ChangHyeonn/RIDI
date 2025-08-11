@@ -6,6 +6,7 @@ werkzeug==2.3.7
 
 # AI/ML dependencies
 google-generativeai==0.3.0
+google-cloud-speech==2.21.0
 gtts==2.4.0
 pydub==0.25.1
 
@@ -26,8 +27,8 @@ pyyaml==6.0.1
 python-dateutil==2.8.2
 
 # Database
-PyMySQL==1.1.0
+pymongo==4.6.1
 
 # Testing
 pytest==7.4.0
-pytest-cov==4.1.0 
+pytest-cov==4.1.0

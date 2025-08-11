@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Schedule Repository Layer
-MySQL 및 In-Memory 저장소 구현
+MongoDB 및 In-Memory 저장소 구현
 """
 
 from __future__ import annotations
@@ -11,9 +11,11 @@ from datetime import datetime, date
 import logging
 
 try:
-    import pymysql  # type: ignore
+    from pymongo import MongoClient
+    from bson import ObjectId
 except Exception:  # pragma: no cover - optional at runtime
-    pymysql = None
+    MongoClient = None
+    ObjectId = None
 
 
 class BaseScheduleRepository:
@@ -98,149 +100,189 @@ class InMemoryScheduleRepository(BaseScheduleRepository):
         return results
 
 
-class MySQLScheduleRepository(BaseScheduleRepository):
-    """MySQL 기반 일정 저장소 (운영용)"""
+class MongoDBScheduleRepository(BaseScheduleRepository):
+    """MongoDB 기반 일정 저장소 (NoSQL)"""
 
-    def __init__(self, host: str, port: int, user: str, password: str, db: str, autoinit: bool = True) -> None:
+    def __init__(self, connection_string: str = "mongodb://localhost:27017/", 
+                 db_name: str = "ridi_ai") -> None:
         self.logger = logging.getLogger(__name__)
-        if pymysql is None:
-            raise RuntimeError("PyMySQL이 설치되어 있지 않습니다. requirements에 PyMySQL를 추가하세요.")
-        self.conn_params = dict(host=host, port=port, user=user, password=password, database=db, charset='utf8mb4')
-        if autoinit:
-            self._ensure_tables()
-
-    def _connect(self):
-        return pymysql.connect(**self.conn_params, cursorclass=pymysql.cursors.DictCursor, autocommit=True)
-
-    def _ensure_tables(self) -> None:
-        sql_users = (
-            """
-            CREATE TABLE IF NOT EXISTS users (
-              id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-              external_id VARCHAR(64) UNIQUE,
-              name VARCHAR(100),
-              locale VARCHAR(10) NOT NULL DEFAULT 'ko-KR',
-              timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Seoul',
-              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-            """
-        )
-        sql_schedules = (
-            """
-            CREATE TABLE IF NOT EXISTS schedules (
-              id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-              user_id BIGINT UNSIGNED NOT NULL,
-              title VARCHAR(200) NOT NULL,
-              start_dt DATETIME NOT NULL,
-              end_dt DATETIME NULL,
-              all_day TINYINT(1) NOT NULL DEFAULT 0,
-              category VARCHAR(20) NOT NULL DEFAULT '일반',
-              priority VARCHAR(20) NOT NULL DEFAULT 'not_important',
-              location TEXT NULL,
-              description TEXT NULL,
-              source VARCHAR(30) DEFAULT 'voice',
-              status VARCHAR(20) NOT NULL DEFAULT 'active',
-              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-              updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-              INDEX idx_user_date (user_id, start_dt)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-            """
-        )
-        with self._connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute(sql_users)
-                cur.execute(sql_schedules)
+        if MongoClient is None:
+            raise RuntimeError("PyMongo가 설치되어 있지 않습니다. requirements에 pymongo를 추가하세요.")
+        
+        self.client = MongoClient(connection_string)
+        self.db = self.client[db_name]
+        self.schedules = self.db.schedules
+        self.users = self.db.users
+        
+        # 인덱스 생성
+        self._ensure_indexes()
+    
+    def _ensure_indexes(self) -> None:
+        """MongoDB 인덱스 생성"""
+        try:
+            # 사용자별 일정 조회를 위한 인덱스
+            self.schedules.create_index([("user_id", 1), ("start_dt", 1)])
+            # 제목 검색을 위한 인덱스
+            self.schedules.create_index([("user_id", 1), ("title", "text")])
+            # 카테고리별 조회를 위한 인덱스
+            self.schedules.create_index([("user_id", 1), ("category", 1)])
+            # 상태별 조회를 위한 인덱스
+            self.schedules.create_index([("status", 1)])
+        except Exception as e:
+            self.logger.warning(f"인덱스 생성 중 오류: {e}")
 
     def add_schedule(self, user_id: str, schedule_data: Dict[str, Any]) -> Dict[str, Any]:
-        start_dt = schedule_data.get('datetime')  # 'YYYY-MM-DD HH:MM'
-        title = schedule_data.get('title')
-        category = schedule_data.get('category', '일반')
-        priority = schedule_data.get('priority', 'not_important')
-        location = schedule_data.get('location')
-        description = schedule_data.get('description')
-        source = 'voice'
-        with self._connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO schedules (user_id, title, start_dt, category, priority, location, description, source)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-                    """,
-                    (user_id, title, start_dt, category, priority, location, description, source)
-                )
-                schedule_id = cur.lastrowid
-        return {
-            'success': True,
-            'schedule_id': str(schedule_id),
-            'schedule': schedule_data,
-            'message': '일정이 성공적으로 추가되었습니다.'
-        }
+        """일정 추가"""
+        try:
+            # datetime 문자열을 datetime 객체로 변환
+            datetime_str = schedule_data.get('datetime')
+            if datetime_str:
+                try:
+                    if 'T' in datetime_str:
+                        # ISO 형식: "2024-01-20T14:00"
+                        start_dt = datetime.fromisoformat(datetime_str.replace('T', ' '))
+                    else:
+                        # 일반 형식: "2024-01-20 14:00"
+                        start_dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
+                except ValueError:
+                    # 변환 실패 시 문자열 그대로 저장
+                    start_dt = datetime_str
+            else:
+                start_dt = None
+            
+            # MongoDB 문서 구조
+            schedule_doc = {
+                'user_id': user_id,
+                'title': schedule_data.get('title'),
+                'start_dt': start_dt,
+                'category': schedule_data.get('category', '일반'),
+                'priority': schedule_data.get('priority', 'not_important'),
+                'location': schedule_data.get('location'),
+                'description': schedule_data.get('description'),
+                'source': 'voice',
+                'status': 'active',
+                'created_at': datetime.now(),
+                'updated_at': datetime.now()
+            }
+            
+            result = self.schedules.insert_one(schedule_doc)
+            schedule_id = str(result.inserted_id)
+            
+            return {
+                'success': True,
+                'schedule_id': schedule_id,
+                'schedule': schedule_data,
+                'message': '일정이 성공적으로 추가되었습니다.'
+            }
+        except Exception as e:
+            self.logger.error(f"일정 추가 실패: {e}")
+            return {
+                'success': False,
+                'error': f'일정 추가 중 오류가 발생했습니다: {str(e)}'
+            }
 
     def delete_schedule(self, user_id: str, schedule_id: str) -> Dict[str, Any]:
-        with self._connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM schedules WHERE id=%s AND user_id=%s", (schedule_id, user_id))
-                if cur.rowcount == 0:
-                    return {'success': False, 'error': '해당 일정을 찾을 수 없습니다.'}
-        return {'success': True, 'message': '일정이 성공적으로 삭제되었습니다.'}
+        """일정 삭제"""
+        try:
+            # ObjectId로 변환
+            if not ObjectId.is_valid(schedule_id):
+                return {'success': False, 'error': '잘못된 일정 ID입니다.'}
+            
+            object_id = ObjectId(schedule_id)
+            result = self.schedules.delete_one({
+                '_id': object_id,
+                'user_id': user_id
+            })
+            
+            if result.deleted_count == 0:
+                return {'success': False, 'error': '해당 일정을 찾을 수 없습니다.'}
+            
+            return {'success': True, 'message': '일정이 성공적으로 삭제되었습니다.'}
+        except Exception as e:
+            self.logger.error(f"일정 삭제 실패: {e}")
+            return {
+                'success': False,
+                'error': f'일정 삭제 중 오류가 발생했습니다: {str(e)}'
+            }
 
     def get_schedules_by_date(self, user_id: str, target_date: str) -> List[Dict[str, Any]]:
-        sql = (
-            "SELECT id, title, DATE_FORMAT(start_dt, '%Y-%m-%d %H:%i') AS datetime, category, priority, location, description "
-            "FROM schedules WHERE user_id=%s AND DATE(start_dt)=%s AND status='active' ORDER BY start_dt"
-        )
-        with self._connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute(sql, (user_id, target_date))
-                rows = cur.fetchall()
+        """특정 날짜 일정 조회"""
+        try:
+            # 날짜 범위 쿼리 (target_date의 00:00:00 ~ 23:59:59)
+            start_datetime = datetime.strptime(f"{target_date} 00:00:00", "%Y-%m-%d %H:%M:%S")
+            end_datetime = datetime.strptime(f"{target_date} 23:59:59", "%Y-%m-%d %H:%M:%S")
+            
+            cursor = self.schedules.find({
+                'user_id': user_id,
+                'start_dt': {'$gte': start_datetime, '$lte': end_datetime},
+                'status': 'active'
+            }).sort('start_dt', 1)
+            
+            results = []
+            for doc in cursor:
                 # 표준화된 구조로 변환
-                results: List[Dict[str, Any]] = []
-                for r in rows:
-                    results.append({
-                        'id': str(r['id']),
-                        'user_id': user_id,
-                        'data': {
-                            'title': r['title'],
-                            'datetime': r['datetime'],
-                            'category': r['category'],
-                            'priority': r['priority'],
-                            'location': r['location'],
-                            'description': r['description']
-                        }
-                    })
-                return results
+                results.append({
+                    'id': str(doc['_id']),
+                    'user_id': doc['user_id'],
+                    'data': {
+                        'title': doc['title'],
+                        'datetime': doc['start_dt'].strftime('%Y-%m-%d %H:%M'),
+                        'category': doc.get('category', '일반'),
+                        'priority': doc.get('priority', 'not_important'),
+                        'location': doc.get('location'),
+                        'description': doc.get('description')
+                    }
+                })
+            
+            return results
+        except Exception as e:
+            self.logger.error(f"날짜별 일정 조회 실패: {e}")
+            return []
 
     def find_schedules(self, user_id: str, title: Optional[str] = None,
                         date_str: Optional[str] = None, time_str: Optional[str] = None) -> List[Dict[str, Any]]:
-        where = ["user_id=%s", "status='active'"]
-        params: List[Any] = [user_id]
-        if title:
-            where.append("title LIKE CONCAT('%', %s, '%')")
-            params.append(title)
-        if date_str:
-            where.append("DATE(start_dt)=%s")
-            params.append(date_str)
-        if time_str:
-            where.append("DATE_FORMAT(start_dt, '%H:%i')=%s")
-            params.append(time_str)
-        sql = (
-            "SELECT id, title, DATE_FORMAT(start_dt, '%Y-%m-%d %H:%i') AS datetime "
-            f"FROM schedules WHERE {' AND '.join(where)} ORDER BY start_dt DESC LIMIT 50"
-        )
-        with self._connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute(sql, params)
-                rows = cur.fetchall()
-                results: List[Dict[str, Any]] = []
-                for r in rows:
-                    results.append({
-                        'id': str(r['id']),
-                        'user_id': user_id,
-                        'data': {
-                            'title': r['title'],
-                            'datetime': r['datetime']
-                        }
-                    })
-                return results
-
-
+        """일정 검색 (제목/날짜/시간)"""
+        try:
+            query = {'user_id': user_id, 'status': 'active'}
+            
+            # 제목 검색
+            if title:
+                query['title'] = {'$regex': title, '$options': 'i'}
+            
+            # 날짜 검색
+            if date_str:
+                try:
+                    start_datetime = datetime.strptime(f"{date_str} 00:00:00", "%Y-%m-%d %H:%M:%S")
+                    end_datetime = datetime.strptime(f"{date_str} 23:59:59", "%Y-%m-%d %H:%M:%S")
+                    query['start_dt'] = {'$gte': start_datetime, '$lte': end_datetime}
+                except ValueError:
+                    # 날짜 형식 오류 시 제목으로만 검색
+                    pass
+            
+            # 시간 검색
+            if time_str and date_str:
+                try:
+                    start_time = datetime.strptime(f"{date_str} {time_str}:00", "%Y-%m-%d %H:%M:%S")
+                    end_time = datetime.strptime(f"{date_str} {time_str}:59", "%Y-%m-%d %H:%M:%S")
+                    query['start_dt'] = {'$gte': start_time, '$lte': end_time}
+                except ValueError:
+                    # 시간 형식 오류 시 날짜로만 검색
+                    pass
+            
+            cursor = self.schedules.find(query).sort('start_dt', -1).limit(50)
+            
+            results = []
+            for doc in cursor:
+                results.append({
+                    'id': str(doc['_id']),
+                    'user_id': doc['user_id'],
+                    'data': {
+                        'title': doc['title'],
+                        'datetime': doc['start_dt'].strftime('%Y-%m-%d %H:%M')
+                    }
+                })
+            
+            return results
+        except Exception as e:
+            self.logger.error(f"일정 검색 실패: {e}")
+            return []
