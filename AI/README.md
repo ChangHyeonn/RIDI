@@ -53,7 +53,7 @@ pip install -r requirements.txt
 ### 2. 환경 변수 설정 (선택사항)
 ```bash
 export HOST=0.0.0.0
-export PORT=5000
+export PORT=8080
 export LLM_TYPE=gemini
 export DEVICE=auto
 export DEBUG=false
@@ -94,7 +94,7 @@ python main.py --host 127.0.0.1 --port 8080 --debug --llm-type gemini
 
 ### 환경 변수
 - `HOST`: 서버 호스트 (기본값: 0.0.0.0)
-- `PORT`: 서버 포트 (기본값: 5000)
+- `PORT`: 서버 포트 (기본값: 8080)
 - `DEBUG`: 디버그 모드 (기본값: false)
 - `LLM_TYPE`: LLM 모델 타입 (기본값: gemini)
 - `DEVICE`: AI 모델 디바이스 (기본값: auto)
@@ -110,14 +110,14 @@ python main.py --host 127.0.0.1 --port 8080 --debug --llm-type gemini
 
 ### 음성 명령 처리
 ```bash
-curl -X POST http://localhost:5000/api/v1/process_voice \
+curl -X POST http://localhost:8080/api/v1/process_voice \
   -F "audio=@voice_command.wav" \
   -F "user_id=user123"
 ```
 
 ### 일정 추가
 ```bash
-curl -X POST http://localhost:5000/api/v1/schedule/add \
+curl -X POST http://localhost:8080/api/v1/schedule/add \
   -H "Content-Type: application/json" \
   -H "X-User-ID: user123" \
   -d '{
@@ -130,7 +130,7 @@ curl -X POST http://localhost:5000/api/v1/schedule/add \
 
 ### 서버 상태 확인
 ```bash
-curl http://localhost:5000/api/v1/health
+curl http://localhost:8080/api/v1/health
 ```
 
 ## 🔒 보안
