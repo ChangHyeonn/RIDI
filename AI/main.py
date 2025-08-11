@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-AI Server Main Entry Point
-고령층 일정 메모 관리 AI 서버 메인 실행 파일
-"""
-
 import os
 import sys
 import argparse
