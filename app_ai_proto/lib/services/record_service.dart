@@ -20,30 +20,43 @@ class RecordService {
 
   // 녹음 파일 저장 디렉토리 가져오기
   Future<Directory> _getRecordingsDirectory() async {
-    if (Platform.isAndroid) {
-      // Android에서는 앱 내부 저장소에 저장
-      final appDir = await getApplicationDocumentsDirectory();
-      final recordingsDir = Directory('${appDir.path}/recordings');
+    try {
+      if (Platform.isAndroid) {
+        // Android에서는 앱 내부 저장소에 저장
+        final appDir = await getApplicationDocumentsDirectory();
+        final recordingsDir = Directory('${appDir.path}/recordings');
+        if (!await recordingsDir.exists()) {
+          await recordingsDir.create(recursive: true);
+        }
+        print('Android 녹음 디렉토리: ${recordingsDir.path}');
+        return recordingsDir;
+      } else if (Platform.isIOS) {
+        // iOS에서는 앱 문서 디렉토리 내에 recordings 폴더 생성
+        final appDir = await getApplicationDocumentsDirectory();
+        final recordingsDir = Directory('${appDir.path}/recordings');
+        if (!await recordingsDir.exists()) {
+          await recordingsDir.create(recursive: true);
+        }
+        print('iOS 녹음 디렉토리: ${recordingsDir.path}');
+        return recordingsDir;
+      } else {
+        // 데스크톱에서는 현재 프로젝트 디렉토리의 recordings 폴더 사용
+        final currentDir = Directory.current;
+        final recordingsDir = Directory('${currentDir.path}/recordings');
+        if (!await recordingsDir.exists()) {
+          await recordingsDir.create(recursive: true);
+        }
+        return recordingsDir;
+      }
+    } catch (e) {
+      print('녹음 디렉토리 생성 실패: $e');
+      // 폴백: 임시 디렉토리 사용
+      final tempDir = await getTemporaryDirectory();
+      final recordingsDir = Directory('${tempDir.path}/recordings');
       if (!await recordingsDir.exists()) {
         await recordingsDir.create(recursive: true);
       }
-      print('Android 녹음 디렉토리: ${recordingsDir.path}');
-      return recordingsDir;
-    } else if (Platform.isIOS) {
-      // iOS에서는 앱 문서 디렉토리 내에 recordings 폴더 생성
-      final appDir = await getApplicationDocumentsDirectory();
-      final recordingsDir = Directory('${appDir.path}/recordings');
-      if (!await recordingsDir.exists()) {
-        await recordingsDir.create(recursive: true);
-      }
-      return recordingsDir;
-    } else {
-      // 데스크톱에서는 현재 프로젝트 디렉토리의 recordings 폴더 사용
-      final currentDir = Directory.current;
-      final recordingsDir = Directory('${currentDir.path}/recordings');
-      if (!await recordingsDir.exists()) {
-        await recordingsDir.create(recursive: true);
-      }
+      print('폴백 녹음 디렉토리: ${recordingsDir.path}');
       return recordingsDir;
     }
   }
@@ -64,6 +77,8 @@ class RecordService {
       // 마이크 권한이 영구적으로 거부된 경우
       if (micStatusBefore == PermissionStatus.permanentlyDenied) {
         print('마이크 권한이 영구적으로 거부되었습니다. 설정에서 권한을 허용해주세요.');
+        // 사용자에게 설정으로 이동하도록 안내
+        await openAppSettings();
         return false;
       }
 
@@ -77,7 +92,6 @@ class RecordService {
         return false;
       }
 
-      // Android 13+에서는 저장소 권한이 필요하지 않으므로 마이크 권한만 확인
       print('마이크 권한 허용됨 - 녹음 가능');
       return true;
     } else if (Platform.isIOS) {
@@ -97,6 +111,8 @@ class RecordService {
           break;
         case PermissionStatus.permanentlyDenied:
           print('iOS 마이크 권한이 영구적으로 거부되었습니다. 설정에서 수동으로 허용해야 합니다.');
+          // 사용자에게 설정으로 이동하도록 안내
+          await openAppSettings();
           return false;
         case PermissionStatus.restricted:
           print('iOS 마이크 권한이 제한되어 있습니다.');
@@ -139,43 +155,50 @@ class RecordService {
       throw Exception('현재 플랫폼에서 녹음 기능을 지원하지 않습니다. Android 또는 iOS 기기에서 실행해주세요.');
     }
 
-    final hasPermission = await _requestPermission();
-    if (!hasPermission) {
-      if (Platform.isAndroid) {
-        throw Exception('마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
-      } else if (Platform.isIOS) {
-        throw Exception('마이크 권한이 필요합니다. 설정 > 개인정보 보호 및 보안 > 마이크에서 권한을 허용해주세요.');
-      } else {
-        throw Exception('마이크 권한이 필요합니다.');
-      }
-    }
-
     try {
       print('녹음 시작 준비...');
 
-      // flutter_sound 초기화
-      print('flutter_sound 초기화 중...');
-      await _audioRecorder.openRecorder();
-      print('flutter_sound 초기화 완료');
+      // 권한 확인 및 요청
+      final hasPermission = await _requestPermission();
+      if (!hasPermission) {
+        if (Platform.isAndroid) {
+          throw Exception('마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
+        } else if (Platform.isIOS) {
+          throw Exception('마이크 권한이 필요합니다. 설정 > 개인정보 보호 및 보안 > 마이크에서 권한을 허용해주세요.');
+        } else {
+          throw Exception('마이크 권한이 필요합니다.');
+        }
+      }
 
       // 녹음 파일 저장 디렉토리 가져오기
       print('녹음 디렉토리 확인 중...');
       final recordingsDir = await _getRecordingsDirectory();
-      final extension = Platform.isAndroid ? '.m4a' : '.wav';
+
+      // 디렉토리 존재 확인
+      if (await recordingsDir.exists()) {
+        print('녹음 디렉토리 존재 확인: ${recordingsDir.path}');
+      } else {
+        print('경고: 녹음 디렉토리가 존재하지 않습니다: ${recordingsDir.path}');
+        await recordingsDir.create(recursive: true);
+        print('녹음 디렉토리 생성 완료');
+      }
+
+      final extension = '.wav'; // 모든 플랫폼에서 .wav 사용
       final fileName =
           'recording_${DateTime.now().year}_${DateTime.now().month.toString().padLeft(2, '0')}_${DateTime.now().day.toString().padLeft(2, '0')}_${DateTime.now().hour.toString().padLeft(2, '0')}_${DateTime.now().minute.toString().padLeft(2, '0')}_${DateTime.now().second.toString().padLeft(2, '0')}$extension';
       _currentRecordingPath = '${recordingsDir.path}/$fileName';
 
       print('녹음 파일 경로: $_currentRecordingPath');
-      print(
-        '사용할 코덱: ${Platform.isAndroid ? "Codec.aacMP4" : "Codec.pcm16WAV"}',
-      );
 
       // flutter_sound를 사용한 녹음 시작
       print('녹음 시작...');
+
+      // flutter_sound 초기화
+      await _audioRecorder.openRecorder();
+
       await _audioRecorder.startRecorder(
         toFile: _currentRecordingPath!,
-        codec: Platform.isAndroid ? Codec.aacMP4 : Codec.pcm16WAV,
+        codec: Codec.pcm16WAV,
       );
 
       print('녹음 시작 완료');
@@ -183,6 +206,8 @@ class RecordService {
       return true;
     } catch (e) {
       print('녹음 시작 실패: $e');
+      _isRecording = false;
+      _currentRecordingPath = null;
       return false;
     }
   }
@@ -212,6 +237,73 @@ class RecordService {
       print('녹음 중지 실패: $e');
       _isRecording = false;
       return null;
+    }
+  }
+
+  // 녹음 취소
+  Future<void> cancelRecording() async {
+    if (!_isRecording) return;
+
+    try {
+      await _audioRecorder.stopRecorder();
+      _isRecording = false;
+      _currentRecordingPath = null;
+    } catch (e) {
+      print('녹음 취소 실패: $e');
+    }
+  }
+
+  // 녹음 상태 확인
+  Future<bool> checkRecordingStatus() async {
+    if (!_isSupportedPlatform) return false;
+    return await _audioRecorder.isRecording;
+  }
+
+  // 저장된 녹음 파일 목록 가져오기
+  Future<List<File>> getRecordedFiles() async {
+    try {
+      final recordingsDir = await _getRecordingsDirectory();
+      
+      if (!await recordingsDir.exists()) {
+        print('녹음 디렉토리가 존재하지 않습니다: ${recordingsDir.path}');
+        return [];
+      }
+
+      final files = recordingsDir
+          .listSync()
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.wav'))
+          .toList();
+
+      print('발견된 녹음 파일 수: ${files.length}');
+      for (var file in files) {
+        final size = await file.length();
+        print('파일: ${file.path.split('/').last} (${(size / 1024).toStringAsFixed(1)} KB)');
+      }
+
+      // 최신 파일부터 정렬
+      files.sort(
+        (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()),
+      );
+      return files;
+    } catch (e) {
+      print('녹음 파일 목록 로드 실패: $e');
+      return [];
+    }
+  }
+
+  // 녹음 파일 삭제
+  Future<bool> deleteRecording(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        await file.delete();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('녹음 파일 삭제 실패: $e');
+      return false;
     }
   }
 
@@ -250,63 +342,6 @@ class RecordService {
       }
     } catch (e) {
       print('파일 정보 확인 실패: $e');
-    }
-  }
-
-  // 녹음 취소
-  Future<void> cancelRecording() async {
-    if (!_isRecording) return;
-
-    try {
-      await _audioRecorder.stopRecorder();
-      _isRecording = false;
-      _currentRecordingPath = null;
-    } catch (e) {
-      print('녹음 취소 실패: $e');
-    }
-  }
-
-  // 녹음 상태 확인
-  Future<bool> checkRecordingStatus() async {
-    if (!_isSupportedPlatform) return false;
-    return await _audioRecorder.isRecording;
-  }
-
-  // 저장된 녹음 파일 목록 가져오기
-  Future<List<File>> getRecordedFiles() async {
-    try {
-      final recordingsDir = await _getRecordingsDirectory();
-      final files = recordingsDir
-          .listSync()
-          .whereType<File>()
-          .where(
-            (file) => file.path.endsWith('.m4a') || file.path.endsWith('.wav'),
-          )
-          .toList();
-
-      // 최신 파일부터 정렬
-      files.sort(
-        (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()),
-      );
-      return files;
-    } catch (e) {
-      print('녹음 파일 목록 가져오기 실패: $e');
-      return [];
-    }
-  }
-
-  // 녹음 파일 삭제
-  Future<bool> deleteRecording(String filePath) async {
-    try {
-      final file = File(filePath);
-      if (await file.exists()) {
-        await file.delete();
-        return true;
-      }
-      return false;
-    } catch (e) {
-      print('녹음 파일 삭제 실패: $e');
-      return false;
     }
   }
 
