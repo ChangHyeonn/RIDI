@@ -1237,7 +1237,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                         BoxShadow(
                                           color: const Color(
                                             0xFF6366f1,
-                                          ).withOpacity(0.3),
+                                          ).withValues(alpha: 0.3),
                                           blurRadius: 12,
                                           offset: const Offset(0, 4),
                                         ),
@@ -1251,8 +1251,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                         Container(
                                           padding: const EdgeInsets.all(8),
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(
-                                              0.2,
+                                            color: Colors.white.withValues(
+                                              alpha: 0.2,
                                             ),
                                             borderRadius: BorderRadius.circular(
                                               12,
@@ -1308,7 +1308,9 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                       borderRadius: BorderRadius.circular(20),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.08),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.08,
+                                          ),
                                           blurRadius: 20,
                                           offset: const Offset(0, 8),
                                         ),
@@ -1359,7 +1361,9 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                       borderRadius: BorderRadius.circular(20),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.08),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.08,
+                                          ),
                                           blurRadius: 20,
                                           offset: const Offset(0, 8),
                                         ),
