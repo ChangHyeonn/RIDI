@@ -131,41 +131,49 @@ class _RecordScreenState extends State<RecordScreen> {
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _processWithAI(String audioPath) async {
-    setState(() {
-      _isProcessingAI = true;
-      _aiResponseText = 'AI가 음성을 분석하고 있습니다...';
-    });
+    if (mounted) {
+      setState(() {
+        _isProcessingAI = true;
+        _aiResponseText = 'AI가 음성을 분석하고 있습니다...';
+      });
+    }
 
     try {
       // AI 서버에 음성 파일 전송
       final aiResponse = await AIService.processVoice(audioPath);
 
-      setState(() {
-        _aiResponseText = aiResponse.voiceResponse?.text ?? '응답을 받지 못했습니다.';
-      });
+      if (mounted) {
+        setState(() {
+          _aiResponseText = aiResponse.voiceResponse?.text ?? '응답을 받지 못했습니다.';
+        });
+      }
 
       // 액션 처리
-      if (aiResponse.action != null) {
+      if (aiResponse.action != null && mounted) {
         ActionHandler.handleAction(aiResponse.action!, context);
       }
 
@@ -179,14 +187,18 @@ class _RecordScreenState extends State<RecordScreen> {
 
       _showSuccessSnackBar('AI 처리가 완료되었습니다.');
     } catch (e) {
-      setState(() {
-        _aiResponseText = 'AI 처리 중 오류가 발생했습니다: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _aiResponseText = 'AI 처리 중 오류가 발생했습니다: $e';
+        });
+      }
       _showErrorSnackBar('AI 처리 실패: $e');
     } finally {
-      setState(() {
-        _isProcessingAI = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isProcessingAI = false;
+        });
+      }
     }
   }
 

@@ -45,11 +45,8 @@ class RecordService {
       throw Exception('현재 플랫폼에서 녹음 기능을 지원하지 않습니다.');
     }
 
-    if (Platform.isAndroid) {
-      final status = await Permission.microphone.request();
-      return status == PermissionStatus.granted;
-    }
-    return true;
+    final status = await Permission.microphone.request();
+    return status == PermissionStatus.granted;
   }
 
   // 녹음 시작
@@ -72,14 +69,15 @@ class RecordService {
       // 녹음 파일 저장 디렉토리 가져오기
       final recordingsDir = await _getRecordingsDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final extension = Platform.isAndroid ? '.m4a' : '.wav';
       final fileName =
-          'recording_${DateTime.now().year}_${DateTime.now().month.toString().padLeft(2, '0')}_${DateTime.now().day.toString().padLeft(2, '0')}_${DateTime.now().hour.toString().padLeft(2, '0')}_${DateTime.now().minute.toString().padLeft(2, '0')}_${DateTime.now().second.toString().padLeft(2, '0')}.m4a';
+          'recording_${DateTime.now().year}_${DateTime.now().month.toString().padLeft(2, '0')}_${DateTime.now().day.toString().padLeft(2, '0')}_${DateTime.now().hour.toString().padLeft(2, '0')}_${DateTime.now().minute.toString().padLeft(2, '0')}_${DateTime.now().second.toString().padLeft(2, '0')}$extension';
       _currentRecordingPath = '${recordingsDir.path}/$fileName';
 
       // flutter_sound를 사용한 녹음 시작
       await _audioRecorder.startRecorder(
         toFile: _currentRecordingPath!,
-        codec: Codec.aacADTS,
+        codec: Platform.isAndroid ? Codec.aacMP4 : Codec.pcm16WAV,
       );
 
       _isRecording = true;
@@ -131,7 +129,9 @@ class RecordService {
       final files = recordingsDir
           .listSync()
           .whereType<File>()
-          .where((file) => file.path.endsWith('.m4a'))
+          .where(
+            (file) => file.path.endsWith('.m4a') || file.path.endsWith('.wav'),
+          )
           .toList();
 
       // 최신 파일부터 정렬
