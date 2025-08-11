@@ -20,8 +20,17 @@ class RecordService {
 
   // 녹음 파일 저장 디렉토리 가져오기
   Future<Directory> _getRecordingsDirectory() async {
-    if (Platform.isAndroid || Platform.isIOS) {
-      // 모바일에서는 앱 문서 디렉토리 내에 recordings 폴더 생성
+    if (Platform.isAndroid) {
+      // Android에서는 앱 내부 저장소에 저장
+      final appDir = await getApplicationDocumentsDirectory();
+      final recordingsDir = Directory('${appDir.path}/recordings');
+      if (!await recordingsDir.exists()) {
+        await recordingsDir.create(recursive: true);
+      }
+      print('Android 녹음 디렉토리: ${recordingsDir.path}');
+      return recordingsDir;
+    } else if (Platform.isIOS) {
+      // iOS에서는 앱 문서 디렉토리 내에 recordings 폴더 생성
       final appDir = await getApplicationDocumentsDirectory();
       final recordingsDir = Directory('${appDir.path}/recordings');
       if (!await recordingsDir.exists()) {
@@ -45,8 +54,81 @@ class RecordService {
       throw Exception('현재 플랫폼에서 녹음 기능을 지원하지 않습니다.');
     }
 
-    final status = await Permission.microphone.request();
-    return status == PermissionStatus.granted;
+    if (Platform.isAndroid) {
+      print('Android 권한 요청 시작...');
+
+      // 현재 권한 상태 확인
+      final micStatusBefore = await Permission.microphone.status;
+      print('마이크 권한 상태: $micStatusBefore');
+
+      // 마이크 권한이 영구적으로 거부된 경우
+      if (micStatusBefore == PermissionStatus.permanentlyDenied) {
+        print('마이크 권한이 영구적으로 거부되었습니다. 설정에서 권한을 허용해주세요.');
+        return false;
+      }
+
+      // 마이크 권한 요청
+      print('마이크 권한 요청 시도...');
+      final micStatus = await Permission.microphone.request();
+      print('마이크 권한 요청 결과: $micStatus');
+
+      if (micStatus != PermissionStatus.granted) {
+        print('마이크 권한이 거부되었습니다.');
+        return false;
+      }
+
+      // Android 13+에서는 저장소 권한이 필요하지 않으므로 마이크 권한만 확인
+      print('마이크 권한 허용됨 - 녹음 가능');
+      return true;
+    } else if (Platform.isIOS) {
+      print('iOS 권한 요청 시작...');
+
+      // 현재 권한 상태 확인
+      final micStatusBefore = await Permission.microphone.status;
+      print('iOS 마이크 권한 상태: $micStatusBefore');
+
+      // 권한 상태에 따른 상세 정보 출력
+      switch (micStatusBefore) {
+        case PermissionStatus.granted:
+          print('iOS 마이크 권한이 이미 허용되어 있습니다.');
+          return true;
+        case PermissionStatus.denied:
+          print('iOS 마이크 권한이 거부되었습니다. 권한 요청을 시도합니다.');
+          break;
+        case PermissionStatus.permanentlyDenied:
+          print('iOS 마이크 권한이 영구적으로 거부되었습니다. 설정에서 수동으로 허용해야 합니다.');
+          return false;
+        case PermissionStatus.restricted:
+          print('iOS 마이크 권한이 제한되어 있습니다.');
+          return false;
+        case PermissionStatus.limited:
+          print('iOS 마이크 권한이 제한적으로 허용되어 있습니다.');
+          return true;
+        case PermissionStatus.provisional:
+          print('iOS 마이크 권한이 임시로 허용되어 있습니다.');
+          return true;
+        default:
+          print('iOS 마이크 권한 상태를 확인할 수 없습니다.');
+          break;
+      }
+
+      // 권한 요청 (iOS에서는 약간의 지연 후 요청)
+      print('iOS 마이크 권한 요청 시도...');
+      await Future.delayed(const Duration(milliseconds: 500));
+      final status = await Permission.microphone.request();
+      print('iOS 마이크 권한 요청 결과: $status');
+
+      if (status == PermissionStatus.granted) {
+        print('iOS 마이크 권한 허용됨');
+        return true;
+      } else {
+        print('iOS 마이크 권한 거부됨: $status');
+        return false;
+      }
+    } else {
+      print('지원되지 않는 플랫폼');
+      return false;
+    }
   }
 
   // 녹음 시작
@@ -59,27 +141,44 @@ class RecordService {
 
     final hasPermission = await _requestPermission();
     if (!hasPermission) {
-      throw Exception('마이크 권한이 필요합니다.');
+      if (Platform.isAndroid) {
+        throw Exception('마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
+      } else if (Platform.isIOS) {
+        throw Exception('마이크 권한이 필요합니다. 설정 > 개인정보 보호 및 보안 > 마이크에서 권한을 허용해주세요.');
+      } else {
+        throw Exception('마이크 권한이 필요합니다.');
+      }
     }
 
     try {
+      print('녹음 시작 준비...');
+
       // flutter_sound 초기화
+      print('flutter_sound 초기화 중...');
       await _audioRecorder.openRecorder();
+      print('flutter_sound 초기화 완료');
 
       // 녹음 파일 저장 디렉토리 가져오기
+      print('녹음 디렉토리 확인 중...');
       final recordingsDir = await _getRecordingsDirectory();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final extension = Platform.isAndroid ? '.m4a' : '.wav';
       final fileName =
           'recording_${DateTime.now().year}_${DateTime.now().month.toString().padLeft(2, '0')}_${DateTime.now().day.toString().padLeft(2, '0')}_${DateTime.now().hour.toString().padLeft(2, '0')}_${DateTime.now().minute.toString().padLeft(2, '0')}_${DateTime.now().second.toString().padLeft(2, '0')}$extension';
       _currentRecordingPath = '${recordingsDir.path}/$fileName';
 
+      print('녹음 파일 경로: $_currentRecordingPath');
+      print(
+        '사용할 코덱: ${Platform.isAndroid ? "Codec.aacMP4" : "Codec.pcm16WAV"}',
+      );
+
       // flutter_sound를 사용한 녹음 시작
+      print('녹음 시작...');
       await _audioRecorder.startRecorder(
         toFile: _currentRecordingPath!,
         codec: Platform.isAndroid ? Codec.aacMP4 : Codec.pcm16WAV,
       );
 
+      print('녹음 시작 완료');
       _isRecording = true;
       return true;
     } catch (e) {
@@ -93,13 +192,64 @@ class RecordService {
     if (!_isRecording) return null;
 
     try {
+      print('녹음 중지 시작...');
+      print('현재 녹음 경로: $_currentRecordingPath');
+
       final path = await _audioRecorder.stopRecorder();
+      print('녹음 중지 완료. 반환된 경로: $path');
+
       _isRecording = false;
+
+      // 파일 존재 여부 확인 및 상세 정보 출력
+      if (path != null) {
+        await _printFileInfo(path);
+      } else {
+        print('경고: 녹음 중지 후 경로가 null입니다.');
+      }
+
       return path;
     } catch (e) {
       print('녹음 중지 실패: $e');
       _isRecording = false;
       return null;
+    }
+  }
+
+  // 파일 정보 출력 (디버깅용)
+  Future<void> _printFileInfo(String sourcePath) async {
+    try {
+      final sourceFile = File(sourcePath);
+      if (!await sourceFile.exists()) {
+        print('원본 파일이 존재하지 않습니다: $sourcePath');
+        return;
+      }
+
+      // 파일 정보 출력
+      final fileSize = await sourceFile.length();
+      final fileName = sourcePath.split('/').last;
+      print('녹음 파일 정보:');
+      print('- 파일명: $fileName');
+      print('- 파일 크기: ${(fileSize / 1024).toStringAsFixed(1)} KB');
+      print('- 전체 경로: $sourcePath');
+
+      // 디렉토리 내용 확인
+      final dir = Directory(
+        sourcePath.substring(0, sourcePath.lastIndexOf('/')),
+      );
+      if (await dir.exists()) {
+        final files = await dir.list().toList();
+        print('- 디렉토리 내 파일 수: ${files.length}');
+        for (var file in files) {
+          if (file is File) {
+            final size = await file.length();
+            print(
+              '  - ${file.path.split('/').last} (${(size / 1024).toStringAsFixed(1)} KB)',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('파일 정보 확인 실패: $e');
     }
   }
 
