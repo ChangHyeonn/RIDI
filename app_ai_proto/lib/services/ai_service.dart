@@ -14,15 +14,15 @@ class AIService {
     if (kDebugMode) {
       if (Platform.isAndroid) {
         // Android 에뮬레이터에서 로컬 서버 접근
-        return 'http://10.0.2.2:5000';
+        return 'http://10.0.2.2:8080';
       } else if (Platform.isIOS) {
         // iOS 시뮬레이터에서 로컬 서버 접근
-        return 'http://localhost:5000';
+        return 'http://localhost:8080';
       }
     }
 
     // 실제 기기나 릴리즈 모드에서는 실제 IP 사용
-    return 'http://192.168.1.100:5000'; // 실제 서버 IP
+    return 'http://192.168.1.100:8080'; // 실제 서버 IP
   }
 
   static Future<AIResponse> processVoice(String audioPath) async {

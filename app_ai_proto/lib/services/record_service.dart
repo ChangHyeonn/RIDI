@@ -1,11 +1,11 @@
 import 'dart:io';
-import 'package:record/record.dart';
+import 'package:flutter_sound/flutter_sound.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/foundation.dart';
 
 class RecordService {
-  final _audioRecorder = Record();
+  final _audioRecorder = FlutterSoundRecorder();
   bool _isRecording = false;
   String? _currentRecordingPath;
 
@@ -66,6 +66,9 @@ class RecordService {
     }
 
     try {
+      // flutter_sound 초기화
+      await _audioRecorder.openRecorder();
+
       // 녹음 파일 저장 디렉토리 가져오기
       final recordingsDir = await _getRecordingsDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -73,18 +76,11 @@ class RecordService {
           'recording_${DateTime.now().year}_${DateTime.now().month.toString().padLeft(2, '0')}_${DateTime.now().day.toString().padLeft(2, '0')}_${DateTime.now().hour.toString().padLeft(2, '0')}_${DateTime.now().minute.toString().padLeft(2, '0')}_${DateTime.now().second.toString().padLeft(2, '0')}.m4a';
       _currentRecordingPath = '${recordingsDir.path}/$fileName';
 
-      // iOS에서는 기본 설정으로 녹음 시작
-      if (Platform.isIOS) {
-        await _audioRecorder.start(path: _currentRecordingPath!);
-      } else {
-        // Android에서는 상세 설정 사용
-        await _audioRecorder.start(
-          path: _currentRecordingPath!,
-          encoder: AudioEncoder.aacLc,
-          bitRate: 128000,
-          samplingRate: 44100,
-        );
-      }
+      // flutter_sound를 사용한 녹음 시작
+      await _audioRecorder.startRecorder(
+        toFile: _currentRecordingPath!,
+        codec: Codec.aacADTS,
+      );
 
       _isRecording = true;
       return true;
@@ -99,7 +95,7 @@ class RecordService {
     if (!_isRecording) return null;
 
     try {
-      final path = await _audioRecorder.stop();
+      final path = await _audioRecorder.stopRecorder();
       _isRecording = false;
       return path;
     } catch (e) {
@@ -114,7 +110,7 @@ class RecordService {
     if (!_isRecording) return;
 
     try {
-      await _audioRecorder.stop();
+      await _audioRecorder.stopRecorder();
       _isRecording = false;
       _currentRecordingPath = null;
     } catch (e) {
@@ -125,7 +121,7 @@ class RecordService {
   // 녹음 상태 확인
   Future<bool> checkRecordingStatus() async {
     if (!_isSupportedPlatform) return false;
-    return await _audioRecorder.isRecording();
+    return await _audioRecorder.isRecording;
   }
 
   // 저장된 녹음 파일 목록 가져오기
@@ -166,6 +162,6 @@ class RecordService {
 
   // 리소스 해제
   void dispose() {
-    _audioRecorder.dispose();
+    _audioRecorder.closeRecorder();
   }
 }
