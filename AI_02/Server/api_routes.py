@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-API Routes for AI Server
-고령층 일정 메모 관리 AI 서버 API 라우트
+API Routes for AI Server (Text-based)
+고령층 일정 메모 관리 AI 서버 API 라우트 (텍스트 기반)
 """
 
 import sys
 import os
-import tempfile
 import logging
 import base64
 
@@ -18,10 +17,10 @@ from datetime import datetime
 from Server.utils.response_utils import create_response, create_error_response
 from Server.utils.app_response_utils import (
     create_app_action_response, create_schedule_action_response,
-    create_settings_action_response, create_voice_only_response,
+    create_settings_action_response, create_text_response,
     create_error_action_response, create_health_action_response
 )
-from Server.utils.validation import validate_audio_file, validate_schedule_data, validate_accessibility_settings
+from Server.utils.validation import validate_text_input, validate_schedule_data, validate_accessibility_settings
 from Server.utils.auth import require_api_key
 from Config.settings import Settings
 
@@ -39,37 +38,33 @@ def health_check():
         logger.error(f"Health check failed: {e}")
         return create_error_action_response("서버 상태 확인 중 오류가 발생했습니다", "health_check")
 
-@api_bp.route('/process_voice', methods=['POST'])
-def process_voice():
-    """음성 명령 처리 API"""
+@api_bp.route('/process_text', methods=['POST'])
+def process_text():
+    """텍스트 명령 처리 API"""
     try:
         # 입력 검증
-        if 'audio' not in request.files:
-            return create_error_response("오디오 파일이 제공되지 않았습니다", 400)
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return create_error_response("텍스트가 제공되지 않았습니다", 400)
         
-        audio_file = request.files['audio']
-        user_id = request.form.get('user_id', 'default_user')
+        user_text = data['text']
+        user_id = data.get('user_id', 'default_user')
         
-        # 파일 검증
-        validation_result = validate_audio_file(audio_file)
+        # 텍스트 검증
+        validation_result = validate_text_input(user_text)
         if not validation_result['valid']:
             return create_error_response(validation_result['error'], 400)
         
-        # 임시 파일 생성
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
-            audio_file.save(tmp_file.name)
-            audio_path = tmp_file.name
-        
         try:
-            # AI 처리 (새로운 통합 파이프라인 사용)
-            result = current_app.ai_service.process_voice_command(audio_path, user_id)
+            # AI 처리 (텍스트 기반 통합 파이프라인 사용)
+            result = current_app.ai_service.process_text_command(user_text, user_id)
             
             # 액션 기반 응답으로 변환
             if result.get('success'):
                 processing_result = result.get('processing_result', {})
                 analysis = processing_result.get('analysis', {})
                 result_data = processing_result.get('result', {})
-                audio_bytes = result.get('audio_response')
+                response_text = result.get('response_text', '')
                 
                 category = analysis.get('category', 'other')
                 action = result_data.get('action', '')
@@ -84,9 +79,9 @@ def process_voice():
                     return create_app_action_response(
                         action_type="clarification_request",
                         data=payload,
-                        voice_response={
+                        text_response={
                             "text": msg,
-                            "play_automatically": True
+                            "display_automatically": True
                         },
                         ui_instructions={
                             "screen": "conversation",
@@ -106,27 +101,24 @@ def process_voice():
                     return create_schedule_action_response(
                         action_type="schedule_add",
                         schedule_data=minimal_payload,
-                        voice_text=result_data.get('message', '일정이 추가되었습니다.'),
-                        highlight_date=schedule_data.get('datetime', '').split(' ')[0] if schedule_data.get('datetime') else '',
-                        audio_data=audio_bytes
+                        text_response=result_data.get('message', '일정이 추가되었습니다.'),
+                        highlight_date=schedule_data.get('datetime', '').split(' ')[0] if schedule_data.get('datetime') else ''
                     )
                 elif category == "schedule_delete" or action == "schedule_delete":
                     delete_info = result_data.get('delete_info', {})
                     return create_schedule_action_response(
                         action_type="schedule_delete",
                         schedule_data=delete_info,
-                        voice_text=result_data.get('message', '일정이 삭제되었습니다.'),
-                        audio_data=audio_bytes
+                        text_response=result_data.get('message', '일정이 삭제되었습니다.')
                     )
                 elif category == "schedule_read" or action == "schedule_read":
                     schedules = result_data.get('schedules', [])
                     return create_app_action_response(
                         action_type="schedule_list",
                         data={"schedules": schedules},
-                        voice_response={
+                        text_response={
                             "text": result_data.get('message', '일정을 조회했습니다.'),
-                            "play_automatically": True,
-                            **({"audio_url": f"data:audio/mp3;base64,{base64.b64encode(audio_bytes).decode()}"} if audio_bytes else {})
+                            "display_automatically": True
                         },
                         ui_instructions={
                             "screen": "schedule_list",
@@ -138,35 +130,28 @@ def process_voice():
                     return create_settings_action_response(
                         setting_type="accessibility",
                         changes=accessibility_info,
-                        voice_text=result.get('ai_response', '설정이 변경되었습니다.')
+                        text_response=result.get('ai_response', '설정이 변경되었습니다.')
                     )
                 else:
-                    # 일반 음성 응답
-                    return create_voice_only_response(
+                    # 일반 텍스트 응답
+                    return create_text_response(
                         text=result.get('ai_response', ''),
-                        audio_data=audio_bytes
+                        response_text=response_text
                     )
             else:
-                # 음성 인식 실패 시에도 음성 응답이 포함된 경우 처리
-                audio_bytes = result.get('audio_response')
-                if audio_bytes:
-                    return create_voice_only_response(
-                        text=result.get('error', '음성 인식이 잘 안되네요, 다시 한번 말씀해 주시겠어요?'),
-                        audio_data=audio_bytes
-                    )
-                else:
-                    return create_error_action_response(
-                        result.get('error', '음성 처리 중 오류가 발생했습니다'),
-                        "voice_processing"
-                    )
-        finally:
-            # 임시 파일 정리
-            if os.path.exists(audio_path):
-                os.unlink(audio_path)
+                # 텍스트 처리 실패 시
+                return create_error_action_response(
+                    result.get('error', '텍스트 처리 중 오류가 발생했습니다'),
+                    "text_processing"
+                )
+                
+        except Exception as e:
+            logger.error(f"Text processing failed: {e}")
+            return create_error_response("텍스트 처리 중 오류가 발생했습니다", 500)
                 
     except Exception as e:
-        logger.error(f"Voice processing failed: {e}")
-        return create_error_response("음성 처리 중 오류가 발생했습니다", 500)
+        logger.error(f"Text processing failed: {e}")
+        return create_error_response("텍스트 처리 중 오류가 발생했습니다", 500)
 
 @api_bp.route('/schedule/add', methods=['POST'])
 def add_schedule():
@@ -190,7 +175,7 @@ def add_schedule():
             return create_schedule_action_response(
                 action_type="schedule_add",
                 schedule_data=schedule_data,
-                voice_text=result.get('message', '일정이 추가되었습니다.'),
+                text_response=result.get('message', '일정이 추가되었습니다.'),
                 highlight_date=schedule_data.get('datetime', '').split('T')[0] if schedule_data.get('datetime') else None
             )
         else:
@@ -215,9 +200,9 @@ def list_schedules():
             return create_app_action_response(
                 action_type="schedule_list",
                 data={"schedules": schedules},
-                voice_response={
+                text_response={
                     "text": f"총 {len(schedules)}개의 일정이 있습니다.",
-                    "play_automatically": True
+                    "display_automatically": True
                 },
                 ui_instructions={
                     "screen": "schedule_list",
@@ -291,57 +276,8 @@ def test_endpoint():
     return create_response({
         "message": "AI Server is running!",
         "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0"
+        "version": "2.0.0"
     })
-
-@api_bp.route('/elderly/simple_response', methods=['POST'])
-def get_simple_response():
-    """고령자용 간단 응답 API"""
-    try:
-        data = request.get_json()
-        if not data or 'message' not in data:
-            return create_error_action_response("메시지가 제공되지 않았습니다", "validation_error")
-        
-        message = data['message']
-        
-        # 간단한 응답 생성
-        simple_response = current_app.ai_service._simplify_response_for_elderly({
-            'ai_response': message
-        })
-        
-        simple_text = simple_response.get('ai_response', message)
-        
-        return create_voice_only_response(
-            text=simple_text,
-            audio_data=None # elderly_optimized 제거
-        )
-        
-    except Exception as e:
-        logger.error(f"Simple response generation failed: {e}")
-        return create_error_action_response("간단 응답 생성 중 오류가 발생했습니다", "simple_response_error")
-
-@api_bp.route('/elderly/repeat_important', methods=['POST'])
-def repeat_important_message():
-    """중요 메시지 반복 API"""
-    try:
-        data = request.get_json()
-        if not data or 'message' not in data:
-            return create_error_action_response("메시지가 제공되지 않았습니다", "validation_error")
-        
-        message = data['message']
-        repeat_count = data.get('repeat_count', 2)
-        
-        # 중요 메시지 반복
-        repeated_message = f"{message} " * repeat_count
-        
-        return create_voice_only_response(
-            text=repeated_message.strip(),
-            audio_data=None # elderly_optimized 제거
-        )
-        
-    except Exception as e:
-        logger.error(f"Message repetition failed: {e}")
-        return create_error_action_response("메시지 반복 중 오류가 발생했습니다", "repeat_message_error")
 
 @api_bp.route('/schedule/delete', methods=['DELETE'])
 def delete_schedule():
@@ -368,7 +304,7 @@ def delete_schedule():
             return create_schedule_action_response(
                 action_type="schedule_delete",
                 schedule_data=schedule_data,
-                voice_text=result.get('message', '일정이 삭제되었습니다.')
+                text_response=result.get('message', '일정이 삭제되었습니다.')
             )
         else:
             return create_error_action_response(
@@ -397,9 +333,9 @@ def read_schedules_by_date():
                     "schedules": schedules,
                     "date": target_date
                 },
-                voice_response={
+                text_response={
                     "text": f"{target_date}에 {len(schedules)}개의 일정이 있습니다.",
-                    "play_automatically": True
+                    "display_automatically": True
                 },
                 ui_instructions={
                     "screen": "schedule_list",
@@ -433,9 +369,9 @@ def get_important_schedules():
                     "schedules": schedules,
                     "filter": "important"
                 },
-                voice_response={
+                text_response={
                     "text": f"중요한 일정 {len(schedules)}개가 있습니다.",
-                    "play_automatically": True
+                    "display_automatically": True
                 },
                 ui_instructions={
                     "screen": "schedule_list",
@@ -475,7 +411,7 @@ def update_accessibility_settings():
             return create_settings_action_response(
                 setting_type="accessibility",
                 changes=data,
-                voice_text=result.get('message', '접근성 설정이 변경되었습니다.')
+                text_response=result.get('message', '접근성 설정이 변경되었습니다.')
             )
         else:
             return create_error_action_response(
@@ -502,9 +438,9 @@ def get_accessibility_settings():
                     "setting_type": "accessibility",
                     "settings": settings
                 },
-                voice_response={
+                text_response={
                     "text": "접근성 설정을 조회했습니다.",
-                    "play_automatically": True
+                    "display_automatically": True
                 },
                 ui_instructions={
                     "screen": "settings",
