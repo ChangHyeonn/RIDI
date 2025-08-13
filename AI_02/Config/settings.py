@@ -33,6 +33,13 @@ class Settings:
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
     ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
     
+    # 데이터베이스 설정
+    DB_ENGINE = os.getenv('DB_ENGINE', 'inmemory')  # inmemory | mongodb
+    
+    # MongoDB 설정
+    MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017/')
+    MONGO_DB = os.getenv('MONGO_DB', 'ridi_ai')
+    
     # 텍스트 처리 설정
     MAX_TEXT_LENGTH = int(os.getenv('MAX_TEXT_LENGTH', 1000))
     MIN_TEXT_LENGTH = int(os.getenv('MIN_TEXT_LENGTH', 1))
@@ -90,6 +97,10 @@ class Settings:
         elif cls.LLM_TYPE == 'claude' and not cls.ANTHROPIC_API_KEY:
             errors.append("Claude 모델 사용 시 ANTHROPIC_API_KEY가 필요합니다")
         
+        # MongoDB 설정 검증
+        if cls.DB_ENGINE == 'mongodb' and not cls.MONGO_URI:
+            errors.append("MongoDB 사용 시 MONGO_URI가 설정되지 않았습니다")
+        
         # 텍스트 길이 검증
         if cls.MAX_TEXT_LENGTH < cls.MIN_TEXT_LENGTH:
             errors.append("최대 텍스트 길이는 최소 텍스트 길이보다 커야 합니다")
@@ -128,4 +139,13 @@ class Settings:
             "min_length": cls.MIN_TEXT_LENGTH,
             "timeout": cls.DEFAULT_RESPONSE_TIMEOUT,
             "max_response_length": cls.MAX_RESPONSE_LENGTH
+        }
+    
+    @classmethod
+    def get_database_config(cls) -> dict:
+        """데이터베이스 설정 반환"""
+        return {
+            "engine": cls.DB_ENGINE,
+            "mongo_uri": cls.MONGO_URI,
+            "mongo_db": cls.MONGO_DB
         }
