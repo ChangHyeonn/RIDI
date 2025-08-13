@@ -243,11 +243,13 @@ class SpeechToTextService {
             );
             _currentWords = result.recognizedWords;
 
+            // 최종 결과만 스트림으로 전송 (중간 결과는 무시)
             if (result.finalResult) {
               _lastWords = result.recognizedWords;
+              print('✅ 최종 결과 전송: "$_lastWords"');
               _textStreamController.add(_lastWords);
             } else {
-              _textStreamController.add(_currentWords);
+              print('⏳ 중간 결과 무시: "${result.recognizedWords}"');
             }
           },
           onSoundLevelChange: (level) {

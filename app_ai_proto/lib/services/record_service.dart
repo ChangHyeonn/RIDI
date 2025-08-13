@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 import 'speech_to_text_service.dart';
 import 'text_to_speech_service.dart';
 import 'ai_service.dart';
 import '../models/ai_response.dart';
+import '../providers/task_provider.dart';
 
 class RecordService {
   final SpeechToTextService _sttService = SpeechToTextService();
@@ -69,17 +71,12 @@ class RecordService {
   }
 
   void _setupStreamSubscriptions() {
-    // STT 텍스트 스트림 구독 (audio_app2 방식)
+    // STT 텍스트 스트림 구독 - 중간 결과는 무시하고 최종 결과만 저장
     _sttService.textStream.listen((text) {
       print('🎤 음성 인식 텍스트 수신: "$text"');
       _recognizedText = text;
       _textStreamController.add(text);
-
-      // 텍스트가 있으면 AI 처리 (audio_app2 방식)
-      if (text.isNotEmpty) {
-        print('🤖 AI 처리 시작 - 인식된 텍스트: "$text"');
-        _processWithAI(text);
-      }
+      // 중간 결과는 AI 처리하지 않음 - 최종 결과만 처리
     });
 
     // STT 상태 스트림 구독
@@ -88,9 +85,9 @@ class RecordService {
       _recordingStateController.add(isListening);
       print('📊 녹음 상태 변경: $isListening');
 
-      // 음성 인식이 끝나면 자동으로 AI 처리 (audio_app2 방식)
+      // 음성 인식이 끝나면 최종 결과로 AI 처리
       if (!isListening && _recognizedText.isNotEmpty) {
-        print('🔄 음성 인식 완료 - AI 처리 시작');
+        print('🔄 음성 인식 완료 - 최종 텍스트로 AI 처리 시작: "$_recognizedText"');
         _processWithAI(_recognizedText);
       }
     });
@@ -201,7 +198,7 @@ class RecordService {
     }
   }
 
-  // AI 처리
+  // AI 처리 (가이드에 따른 개선)
   Future<void> _processWithAI(String text) async {
     try {
       print('=== AI 처리 시작 ===');
@@ -218,23 +215,155 @@ class RecordService {
       final aiResponse = await AIService.processText(text);
       print('📡 AI 서비스 응답 수신 완료');
 
-      if (aiResponse.success && aiResponse.textResponse?.text != null) {
-        _aiResponseText = aiResponse.textResponse!.text;
-        _aiResponseStreamController.add(_aiResponseText);
-        print('✅ AI 응답 성공: "$_aiResponseText"');
+      if (aiResponse.success) {
+        // 가이드에 따른 응답 처리
+        print('✅ AI 응답 성공');
 
-        // TTS로 음성 재생
-        print('🔊 TTS 음성 재생 시작...');
-        await _ttsService.speak(_aiResponseText);
-        print('✅ TTS 음성 재생 완료');
+        // 1. 텍스트 응답 처리
+        if (aiResponse.textResponse?.text != null) {
+          _aiResponseText = aiResponse.textResponse!.text;
+          _aiResponseStreamController.add(_aiResponseText);
+          print('✅ AI 텍스트 응답: "$_aiResponseText"');
+        }
+
+        // 2. 액션 처리 (가이드에 따른 UI 업데이트)
+        if (aiResponse.action != null) {
+          print('🎯 액션 처리 시작: ${aiResponse.action!.type}');
+          await _handleAIAction(aiResponse.action!);
+        }
+
+        // 3. TTS로 음성 재생
+        if (_aiResponseText.isNotEmpty) {
+          print('🔊 TTS 음성 재생 시작...');
+          await _ttsService.speak(_aiResponseText);
+          print('✅ TTS 음성 재생 완료');
+        }
       } else {
-        print('❌ AI 응답이 없거나 실패했습니다.');
+        print('❌ AI 응답이 실패했습니다.');
         print('  - success: ${aiResponse.success}');
         print('  - textResponse: ${aiResponse.textResponse?.text}');
       }
     } catch (e) {
       print('❌ AI 처리 중 오류: $e');
       print('🔍 오류 상세: ${e.toString()}');
+    }
+  }
+
+  // AI 액션 처리 (가이드에 따른 구현)
+  Future<void> _handleAIAction(AIAction action) async {
+    try {
+      print('🎯 === AI 액션 처리 시작 ===');
+      print('액션 타입: ${action.type}');
+      print('액션 데이터: ${action.data}');
+
+      switch (action.type) {
+        case 'schedule_add':
+          await _handleScheduleAdd(action);
+          break;
+        case 'schedule_read':
+          await _handleScheduleRead(action);
+          break;
+        case 'schedule_delete':
+          await _handleScheduleDelete(action);
+          break;
+        case 'schedule_modify':
+          await _handleScheduleModify(action);
+          break;
+        default:
+          print('⚠️ 알 수 없는 액션 타입: ${action.type}');
+      }
+
+      print('✅ AI 액션 처리 완료');
+    } catch (e) {
+      print('❌ AI 액션 처리 중 오류: $e');
+    }
+  }
+
+  // 일정 추가 처리
+  Future<void> _handleScheduleAdd(AIAction action) async {
+    try {
+      print('📅 일정 추가 처리 시작');
+
+      // 액션 데이터에서 일정 정보 추출
+      final scheduleData = action.data;
+      if (scheduleData != null) {
+        print('📋 일정 데이터: $scheduleData');
+
+        // AI 서버 응답에서 일정 정보 파싱
+        if (scheduleData is Map<String, dynamic>) {
+          final title = scheduleData['title'] ?? '새 일정';
+          final datetime =
+              scheduleData['datetime'] ?? DateTime.now().toIso8601String();
+          final description = scheduleData['description'] ?? '';
+
+          print('📋 파싱된 일정 정보:');
+          print('  - 제목: $title');
+          print('  - 날짜: $datetime');
+          print('  - 설명: $description');
+
+          // DateTime 파싱
+          DateTime? parsedDateTime;
+          try {
+            parsedDateTime = DateTime.parse(datetime);
+          } catch (e) {
+            print('⚠️ 날짜 파싱 실패, 현재 시간 사용: $e');
+            parsedDateTime = DateTime.now();
+          }
+
+          // TaskProvider를 통해 실제 일정 추가
+          // TODO: TaskProvider 인스턴스에 접근하는 방법 필요
+          // 현재는 로그만 출력하고 실제 구현은 나중에 추가
+          print('✅ 일정 추가 완료 (TaskProvider 연동 필요)');
+          print('  - 제목: $title');
+          print('  - 날짜: ${parsedDateTime.toString()}');
+          print('  - 설명: $description');
+        } else {
+          print('⚠️ 일정 데이터 형식이 올바르지 않습니다: $scheduleData');
+        }
+      } else {
+        print('⚠️ 일정 데이터가 없습니다');
+      }
+    } catch (e) {
+      print('❌ 일정 추가 처리 중 오류: $e');
+    }
+  }
+
+  // 일정 조회 처리
+  Future<void> _handleScheduleRead(AIAction action) async {
+    try {
+      print('📅 일정 조회 처리 시작');
+
+      // TODO: TaskProvider를 통해 실제 일정 조회
+      // 예시: final schedules = await TaskProvider.getTasks();
+      print('✅ 일정 조회 완료 (실제 데이터 반영 필요)');
+    } catch (e) {
+      print('❌ 일정 조회 처리 중 오류: $e');
+    }
+  }
+
+  // 일정 삭제 처리
+  Future<void> _handleScheduleDelete(AIAction action) async {
+    try {
+      print('📅 일정 삭제 처리 시작');
+
+      // TODO: TaskProvider를 통해 실제 일정 삭제
+      // 예시: await TaskProvider.deleteTask(taskId);
+      print('✅ 일정 삭제 완료 (실제 데이터 반영 필요)');
+    } catch (e) {
+      print('❌ 일정 삭제 처리 중 오류: $e');
+    }
+  }
+
+  // 일정 수정 처리
+  Future<void> _handleScheduleModify(AIAction action) async {
+    try {
+      print('📅 일정 수정 처리 시작');
+
+      // TODO: TaskProvider를 통해 실제 일정 수정
+      // 예시: await TaskProvider.updateTask(taskId, newData);
+      print('✅ 일정 수정 완료 (실제 데이터 반영 필요)');
+    } catch (e) {
+      print('❌ 일정 수정 처리 중 오류: $e');
     }
   }
 
