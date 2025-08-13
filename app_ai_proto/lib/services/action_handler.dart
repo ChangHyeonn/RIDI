@@ -20,7 +20,7 @@ class ActionHandler {
         handleClarificationRequest(action, context);
         break;
       case 'voice_response':
-        handleVoiceResponse(action, context);
+        handleTextResponse(action, context);
         break;
       default:
         print('알 수 없는 액션 타입: ${action.type}');
@@ -147,20 +147,33 @@ class ActionHandler {
     }
   }
 
-  static void handleVoiceResponse(AIAction action, BuildContext context) {
+  static void handleTextResponse(AIAction action, BuildContext context) {
     try {
-      // 음성 응답 처리 (UI 표시 등)
-      if (action.uiInstructions.showVoiceIndicator == true) {
+      // 텍스트 응답 처리 (UI 표시 등)
+      if (action.uiInstructions.notification != null) {
+        final notification = action.uiInstructions.notification!;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('음성 응답을 재생합니다.'),
-            backgroundColor: Colors.blue,
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(notification.message),
+            backgroundColor: _getNotificationColor(notification.type),
+            duration: Duration(seconds: notification.duration ?? 3),
           ),
         );
       }
     } catch (e) {
       print('음성 응답 처리 오류: $e');
+    }
+  }
+
+  static Color _getNotificationColor(String type) {
+    switch (type) {
+      case 'success':
+        return Colors.green;
+      case 'error':
+        return Colors.red;
+      case 'info':
+      default:
+        return Colors.blue;
     }
   }
 }

@@ -69,41 +69,53 @@ class RecordService {
   }
 
   void _setupStreamSubscriptions() {
-    // STT 텍스트 스트림 구독
+    // STT 텍스트 스트림 구독 (audio_app2 방식)
     _sttService.textStream.listen((text) {
+      print('🎤 음성 인식 텍스트 수신: "$text"');
       _recognizedText = text;
       _textStreamController.add(text);
-      print('음성 인식 텍스트: $text');
+
+      // 텍스트가 있으면 AI 처리 (audio_app2 방식)
+      if (text.isNotEmpty) {
+        print('🤖 AI 처리 시작 - 인식된 텍스트: "$text"');
+        _processWithAI(text);
+      }
     });
 
     // STT 상태 스트림 구독
     _sttService.listeningStateStream.listen((isListening) {
       _isRecording = isListening;
       _recordingStateController.add(isListening);
-      print('녹음 상태 변경: $isListening');
+      print('📊 녹음 상태 변경: $isListening');
+
+      // 음성 인식이 끝나면 자동으로 AI 처리 (audio_app2 방식)
+      if (!isListening && _recognizedText.isNotEmpty) {
+        print('🔄 음성 인식 완료 - AI 처리 시작');
+        _processWithAI(_recognizedText);
+      }
     });
 
     // TTS 상태 스트림 구독
     _ttsService.speakingStateStream.listen((isSpeaking) {
       _isPlaying = isSpeaking;
       _playingStateController.add(isSpeaking);
-      print('재생 상태 변경: $isSpeaking');
+      print('🔊 재생 상태 변경: $isSpeaking');
     });
 
     // STT 오류 스트림 구독
     _sttService.errorStream.listen((error) {
-      print('STT 오류: $error');
+      print('❌ STT 오류: $error');
     });
 
     // TTS 오류 스트림 구독
     _ttsService.errorStream.listen((error) {
-      print('TTS 오류: $error');
+      print('❌ TTS 오류: $error');
     });
   }
 
-  // 권한 요청 (기존 메서드명 유지)
+  // 권한 확인 (기존 메서드명 유지)
   Future<bool> _requestPermission() async {
-    print('=== 마이크 권한 요청 ===');
+    print('=== 마이크 권한 확인 ===');
 
     try {
       if (kIsWeb) {
@@ -115,29 +127,22 @@ class RecordService {
       print('현재 마이크 권한 상태: $micStatus');
 
       if (micStatus == PermissionStatus.granted) {
-        print('✅ 마이크 권한이 이미 허용되어 있습니다.');
+        print('✅ 마이크 권한이 허용되어 있습니다.');
         return true;
       }
 
       if (micStatus == PermissionStatus.permanentlyDenied) {
         print('❌ 마이크 권한이 영구적으로 거부되었습니다.');
+        print('⚠️ 앱 설정에서 마이크 권한을 수동으로 허용해주세요.');
         await openAppSettings();
         return false;
       }
 
-      print('마이크 권한을 요청합니다...');
-      final micResult = await Permission.microphone.request();
-      print('마이크 권한 요청 결과: $micResult');
-
-      if (micResult == PermissionStatus.granted) {
-        print('✅ 마이크 권한이 허용되었습니다.');
-        return true;
-      } else {
-        print('❌ 마이크 권한이 거부되었습니다.');
-        return false;
-      }
+      print('❌ 마이크 권한이 거부되었습니다.');
+      print('⚠️ 앱 시작 시 권한을 허용해주세요.');
+      return false;
     } catch (e) {
-      print('권한 요청 중 오류: $e');
+      print('권한 확인 중 오류: $e');
       return false;
     }
   }
@@ -152,19 +157,15 @@ class RecordService {
     try {
       print('=== 음성 인식 시작 ===');
 
-      // 권한 확인
-      final hasPermission = await _requestPermission();
-      if (!hasPermission) {
-        print('❌ 마이크 권한이 필요합니다.');
-        return false;
-      }
+      // audio_app2 방식: 매번 초기화하므로 여기서는 확인만
+      print('🔧 audio_app2 방식으로 STT 서비스 사용');
 
       // 이전 텍스트 초기화
       _recognizedText = '';
       _aiResponseText = '';
       _recordingStartTime = DateTime.now();
 
-      // 음성 인식 시작
+      // 음성 인식 시작 (권한은 이미 RecordScreen에서 확인됨)
       final success = await _sttService.startListening();
       if (success) {
         print('✅ 음성 인식 시작 성공');
@@ -191,11 +192,7 @@ class RecordService {
 
       await _sttService.stopListening();
 
-      // AI 처리
-      if (_recognizedText.isNotEmpty) {
-        await _processWithAI(_recognizedText);
-      }
-
+      // AI 처리는 스트림에서 자동으로 처리되므로 여기서는 하지 않음
       print('✅ 음성 인식 중지 완료');
       return _recognizedText.isNotEmpty ? _recognizedText : null;
     } catch (e) {
@@ -208,23 +205,36 @@ class RecordService {
   Future<void> _processWithAI(String text) async {
     try {
       print('=== AI 처리 시작 ===');
-      print('처리할 텍스트: $text');
+      print('📝 처리할 텍스트: "$text"');
+      print('📏 텍스트 길이: ${text.length}');
+
+      if (text.isEmpty) {
+        print('⚠️ 빈 텍스트는 처리하지 않습니다.');
+        return;
+      }
 
       // AI 서비스에 텍스트 전송
+      print('🚀 AIService.processText() 호출 중...');
       final aiResponse = await AIService.processText(text);
+      print('📡 AI 서비스 응답 수신 완료');
 
-      if (aiResponse.success && aiResponse.voiceResponse?.text != null) {
-        _aiResponseText = aiResponse.voiceResponse!.text;
+      if (aiResponse.success && aiResponse.textResponse?.text != null) {
+        _aiResponseText = aiResponse.textResponse!.text;
         _aiResponseStreamController.add(_aiResponseText);
-        print('AI 응답: $_aiResponseText');
+        print('✅ AI 응답 성공: "$_aiResponseText"');
 
         // TTS로 음성 재생
+        print('🔊 TTS 음성 재생 시작...');
         await _ttsService.speak(_aiResponseText);
+        print('✅ TTS 음성 재생 완료');
       } else {
-        print('AI 응답이 없거나 실패했습니다.');
+        print('❌ AI 응답이 없거나 실패했습니다.');
+        print('  - success: ${aiResponse.success}');
+        print('  - textResponse: ${aiResponse.textResponse?.text}');
       }
     } catch (e) {
       print('❌ AI 처리 중 오류: $e');
+      print('🔍 오류 상세: ${e.toString()}');
     }
   }
 

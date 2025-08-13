@@ -36,30 +36,25 @@ class SpeechToTextService {
     print('🌐 Web 환경 여부: $kIsWeb');
 
     try {
-      // Web 환경에서는 권한 처리를 다르게
-      if (kIsWeb) {
-        print('🌐 Web 환경에서 초기화 중...');
-        print('⚠️ Web에서는 브라우저가 자동으로 마이크 권한을 요청합니다.');
-        // Web에서는 권한 확인을 건너뛰고 바로 초기화 시도
-      } else {
-        // 모바일 환경에서 권한 확인
-        final hasPermission = await _requestPermission();
-        if (!hasPermission) {
-          print('❌ 음성 인식 권한이 없습니다.');
-          _errorStreamController.add('음성 인식 권한이 필요합니다.');
-          return false;
-        }
-      }
-
       // SpeechToText 초기화 (audio_app2 방식)
       print('🔧 SpeechToText 초기화 시작...');
 
       // Web 환경에서는 더 간단한 초기화 사용
       if (kIsWeb) {
+        print('🌐 Web 환경 초기화 설정');
         _isAvailable = await _speech.initialize(
           onError: (error) {
             print('❌ Web 음성 인식 오류: ${error.errorMsg}');
-            _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+            print('  - errorCode: ${error.errorMsg}');
+
+            // 타임아웃 오류에 대한 특별 처리
+            if (error.errorMsg == 'error_speech_timeout') {
+              print('⏰ Web 음성 인식 타임아웃 - 말하기 전에 시간이 초과되었습니다.');
+              _errorStreamController.add('음성 인식 타임아웃. 다시 시도해주세요.');
+            } else {
+              _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+            }
+
             _isListening = false;
             _listeningStateController.add(false);
           },
@@ -75,12 +70,22 @@ class SpeechToTextService {
           debugLogging: true, // Web에서는 디버그 로깅 활성화
         );
       } else {
+        print('📱 모바일 환경 초기화 설정');
         _isAvailable = await _speech.initialize(
           onError: (error) {
             print('❌ 음성 인식 오류 발생:');
             print('  - errorMsg: ${error.errorMsg}');
             print('  - permanent: ${error.permanent}');
-            _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+            print('  - errorCode: ${error.errorMsg}');
+
+            // 타임아웃 오류에 대한 특별 처리
+            if (error.errorMsg == 'error_speech_timeout') {
+              print('⏰ 음성 인식 타임아웃 - 말하기 전에 시간이 초과되었습니다.');
+              _errorStreamController.add('음성 인식 타임아웃. 다시 시도해주세요.');
+            } else {
+              _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+            }
+
             _isListening = false;
             _listeningStateController.add(false);
           },
@@ -102,9 +107,18 @@ class SpeechToTextService {
 
       if (_isAvailable) {
         print('✅ SpeechToText 초기화 성공');
+
+        // 추가 상태 확인
+        print('🔍 추가 상태 확인:');
+        print('  - isSupported: ${_speech.isAvailable}');
+        print('  - _isAvailable: $_isAvailable');
+
         return true;
       } else {
         print('❌ SpeechToText 초기화 실패');
+        print('🔍 실패 원인 분석:');
+        print('  - isSupported: ${_speech.isAvailable}');
+        print('  - _isAvailable: $_isAvailable');
         _errorStreamController.add('음성 인식 기능을 초기화할 수 없습니다.');
         return false;
       }
@@ -115,9 +129,9 @@ class SpeechToTextService {
     }
   }
 
-  // 권한 요청
+  // 권한 확인
   Future<bool> _requestPermission() async {
-    print('=== 음성 인식 권한 요청 ===');
+    print('=== 음성 인식 권한 확인 ===');
 
     try {
       // Web 환경에서는 권한 처리가 다름
@@ -128,48 +142,61 @@ class SpeechToTextService {
       }
 
       // 마이크 권한 확인
-      final micStatus = await Permission.microphone.status;
+      var micStatus = await Permission.microphone.status;
       print('현재 마이크 권한 상태: $micStatus');
 
       if (micStatus == PermissionStatus.granted) {
-        print('✅ 마이크 권한이 이미 허용되어 있습니다.');
+        print('✅ 마이크 권한이 허용되어 있습니다.');
         return true;
       }
 
       if (micStatus == PermissionStatus.permanentlyDenied) {
         print('❌ 마이크 권한이 영구적으로 거부되었습니다.');
+        print('⚠️ 앱 설정에서 마이크 권한을 수동으로 허용해주세요.');
         await openAppSettings();
         return false;
       }
 
-      // 권한 요청
-      print('마이크 권한을 요청합니다...');
-      final micResult = await Permission.microphone.request();
-      print('마이크 권한 요청 결과: $micResult');
+      // 권한 요청 (거부된 경우)
+      if (micStatus == PermissionStatus.denied) {
+        print('마이크 권한을 요청합니다...');
+        micStatus = await Permission.microphone.request();
+        print('마이크 권한 요청 결과: $micStatus');
 
-      if (micResult == PermissionStatus.granted) {
-        print('✅ 마이크 권한이 허용되었습니다.');
-        return true;
-      } else {
-        print('❌ 마이크 권한이 거부되었습니다.');
-        return false;
+        if (micStatus == PermissionStatus.granted) {
+          print('✅ 마이크 권한이 허용되었습니다.');
+          return true;
+        }
       }
+
+      print('❌ 마이크 권한이 거부되었습니다.');
+      print('⚠️ 음성 인식을 사용하려면 마이크 권한이 필요합니다.');
+      return false;
     } catch (e) {
-      print('권한 요청 중 오류: $e');
+      print('권한 확인 중 오류: $e');
       return false;
     }
   }
 
-  // 음성 인식 시작 (웹 환경 최적화)
+  // 음성 인식 시작 (audio_app2 방식으로 완전히 변경)
   Future<bool> startListening({
     String? localeId,
     bool partialResults = true,
     bool onDevice = false,
   }) async {
-    if (!_isAvailable) {
-      print('❌ SpeechToText가 초기화되지 않았습니다.');
-      _errorStreamController.add('음성 인식이 초기화되지 않았습니다.');
-      return false;
+    print('=== 음성 인식 시작 요청 (audio_app2 방식) ===');
+    print('🌐 Web 환경 여부: $kIsWeb');
+
+    // 권한 확인 (Error 7 방지)
+    if (!kIsWeb) {
+      print('🔐 권한 확인 중...');
+      final hasPermission = await _requestPermission();
+      if (!hasPermission) {
+        print('❌ 권한이 없어서 음성 인식을 시작할 수 없습니다.');
+        _errorStreamController.add('마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
+        return false;
+      }
+      print('✅ 권한 확인 완료');
     }
 
     // 이미 음성 인식 중이면 먼저 중지
@@ -180,24 +207,39 @@ class SpeechToTextService {
     }
 
     try {
-      print('=== 음성 인식 시작 ===');
-      print('🌐 Web 환경 여부: $kIsWeb');
+      print('=== audio_app2 방식으로 초기화 및 시작 ===');
 
-      // 이전 텍스트 초기화
-      _currentWords = '';
-      _lastWords = '';
+      // audio_app2 방식: 매번 initialize 호출
+      bool available = await _speech.initialize(
+        onError: (error) {
+          print('❌ 음성 인식 오류: ${error.errorMsg}');
+          _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+          _isListening = false;
+          _listeningStateController.add(false);
+        },
+        onStatus: (status) {
+          print('📊 음성 인식 상태: $status');
+          if (status == 'done' ||
+              status == 'notListening' ||
+              status == 'error') {
+            _isListening = false;
+            _listeningStateController.add(false);
+          }
+        },
+      );
 
-      // Web 환경에서는 audio_app2 방식으로 최대한 간단하게
-      if (kIsWeb) {
-        print('🌐 Web 환경 음성 인식 설정 (audio_app2 방식):');
-        print('  - 최소한의 파라미터만 사용');
-        print('  - 반환값 확인하지 않음');
+      print('🔧 SpeechToText 초기화 결과: $available');
 
-        // audio_app2 방식: 반환값을 확인하지 않고 바로 시작
+      if (available) {
+        // 이전 텍스트 초기화
+        _currentWords = '';
+        _lastWords = '';
+
+        // audio_app2 방식: 매우 간단한 listen 파라미터
         _speech.listen(
           onResult: (result) {
             print(
-              '🎤 Web 음성 인식 결과: "${result.recognizedWords}" (final: ${result.finalResult})',
+              '🎤 음성 인식 결과: "${result.recognizedWords}" (final: ${result.finalResult})',
             );
             _currentWords = result.recognizedWords;
 
@@ -208,38 +250,22 @@ class SpeechToTextService {
               _textStreamController.add(_currentWords);
             }
           },
+          onSoundLevelChange: (level) {
+            print('🔊 소리 레벨: $level');
+          },
           listenFor: const Duration(seconds: 30),
-          pauseFor: const Duration(seconds: 30),
+          pauseFor: const Duration(seconds: 30), // audio_app2와 동일하게 30초
         );
+
+        _isListening = true;
+        _listeningStateController.add(true);
+        print('✅ 음성 인식 시작 성공 (audio_app2 방식)');
+        return true;
       } else {
-        // 모바일 환경
-        print('📱 모바일 환경 음성 인식 설정');
-        _speech.listen(
-          onResult: (result) {
-            print(
-              '🎤 모바일 음성 인식 결과: "${result.recognizedWords}" (final: ${result.finalResult})',
-            );
-            _currentWords = result.recognizedWords;
-
-            if (result.finalResult) {
-              _lastWords = result.recognizedWords;
-              _textStreamController.add(_lastWords);
-            } else {
-              _textStreamController.add(_currentWords);
-            }
-          },
-          listenFor: const Duration(seconds: 30),
-          pauseFor: const Duration(seconds: 30),
-          partialResults: partialResults,
-          onDevice: onDevice,
-          localeId: localeId,
-        );
+        print('❌ SpeechToText 초기화 실패');
+        _errorStreamController.add('음성 인식 기능을 초기화할 수 없습니다.');
+        return false;
       }
-
-      _isListening = true;
-      _listeningStateController.add(true);
-      print('✅ 음성 인식 시작 성공');
-      return true;
     } catch (e) {
       print('❌ 음성 인식 시작 중 오류: $e');
       _errorStreamController.add('음성 인식 시작 오류: $e');

@@ -189,20 +189,19 @@ class UnifiedVoiceService {
         success: true,
         timestamp: DateTime.now().toIso8601String(),
         action: null,
-        voiceResponse: VoiceResponse(
+        textResponse: TextResponse(
           text:
               '음성 인식이 완료되었습니다. 인식된 텍스트: "$text". AI 서버의 텍스트 처리 API가 준비되면 실제 AI 응답을 받을 수 있습니다.',
-          playAutomatically: true,
-          audioUrl: null,
+          displayAutomatically: true,
         ),
       );
 
       _aiResponseStreamController.add(aiResponse);
-      print('AI 응답: ${aiResponse.voiceResponse?.text}');
+      print('AI 응답: ${aiResponse.textResponse?.text}');
 
       // TTS로 응답 재생
-      if (aiResponse.voiceResponse?.text != null) {
-        await _ttsService.speak(aiResponse.voiceResponse!.text);
+      if (aiResponse.textResponse?.text != null) {
+        await _ttsService.speak(aiResponse.textResponse!.text);
       }
 
       _isProcessing = false;

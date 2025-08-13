@@ -83,10 +83,9 @@ class AIService {
           print('액션 우선순위: ${aiResponse.action!.priority}');
           print('액션 데이터: ${aiResponse.action!.data}');
         }
-        if (aiResponse.voiceResponse != null) {
-          print('음성 응답 텍스트: ${aiResponse.voiceResponse!.text}');
-          print('자동 재생: ${aiResponse.voiceResponse!.playAutomatically}');
-          print('오디오 URL: ${aiResponse.voiceResponse!.audioUrl}');
+        if (aiResponse.textResponse != null) {
+          print('텍스트 응답: ${aiResponse.textResponse!.text}');
+          print('자동 표시: ${aiResponse.textResponse!.displayAutomatically}');
         }
         print('====================');
 
@@ -177,11 +176,10 @@ class AIService {
             print('   데이터: ${aiResponse.action!.data}');
           }
 
-          if (aiResponse.voiceResponse != null) {
-            print('🔊 음성 응답 정보:');
-            print('   텍스트: ${aiResponse.voiceResponse!.text}');
-            print('   자동 재생: ${aiResponse.voiceResponse!.playAutomatically}');
-            print('   오디오 URL: ${aiResponse.voiceResponse!.audioUrl}');
+          if (aiResponse.textResponse != null) {
+            print('🔊 텍스트 응답 정보:');
+            print('   텍스트: ${aiResponse.textResponse!.text}');
+            print('   자동 표시: ${aiResponse.textResponse!.displayAutomatically}');
           }
 
           print('⏰ AI 처리 완료 시간: ${DateTime.now().toIso8601String()}');

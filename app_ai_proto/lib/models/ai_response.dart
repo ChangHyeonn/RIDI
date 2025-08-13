@@ -1,13 +1,13 @@
 class AIResponse {
   final bool success;
   final AIAction? action;
-  final VoiceResponse? voiceResponse;
+  final TextResponse? textResponse; // voiceResponse를 textResponse로 변경
   final String timestamp;
 
   AIResponse({
     required this.success,
     this.action,
-    this.voiceResponse,
+    this.textResponse,
     required this.timestamp,
   });
 
@@ -15,8 +15,8 @@ class AIResponse {
     return AIResponse(
       success: json['success'] ?? false,
       action: json['action'] != null ? AIAction.fromJson(json['action']) : null,
-      voiceResponse: json['voice_response'] != null
-          ? VoiceResponse.fromJson(json['voice_response'])
+      textResponse: json['text_response'] != null
+          ? TextResponse.fromJson(json['text_response'])
           : null,
       timestamp: json['timestamp'] ?? '',
     );
@@ -46,54 +46,65 @@ class AIAction {
   }
 }
 
-class VoiceResponse {
+class TextResponse {
   final String text;
-  final bool playAutomatically;
-  final String? audioUrl;
+  final bool
+  displayAutomatically; // playAutomatically를 displayAutomatically로 변경
 
-  VoiceResponse({
-    required this.text,
-    required this.playAutomatically,
-    this.audioUrl,
-  });
+  TextResponse({required this.text, required this.displayAutomatically});
 
-  factory VoiceResponse.fromJson(Map<String, dynamic> json) {
-    return VoiceResponse(
+  factory TextResponse.fromJson(Map<String, dynamic> json) {
+    return TextResponse(
       text: json['text'] ?? '',
-      playAutomatically: json['play_automatically'] ?? false,
-      audioUrl: json['audio_url'],
+      displayAutomatically: json['display_automatically'] ?? false,
     );
   }
 }
 
 class UIInstructions {
   final String? screen;
-  final String? highlightDate;
-  final bool? showConfirmation;
-  final String? removeItem;
   final bool? refreshData;
-  final bool? showInputPrompt;
-  final bool? showVoiceIndicator;
+  final bool? showConfirmation;
+  final NotificationInfo? notification;
 
   UIInstructions({
     this.screen,
-    this.highlightDate,
-    this.showConfirmation,
-    this.removeItem,
     this.refreshData,
-    this.showInputPrompt,
-    this.showVoiceIndicator,
+    this.showConfirmation,
+    this.notification,
   });
 
   factory UIInstructions.fromJson(Map<String, dynamic> json) {
     return UIInstructions(
       screen: json['screen'],
-      highlightDate: json['highlight_date'],
-      showConfirmation: json['show_confirmation'],
-      removeItem: json['remove_item'],
       refreshData: json['refresh_data'],
-      showInputPrompt: json['show_input_prompt'],
-      showVoiceIndicator: json['show_voice_indicator'],
+      showConfirmation: json['show_confirmation'],
+      notification: json['notification'] != null
+          ? NotificationInfo.fromJson(json['notification'])
+          : null,
+    );
+  }
+}
+
+class NotificationInfo {
+  final String type; // 'success', 'error', 'info'
+  final String title;
+  final String message;
+  final int? duration;
+
+  NotificationInfo({
+    required this.type,
+    required this.title,
+    required this.message,
+    this.duration,
+  });
+
+  factory NotificationInfo.fromJson(Map<String, dynamic> json) {
+    return NotificationInfo(
+      type: json['type'] ?? 'info',
+      title: json['title'] ?? '',
+      message: json['message'] ?? '',
+      duration: json['duration'],
     );
   }
 }

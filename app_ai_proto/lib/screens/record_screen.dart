@@ -10,6 +10,7 @@ import '../services/action_handler.dart';
 import '../services/audio_player_service.dart';
 import '../models/ai_response.dart';
 import 'package:share_plus/share_plus.dart';
+import '../permissions_init.dart';
 
 class RecordScreen extends StatefulWidget {
   const RecordScreen({super.key});
@@ -35,6 +36,7 @@ class _RecordScreenState extends State<RecordScreen> {
     _checkPlatformSupport();
     _loadRecordedFiles();
     _initializeRecordService();
+    // 권한 초기화는 사용자가 버튼을 눌렀을 때 하도록 변경
   }
 
   Future<void> _initializeRecordService() async {
@@ -48,6 +50,16 @@ class _RecordScreenState extends State<RecordScreen> {
       }
     } catch (e) {
       print('❌ RecordService 초기화 중 오류: $e');
+    }
+  }
+
+  Future<void> _initializePermissions() async {
+    try {
+      print('=== RecordScreen에서 권한 초기화 시작 ===');
+      await PermissionsInit.requestNecessaryPermissions();
+      print('✅ RecordScreen 권한 초기화 완료');
+    } catch (e) {
+      print('❌ RecordScreen 권한 초기화 중 오류: $e');
     }
   }
 
@@ -87,15 +99,40 @@ class _RecordScreenState extends State<RecordScreen> {
     }
 
     try {
+      // 1. 권한 확인 및 요청
+      print('=== 음성 인식 시작 - 권한 확인 ===');
+      final hasPermission = await PermissionsInit.checkMicrophonePermission();
+
+      if (!hasPermission) {
+        print('권한이 없습니다. 권한을 요청합니다...');
+        await PermissionsInit.requestNecessaryPermissions();
+
+        // 권한 요청 후 다시 확인
+        final permissionGranted =
+            await PermissionsInit.checkMicrophonePermission();
+        if (!permissionGranted) {
+          _showErrorSnackBar('마이크 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
+          return;
+        }
+      }
+
+      print('✅ 권한 확인 완료 - 음성 인식 시작');
+
+      // 2. 음성 인식 시작
       final success = await _recordService.startRecording();
       if (success) {
         setState(() {
           _isRecording = true;
         });
+        print('✅ 음성 인식 시작 성공');
+
+        // 사용자 안내
+        _showSuccessSnackBar('음성 인식이 시작되었습니다. 1-2초 후 말씀해주세요.');
       } else {
-        _showErrorSnackBar('음성 인식을 시작할 수 없습니다.');
+        _showErrorSnackBar('음성 인식을 시작할 수 없습니다. 다시 시도해주세요.');
       }
     } catch (e) {
+      print('❌ 음성 인식 시작 중 오류: $e');
       _showErrorSnackBar('음성 인식을 시작할 수 없습니다: $e');
     }
   }
@@ -237,7 +274,7 @@ class _RecordScreenState extends State<RecordScreen> {
 
       if (mounted) {
         setState(() {
-          _aiResponseText = aiResponse.voiceResponse?.text ?? '응답을 받지 못했습니다.';
+          _aiResponseText = aiResponse.textResponse?.text ?? '응답을 받지 못했습니다.';
         });
       }
 
@@ -247,7 +284,7 @@ class _RecordScreenState extends State<RecordScreen> {
       }
 
       // TTS로 음성 응답 재생
-      if (aiResponse.voiceResponse?.text != null) {
+      if (aiResponse.textResponse?.text != null) {
         await _recordService.playRecording(null);
       }
 
