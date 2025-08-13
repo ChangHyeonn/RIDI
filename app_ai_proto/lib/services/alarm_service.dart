@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:provider/provider.dart';
 import '../models/task.dart';
 import '../screens/alarm_screen.dart';
 import '../providers/task_provider.dart';
 import '../services/task_service.dart';
+import 'text_to_speech_service.dart';
 
 // 전역 NavigatorKey
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -18,8 +18,22 @@ class AlarmService {
 
   final Map<String, Timer> _alarmTimers = {};
   final Map<String, DateTime> _scheduledAlarms = {};
-  AudioPlayer? _audioPlayer;
   final TaskService _taskService = TaskService();
+  final TextToSpeechService _ttsService = TextToSpeechService();
+  bool _isInitialized = false;
+
+  // 초기화
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+
+    try {
+      await _ttsService.initialize();
+      _isInitialized = true;
+      print('✅ AlarmService 초기화 성공');
+    } catch (e) {
+      print('❌ AlarmService 초기화 실패: $e');
+    }
+  }
 
   // 알람 설정
   void scheduleAlarm(Task task, [BuildContext? context]) {
@@ -82,8 +96,8 @@ class AlarmService {
 
   // 알람 화면 표시
   void _showAlarmScreen(Task task, BuildContext? context) {
-    // 알람 소리 재생 (진동)
-    _playAlarmSound(context);
+    // 알람 소리 재생 (진동 + TTS)
+    _playAlarmSound(task, context);
 
     // 전역 NavigatorKey를 사용하여 알람 화면 표시
     navigatorKey.currentState?.pushAndRemoveUntil(
@@ -92,18 +106,18 @@ class AlarmService {
     );
   }
 
-  // 알람 소리 재생 (진동 + 오디오) - 볼륨 설정 적용
-  void _playAlarmSound([BuildContext? context]) async {
+  // 알람 소리 재생 (진동 + TTS)
+  void _playAlarmSound(Task task, [BuildContext? context]) async {
     try {
       print('=== 알람 소리 재생 시작 ===');
 
-      // 진동으로 알람 효과 생성 (더 강한 진동)
+      // 진동으로 알람 효과 생성
       HapticFeedback.heavyImpact();
       HapticFeedback.heavyImpact();
       HapticFeedback.heavyImpact();
       print('진동 발생 완료');
 
-      // 볼륨 설정 - 설정 화면에서 조절한 값 사용
+      // 볼륨 설정 가져오기
       double volume = 0.5; // 기본값
 
       // context가 있으면 Provider에서 가져오기
@@ -132,58 +146,31 @@ class AlarmService {
 
       // 볼륨이 0이면 소리 재생하지 않음
       if (volume <= 0.0) {
-        print(' 볼륨이 0이므로 소리 재생하지 않음 (진동만 발생)');
+        print('🔇 볼륨이 0이므로 소리 재생하지 않음 (진동만 발생)');
         return;
       }
 
-      // 기존 오디오 플레이어 정리
-      if (_audioPlayer != null) {
-        await _audioPlayer?.stop();
-        await _audioPlayer?.dispose();
-        _audioPlayer = null;
-        print('기존 오디오 플레이어 정리 완료');
+      // TTS 서비스 초기화 확인
+      if (!_isInitialized) {
+        await initialize();
       }
 
-      // 새로운 오디오 플레이어 생성
-      _audioPlayer = AudioPlayer();
-      print('새 오디오 플레이어 생성 완료');
+      // 알람 메시지 생성
+      final alarmMessage = '알람입니다. ${task.title} 일정이 시작되었습니다.';
+      print('알람 메시지: $alarmMessage');
 
-      // 로컬 알람 소리 파일 사용
-      final assetPath = 'assets/sounds/alarm.mp3';
-      print('오디오 파일 로딩 시작: $assetPath');
+      // TTS로 알람 메시지 재생
+      await _ttsService.setVoiceSettings(
+        speechRate: 0.8, // 조금 빠르게
+        volume: volume,
+        pitch: 1.2, // 조금 높은 톤
+      );
 
-      // 파일 존재 여부 확인을 위한 테스트
-      try {
-        await _audioPlayer?.setAsset(assetPath);
-        print('오디오 파일 로딩 성공');
-      } catch (e) {
-        print('오디오 파일 로딩 실패: $e');
-        // 대체 방법: 시스템 알람 소리 사용
-        print('시스템 알람 소리로 대체 시도...');
-        await _audioPlayer?.setAsset('assets/sounds/alarm.mp3');
-      }
-      print('오디오 파일 로딩 완료');
-
-      await _audioPlayer?.setVolume(volume);
-      print('🔊 최종 볼륨 설정 완료: $volume (${(volume * 100).toInt()}%)');
-
-      // 재생 시작 (반복 재생)
-      await _audioPlayer?.setLoopMode(LoopMode.all);
-      await _audioPlayer?.play();
-      print('오디오 반복 재생 시작 완료');
-
-      // 재생 상태 모니터링
-      _audioPlayer?.playerStateStream.listen((state) {
-        print('오디오 플레이어 상태: $state');
-      });
-
-      // 에러 모니터링
-      _audioPlayer?.playbackEventStream.listen((event) {
-        print('오디오 이벤트: $event');
-      });
+      await _ttsService.speak(alarmMessage);
+      print('TTS 알람 메시지 재생 시작');
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      print('알람 진동 및 소리 발생 완료 (타임스탬프: $timestamp)');
+      print('알람 진동 및 TTS 발생 완료 (타임스탬프: $timestamp)');
     } catch (e) {
       print('알람 소리/진동 실패: $e');
       print('에러 상세 정보: ${e.toString()}');
@@ -194,9 +181,7 @@ class AlarmService {
   // 알람 소리 정지
   void stopAlarmSound() async {
     try {
-      await _audioPlayer?.stop();
-      await _audioPlayer?.dispose();
-      _audioPlayer = null;
+      await _ttsService.stop();
       print('알람 소리 정지');
     } catch (e) {
       print('알람 소리 정지 실패: $e');
@@ -209,5 +194,10 @@ class AlarmService {
   // 알람이 설정되어 있는지 확인
   bool isAlarmScheduled(String taskId) {
     return _alarmTimers.containsKey(taskId);
+  }
+
+  // 리소스 해제
+  void dispose() {
+    _ttsService.dispose();
   }
 }
