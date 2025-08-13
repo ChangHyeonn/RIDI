@@ -105,37 +105,67 @@ Content-Type: application/json
 }
 ```
 
-#### **일정 추가**
-```http
-POST /api/v1/schedule/add
-Content-Type: application/json
-X-User-ID: user123
+**요청 필드 설명:**
+- `text` (필수): 처리할 텍스트 명령
+- `user_id` (선택): 사용자 식별자 (기본값: "default_user")
 
+**요청 예시:**
+```json
+// 일정 추가
 {
-  "title": "병원 예약",
-  "datetime": "2024-01-15 15:00:00",
-  "description": "정기 검진",
-  "priority": "important"
+  "text": "내일 오후 3시에 병원 예약이 있어",
+  "user_id": "user123"
+}
+
+// 일정 조회
+{
+  "text": "내일 일정이 뭐야?",
+  "user_id": "user123"
+}
+
+// 일정 삭제
+{
+  "text": "병원 예약 취소해줘",
+  "user_id": "user123"
+}
+
+// 일반 대화
+{
+  "text": "안녕하세요",
+  "user_id": "user123"
 }
 ```
 
-#### **일정 조회**
-```http
-GET /api/v1/schedule/list?user_id=user123
-```
+**요청 검증 규칙:**
+- ✅ **텍스트 길이**: 1자 이상, 1000자 이하
+- ✅ **텍스트 형식**: 문자열만 허용
+- ✅ **보안 검증**: XSS, JavaScript 인젝션 등 위험한 패턴 차단
+- ✅ **사용자 ID**: 문자열 형식 (기본값: "default_user")
 
-#### **일정 삭제**
-```http
-DELETE /api/v1/schedule/delete
-Content-Type: application/json
-X-User-ID: user123
-
+**오류 응답 예시:**
+```json
+// 텍스트 누락
 {
-  "schedule_id": "schedule_1234567890",
-  "title": "병원 예약",
-  "date": "2024-01-15"
+  "error": "텍스트가 제공되지 않았습니다"
+}
+
+// 텍스트 너무 짧음
+{
+  "error": "텍스트가 너무 짧습니다"
+}
+
+// 텍스트 너무 김
+{
+  "error": "텍스트가 너무 깁니다. (최대 1000자)"
+}
+
+// 위험한 패턴 포함
+{
+  "error": "허용되지 않는 텍스트 패턴이 포함되어 있습니다"
 }
 ```
+
+**참고**: 모든 일정 관련 요청은 `/api/v1/process_text` 엔드포인트를 통해 텍스트 명령으로 처리됩니다.
 
 ### **2. AI Server → App (응답)**
 
@@ -143,30 +173,39 @@ X-User-ID: user123
 ```json
 {
   "success": true,
-  "action": {
-    "type": "schedule_add",
-    "priority": "high",
-    "data": {
-      "id": "schedule_1234567890",
-      "title": "병원 예약",
-      "datetime": "2024-01-15 15:00:00"
-    },
-    "ui_instructions": {
-      "screen": "calendar",
-      "refresh_data": true,
-      "show_confirmation": true,
-      "notification": {
-        "type": "success",
-        "title": "일정 추가됨",
-        "message": "병원 예약이 추가되었습니다"
+  "user_text": "내일 오후 3시에 병원 예약이 있어",
+  "processing_result": {
+    "action": "schedule_add",
+    "result": {
+      "action": "schedule_added",
+      "message": "내일 오후 3시에 병원 예약을 추가했습니다.",
+      "schedule_data": {
+        "title": "병원 예약",
+        "datetime": "2024-01-15 15:00:00",
+        "description": "병원 예약"
       }
     }
   },
-  "text_response": {
-    "text": "내일 오후 3시에 병원 예약을 추가했습니다.",
-    "display_automatically": true
-  },
-  "timestamp": "2024-01-14T10:30:00.123456"
+  "response_text": "내일 오후 3시에 병원 예약을 추가했습니다.",
+  "processing_time": 1.234,
+  "timestamp": "2024-01-14T10:30:00.123456",
+  "pipeline_info": {
+    "pipeline_type": "Unified Text Pipeline",
+    "components": {
+      "request_processor": {
+        "processor_type": "Unified Request Processor",
+        "llm_model": {
+          "model_name": "gemini-1.5-flash",
+          "provider": "Google"
+        }
+      }
+    },
+    "features": {
+      "llm_centered": true,
+      "text_to_text": true,
+      "no_stt_tts": true
+    }
+  }
 }
 ```
 
@@ -174,25 +213,32 @@ X-User-ID: user123
 ```json
 {
   "success": false,
-  "action": {
-    "type": "error",
-    "priority": "high",
-    "data": {
-      "error_type": "text_processing",
-      "message": "텍스트 처리 중 오류가 발생했습니다"
-    },
-    "ui_instructions": {
-      "notification": {
-        "type": "error",
-        "title": "오류 발생",
-        "message": "텍스트 처리 중 오류가 발생했습니다",
-        "duration": 5000
+  "error": "텍스트 처리 중 오류가 발생했습니다",
+  "processing_time": 0.123,
+  "timestamp": "2024-01-14T10:30:00.123456",
+  "pipeline_info": {
+    "pipeline_type": "Unified Text Pipeline",
+    "components": {
+      "request_processor": {
+        "processor_type": "Unified Request Processor"
       }
+    },
+    "features": {
+      "llm_centered": true,
+      "text_to_text": true,
+      "no_stt_tts": true
     }
-  },
-  "timestamp": "2024-01-14T10:30:00.123456"
+  }
 }
 ```
+
+### **액션 타입별 의미**
+- `schedule_add`: 일정 추가 요청
+- `schedule_read`: 일정 조회 요청  
+- `schedule_delete`: 일정 삭제 요청
+- `schedule_modify`: 일정 수정 요청
+- `accessibility`: 접근성 설정 변경
+- `other`: 일반 대화 또는 기타 요청
 
 ## 🔧 Flutter 애플리케이션 구현
 
@@ -222,21 +268,48 @@ class AIService {
   static const String baseUrl = 'http://localhost:8080/api/v1';
   
   Future<Map<String, dynamic>> processText(String text, String userId) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/process_text'),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
+    try {
+      // 요청 데이터 구성
+      final requestData = {
         'text': text,
         'user_id': userId,
-      }),
-    );
-    
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to process text');
+      };
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/process_text'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(requestData),
+      );
+      
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        // HTTP 오류 처리
+        final errorData = jsonDecode(response.body);
+        throw Exception(errorData['error'] ?? 'HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('요청 처리 중 오류가 발생했습니다: $e');
+    }
+  }
+  
+  // 서버 상태 확인
+  Future<bool> checkServerHealth() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/health'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['success'] == true;
+      }
+      return false;
+    } catch (e) {
+      return false;
     }
   }
 }
@@ -269,42 +342,60 @@ class VoiceAssistant {
       // 1. STT 처리
       String userText = await _voiceRecorder.recognizeSpeech();
       
-      // 2. AI 서버 요청
+      // 2. 서버 상태 확인 (선택사항)
+      bool isServerHealthy = await _aiService.checkServerHealth();
+      if (!isServerHealthy) {
+        _showErrorDialog('서버 연결 오류', 'AI 서버에 연결할 수 없습니다.');
+        return;
+      }
+      
+      // 3. AI 서버 요청
       Map<String, dynamic> response = await _aiService.processText(
         userText, 
         'user123'
       );
       
-      // 3. 응답 처리
+      // 4. 응답 처리
       if (response['success']) {
-        String responseText = response['text_response']['text'];
+        String responseText = response['response_text'];
         
-        // 4. TTS 처리
+        // 5. TTS 처리
         await _textToSpeech.speak(responseText);
         
-        // 5. UI 업데이트
-        _updateUI(response['action']);
+        // 6. UI 업데이트
+        _updateUI(response['processing_result']);
+        
+        // 7. 처리 시간 로깅 (선택사항)
+        double processingTime = response['processing_time'] ?? 0.0;
+        print('처리 시간: ${processingTime.toStringAsFixed(3)}초');
       } else {
         // 에러 처리
         _handleError(response);
       }
     } catch (e) {
       print('Error: $e');
+      _showErrorDialog('오류', '요청 처리 중 오류가 발생했습니다: $e');
     }
   }
   
-  void _updateUI(Map<String, dynamic> action) {
-    // UI 지시사항에 따른 화면 업데이트
-    switch (action['type']) {
-      case 'schedule_add':
-        _showScheduleAdded(action['data']);
-        break;
-      case 'schedule_list':
-        _showScheduleList(action['data']);
-        break;
-      // ... 기타 액션들
-    }
-  }
+     void _updateUI(Map<String, dynamic> processingResult) {
+     // 처리 결과에 따른 화면 업데이트
+     String action = processingResult['action'];
+     Map<String, dynamic> result = processingResult['result'];
+     
+     switch (action) {
+       case 'schedule_add':
+         _showScheduleAdded(result['schedule_data']);
+         break;
+       case 'schedule_read':
+         _showScheduleList(result);
+         break;
+       case 'schedule_delete':
+         _showScheduleDeleted(result);
+         break;
+       // ... 기타 액션들
+     }
+   }
 }
 ```
 
@@ -330,50 +421,69 @@ void _showScheduleAdded(Map<String, dynamic> scheduleData) {
 }
 ```
 
-#### **일정 목록 (`schedule_list`)**
+#### **일정 조회 (`schedule_read`)**
 ```dart
-void _showScheduleList(Map<String, dynamic> data) {
+void _showScheduleList(Map<String, dynamic> result) {
   // 일정 목록 화면으로 이동
   Navigator.pushNamed(context, '/schedule-list');
   
   // 일정 데이터 업데이트
-  _updateScheduleList(data['schedules']);
+  if (result['schedules']) {
+    _updateScheduleList(result['schedules']);
+  }
   
-  // 중요 일정 하이라이트
-  if (data['filter'] == 'important') {
-    _highlightImportantSchedules();
+  // 메시지 표시
+  if (result['message']) {
+    _showNotification(
+      title: '일정 조회',
+      message: result['message'],
+      type: 'info'
+    );
   }
 }
 ```
 
-#### **설정 변경 (`settings_update`)**
+#### **일정 삭제 (`schedule_delete`)**
 ```dart
-void _updateSettings(Map<String, dynamic> changes) {
-  // 설정 화면으로 이동
-  Navigator.pushNamed(context, '/settings');
+void _showScheduleDeleted(Map<String, dynamic> result) {
+  // 캘린더 화면으로 이동
+  Navigator.pushNamed(context, '/calendar');
   
-  // 설정 변경사항 적용
-  _applySettings(changes);
+  // 삭제된 일정 정보 표시
+  if (result['deleted_schedule']) {
+    _showNotification(
+      title: '일정 삭제됨',
+      message: '${result['deleted_schedule']['title']}이 삭제되었습니다',
+      type: 'success'
+    );
+  }
   
-  // 설정 미리보기 표시
-  _showSettingsPreview(changes);
+  // 일정 목록 새로고침
+  _refreshScheduleList();
 }
 ```
 
 ## 🔒 보안 및 인증
 
-### **API 키 인증 (선택사항)**
+### **기본 보안 (선택사항)**
 ```dart
 class AIService {
+  // API 키가 필요한 경우
   static const String apiKey = 'your_api_key_here';
   
   Future<Map<String, dynamic>> processText(String text, String userId) async {
+    final headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    // API 키가 설정된 경우에만 헤더에 추가
+    if (apiKey.isNotEmpty) {
+      headers['X-API-Key'] = apiKey;
+    }
+    
     final response = await http.post(
       Uri.parse('$baseUrl/process_text'),
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey,  // API 키 헤더
-      },
+      headers: headers,
       body: jsonEncode({
         'text': text,
         'user_id': userId,
@@ -381,34 +491,6 @@ class AIService {
     );
     
     // ... 응답 처리
-  }
-}
-```
-
-### **요청 제한 처리**
-```dart
-class RateLimiter {
-  static const int maxRequestsPerMinute = 100;
-  static final Map<String, List<DateTime>> _requestHistory = {};
-  
-  static bool canMakeRequest(String userId) {
-    final now = DateTime.now();
-    final userRequests = _requestHistory[userId] ?? [];
-    
-    // 1분 이내 요청만 유지
-    final recentRequests = userRequests
-        .where((time) => now.difference(time).inMinutes < 1)
-        .toList();
-    
-    if (recentRequests.length >= maxRequestsPerMinute) {
-      return false;
-    }
-    
-    // 요청 기록 업데이트
-    recentRequests.add(now);
-    _requestHistory[userId] = recentRequests;
-    
-    return true;
   }
 }
 ```
@@ -445,77 +527,31 @@ Future<Map<String, dynamic>> processText(String text, String userId) async {
 
 ### **AI 서버 에러**
 ```dart
-void _handleError(Map<String, dynamic> response) {
-  final errorType = response['action']['data']['error_type'];
-  final errorMessage = response['action']['data']['message'];
-  
-  switch (errorType) {
-    case 'text_processing':
-      _showErrorDialog('텍스트 처리 오류', errorMessage);
-      break;
-    case 'validation_error':
-      _showErrorDialog('입력 검증 오류', errorMessage);
-      break;
-    case 'schedule_add_error':
-      _showErrorDialog('일정 추가 오류', errorMessage);
-      break;
-    default:
-      _showErrorDialog('오류', errorMessage);
-  }
-}
+   void _handleError(Map<String, dynamic> response) {
+     final errorMessage = response['error'];
+     
+     // 일반적인 에러 처리
+     _showErrorDialog('오류', errorMessage);
+   }
 ```
 
 ## 📊 성능 최적화
 
-### **1. 요청 캐싱**
+### **1. 간단한 캐싱 (선택사항)**
 ```dart
-class RequestCache {
-  static final Map<String, Map<String, dynamic>> _cache = {};
-  static const Duration cacheExpiry = Duration(minutes: 5);
+class SimpleCache {
+  static final Map<String, String> _cache = {};
   
-  static Map<String, dynamic>? get(String key) {
-    final cached = _cache[key];
-    if (cached != null) {
-      final timestamp = cached['timestamp'] as DateTime;
-      if (DateTime.now().difference(timestamp) < cacheExpiry) {
-        return cached['data'];
-      }
-    }
-    return null;
+  static String? get(String key) {
+    return _cache[key];
   }
   
-  static void set(String key, Map<String, dynamic> data) {
-    _cache[key] = {
-      'data': data,
-      'timestamp': DateTime.now(),
-    };
-  }
-}
-```
-
-### **2. 배치 요청**
-```dart
-class BatchProcessor {
-  static final List<String> _pendingRequests = [];
-  static Timer? _batchTimer;
-  
-  static void addRequest(String text) {
-    _pendingRequests.add(text);
-    
-    if (_batchTimer == null) {
-      _batchTimer = Timer(Duration(milliseconds: 500), _processBatch);
-    }
+  static void set(String key, String value) {
+    _cache[key] = value;
   }
   
-  static void _processBatch() async {
-    if (_pendingRequests.isEmpty) return;
-    
-    final batchText = _pendingRequests.join(' ');
-    _pendingRequests.clear();
-    _batchTimer = null;
-    
-    // 배치 요청 처리
-    await _aiService.processText(batchText, 'user123');
+  static void clear() {
+    _cache.clear();
   }
 }
 ```
@@ -525,30 +561,26 @@ class BatchProcessor {
 ### **환경별 설정**
 ```dart
 class Environment {
-  static const String development = 'development';
-  static const String production = 'production';
+  // 개발 환경
+  static const String devUrl = 'http://localhost:8080/api/v1';
+  // 프로덕션 환경
+  static const String prodUrl = 'https://your-production-server.com/api/v1';
   
   static String get baseUrl {
-    switch (const String.fromEnvironment('ENVIRONMENT', defaultValue: development)) {
-      case production:
-        return 'https://your-production-server.com/api/v1';
-      case development:
-      default:
-        return 'http://localhost:8080/api/v1';
+    // 디버그 모드에서는 개발 서버 사용
+    if (kDebugMode) {
+      return devUrl;
     }
-  }
-  
-  static bool get enableLogging {
-    return const String.fromEnvironment('ENVIRONMENT') == development;
+    return prodUrl;
   }
 }
 ```
 
-### **로깅 설정**
+### **간단한 로깅**
 ```dart
 class Logger {
   static void log(String message) {
-    if (Environment.enableLogging) {
+    if (kDebugMode) {
       print('[AI_APP] $message');
     }
   }
@@ -572,9 +604,9 @@ class Logger {
 - [ ] **TTS 처리**: Flutter에서 텍스트 → 음성 변환
 - [ ] **UI 업데이트**: 액션 기반 화면 전환
 - [ ] **에러 처리**: 네트워크 및 서버 에러 처리
-- [ ] **보안**: API 키 인증 (필요시)
-- [ ] **성능**: 캐싱 및 배치 처리
-- [ ] **로깅**: 디버깅을 위한 로그 시스템
+- [ ] **보안**: 기본 보안 설정 (선택사항)
+- [ ] **성능**: 기본 캐싱 (선택사항)
+- [ ] **로깅**: 간단한 디버그 로그
 
 ### **테스트 시나리오**
 
@@ -590,16 +622,16 @@ class Logger {
 
 3. **성능 테스트**
    - 연속 요청 처리
-   - 대용량 텍스트 처리
-   - 메모리 사용량 확인
+   - 텍스트 길이 제한 확인
+   - 응답 시간 측정
 
 ## 🚀 배포 가이드
 
 ### **1. AI 서버 배포**
 ```bash
 # AI_02 폴더에서
-cd AI_02/Server
-python3 app.py --host 0.0.0.0 --port 8080
+cd AI_02
+python3 main.py --host 0.0.0.0 --port 8080
 ```
 
 ### **2. Flutter 앱 배포**
