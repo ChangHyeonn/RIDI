@@ -5,6 +5,7 @@ import 'calendar_screen.dart';
 import 'settings_screen.dart';
 import 'date_detail_screen.dart';
 import 'record_screen.dart';
+import 'voice_test_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -1419,7 +1420,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                           height: 70,
                           child: Row(
                             children: [
-                              // 녹음 버튼
+                              // 음성 인식 버튼
                               Expanded(
                                 child: GestureDetector(
                                   onTap: () {
@@ -1453,15 +1454,15 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                         children: [
                                           Icon(
                                             Icons.mic,
-                                            color: Color(0xFFef4444),
+                                            color: Color(0xFF6366f1),
                                             size: 40,
                                           ),
                                           SizedBox(width: 12),
                                           Text(
-                                            '녹음',
+                                            '음성 인식',
                                             style: TextStyle(
                                               color: Color(0xFF1f2937),
-                                              fontSize: 30 * (0.5 + fontSize),
+                                              fontSize: 28 * (0.5 + fontSize),
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
@@ -1471,6 +1472,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                   ),
                                 ),
                               ),
+
                               const SizedBox(width: 16),
                               // 설정 버튼
                               Expanded(
