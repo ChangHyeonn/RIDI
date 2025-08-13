@@ -78,7 +78,14 @@ class UnifiedVoicePipeline:
             # 1. 음성 → 텍스트 변환 (STT)
             user_text = self._process_stt(audio_input_path)
             if not user_text:
-                return self._create_error_response("음성을 텍스트로 변환할 수 없습니다.")
+                # 음성 인식 실패 시 음성 응답 생성
+                error_text = "음성 인식이 잘 안되네요, 다시 한번 말씀해 주시겠어요?"
+                try:
+                    audio_response = self._process_tts(error_text)
+                    return self._create_error_response(error_text, audio_response, time.time() - start_time)
+                except Exception as tts_error:
+                    self.logger.error(f"TTS for error message failed: {tts_error}")
+                    return self._create_error_response(error_text)
             
             # 2. LLM 기반 요청 분석 및 처리
             processing_result = self.request_processor.process_request(user_text, user_id)

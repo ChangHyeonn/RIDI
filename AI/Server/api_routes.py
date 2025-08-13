@@ -147,10 +147,18 @@ def process_voice():
                         audio_data=audio_bytes
                     )
             else:
-                return create_error_action_response(
-                    result.get('error', '음성 처리 중 오류가 발생했습니다'),
-                    "voice_processing"
-                )
+                # 음성 인식 실패 시에도 음성 응답이 포함된 경우 처리
+                audio_bytes = result.get('audio_response')
+                if audio_bytes:
+                    return create_voice_only_response(
+                        text=result.get('error', '음성 인식이 잘 안되네요, 다시 한번 말씀해 주시겠어요?'),
+                        audio_data=audio_bytes
+                    )
+                else:
+                    return create_error_action_response(
+                        result.get('error', '음성 처리 중 오류가 발생했습니다'),
+                        "voice_processing"
+                    )
         finally:
             # 임시 파일 정리
             if os.path.exists(audio_path):
