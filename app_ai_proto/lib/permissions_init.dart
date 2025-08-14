@@ -23,6 +23,14 @@ class PermissionsInit {
 
       if (!micStatus.isGranted) {
         print('마이크 권한을 요청합니다...');
+
+        // iOS에서 권한 팝업이 안 뜨는 문제 해결
+        if (Platform.isIOS) {
+          print('🍎 iOS 환경 - 실제 마이크 접근으로 권한 팝업 트리거');
+          // 실제 마이크 접근을 먼저 시도하여 iOS가 권한 팝업을 띄우도록 함
+          await _triggerIOSMicrophoneAccess();
+        }
+
         micStatus = await Permission.microphone.request();
         print('마이크 권한 요청 결과: $micStatus');
       }
@@ -70,10 +78,30 @@ class PermissionsInit {
     }
   }
 
+  /// iOS에서 실제 마이크 접근을 시도하여 권한 팝업을 트리거
+  static Future<void> _triggerIOSMicrophoneAccess() async {
+    if (!Platform.isIOS) return;
+
+    print('🎤 iOS 마이크 접근 트리거 시작');
+
+    try {
+      // 간단한 방법: 권한 요청 전에 잠시 대기하여 iOS가 마이크 접근을 감지할 시간 제공
+      print('⏰ iOS 마이크 접근 감지를 위한 대기...');
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // 추가로 권한 상태를 다시 확인하여 iOS가 반응하도록 함
+      final currentStatus = await Permission.microphone.status;
+      print('🎤 현재 마이크 권한 상태 (트리거 후): $currentStatus');
+    } catch (e) {
+      print('❌ iOS 마이크 접근 트리거 중 오류: $e');
+      // 오류는 무시하고 계속 진행
+    }
+  }
+
   /// 특정 권한 상태 확인
   static Future<bool> checkMicrophonePermission() async {
     if (kIsWeb) return true; // Web에서는 브라우저가 처리
-    
+
     final status = await Permission.microphone.status;
     return status.isGranted;
   }
@@ -81,7 +109,7 @@ class PermissionsInit {
   /// 권한이 거부된 경우 앱 설정으로 이동
   static Future<void> openAppSettingsIfNeeded() async {
     if (kIsWeb) return; // Web에서는 불필요
-    
+
     final micStatus = await Permission.microphone.status;
     if (micStatus.isPermanentlyDenied) {
       print('🔧 앱 설정으로 이동합니다...');

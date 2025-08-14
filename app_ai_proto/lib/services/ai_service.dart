@@ -14,17 +14,17 @@ class AIService {
     // 웹 환경에서는 Platform 클래스 사용 불가
     if (kIsWeb) {
       // 웹 환경에서는 로컬 서버 IP 사용
-      return 'http://172.20.150.128:8080';
+      return 'http://172.20.150.200:8080';
     }
 
     // 디버그 모드에서 플랫폼별 다른 URL 사용
     if (kDebugMode) {
       if (Platform.isAndroid) {
         // Android 에뮬레이터에서 로컬 서버 접근
-        return 'http://172.20.150.128:8080';
+        return 'http://172.20.150.200:8080';
       } else if (Platform.isIOS) {
         // iOS 시뮬레이터에서 로컬 서버 접근
-        return 'http://172.20.150.128:8080';
+        return 'http://172.20.150.200:8080';
       }
     }
 
