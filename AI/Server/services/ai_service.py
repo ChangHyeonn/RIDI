@@ -142,7 +142,7 @@ class AIService:
             return result
             
         except Exception as e:
-            self.logger.error(f"Voice command processing failed: {e}")
+            self.logger.error(f"음성 명령 처리 중 오류가 발생했습니다: {e}")
             return {
                 "success": False,
                 "error": f"음성 명령 처리 중 오류가 발생했습니다: {str(e)}"

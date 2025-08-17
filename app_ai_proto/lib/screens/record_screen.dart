@@ -105,6 +105,13 @@ class _RecordScreenState extends State<RecordScreen> {
 
       if (!hasPermission) {
         print('권한이 없습니다. 권한을 요청합니다...');
+
+        // iOS에서 권한 팝업이 안 뜨는 문제 해결
+        if (Platform.isIOS) {
+          print('🍎 iOS 환경 - 실제 마이크 접근으로 권한 팝업 트리거');
+          await _recordService.triggerIOSMicrophoneRequest();
+        }
+
         await PermissionsInit.requestNecessaryPermissions();
 
         // 권한 요청 후 다시 확인

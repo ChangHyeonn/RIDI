@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:path_provider/path_provider.dart';
 import 'speech_to_text_service.dart';
 import 'text_to_speech_service.dart';
 import 'ai_service.dart';
@@ -39,6 +41,42 @@ class RecordService {
   Stream<String> get aiResponseStream => _aiResponseStreamController.stream;
   Stream<bool> get recordingStateStream => _recordingStateController.stream;
   Stream<bool> get playingStateStream => _playingStateController.stream;
+
+  // iOS 마이크 권한 팝업 문제 해결을 위한 메서드
+  Future<void> triggerIOSMicrophoneRequest() async {
+    if (!Platform.isIOS) return; // iOS에서만 실행
+
+    print('🎤 iOS 마이크 권한 팝업 트리거 시작');
+
+    try {
+      // 임시 디렉토리 생성
+      final tempDir = await getTemporaryDirectory();
+      final dummyPath = '${tempDir.path}/dummy_check.m4a';
+
+      print('📁 임시 파일 경로: $dummyPath');
+
+      // STT 서비스를 사용해서 실제 마이크 접근 시도
+      final dummySttService = SpeechToTextService();
+      final initialized = await dummySttService.initialize();
+
+      if (initialized) {
+        // 실제 마이크 접근 시도 (매우 짧게)
+        final success = await dummySttService.startListening();
+        if (success) {
+          print('✅ iOS 마이크 접근 성공 - 권한 팝업 트리거됨');
+          await Future.delayed(const Duration(milliseconds: 300));
+          await dummySttService.stopListening();
+        } else {
+          print('⚠️ iOS 마이크 접근 실패');
+        }
+      }
+
+      dummySttService.dispose();
+    } catch (e) {
+      print('❌ iOS 마이크 권한 트리거 중 오류: $e');
+      // 오류는 무시하고 계속 진행
+    }
+  }
 
   // 초기화
   Future<bool> initialize() async {
@@ -210,6 +248,11 @@ class RecordService {
         return;
       }
 
+      // STT 텍스트 로그 저장 (AI 서버 성공/실패와 관계없이)
+      print('🎤 STT 인식 결과 저장: "$text"');
+      _recognizedText = text;
+      _textStreamController.add(text);
+
       // AI 서비스에 텍스트 전송
       print('🚀 AIService.processText() 호출 중...');
       final aiResponse = await AIService.processText(text);
@@ -242,10 +285,25 @@ class RecordService {
         print('❌ AI 응답이 실패했습니다.');
         print('  - success: ${aiResponse.success}');
         print('  - textResponse: ${aiResponse.textResponse?.text}');
+        print('⚠️ AI 서버 실패했지만 STT 텍스트는 저장됨: "$text"');
       }
     } catch (e) {
       print('❌ AI 처리 중 오류: $e');
       print('🔍 오류 상세: ${e.toString()}');
+      print('⚠️ AI 서버 오류 발생했지만 STT 텍스트는 저장됨: "$text"');
+
+      // AI 서버 실패 시에도 기본 응답 설정
+      _aiResponseText = '죄송합니다. AI 서버 연결에 문제가 있어 일정을 처리할 수 없습니다.';
+      _aiResponseStreamController.add(_aiResponseText);
+
+      // TTS로 오류 메시지 재생
+      try {
+        print('🔊 오류 메시지 TTS 재생 시작...');
+        await _ttsService.speak(_aiResponseText);
+        print('✅ 오류 메시지 TTS 재생 완료');
+      } catch (ttsError) {
+        print('❌ TTS 재생 중 오류: $ttsError');
+      }
     }
   }
 
