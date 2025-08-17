@@ -24,14 +24,13 @@ class Settings:
         "*"  # 개발 환경용 (프로덕션에서는 제거)
     ]
     
-    # AI 모델 설정
-    LLM_TYPE = os.getenv('LLM_TYPE', 'gemini')  # gemini, openai, claude
+    # AI 모델 설정 (OpenAI만 사용)
+    LLM_TYPE = os.getenv('LLM_TYPE', 'openai')  # openai
+    LLM_PROVIDER = 'openai'
     DEVICE = os.getenv('DEVICE', 'auto')  # auto, cpu, cuda
     
-    # API 키 설정
-    GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
+    # API 키 설정 (OpenAI)
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
-    ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
     
     # 데이터베이스 설정
     DB_ENGINE = os.getenv('DB_ENGINE', 'inmemory')  # inmemory | mongodb
@@ -61,6 +60,7 @@ class Settings:
     # 보안 설정
     API_KEY_REQUIRED = os.getenv('API_KEY_REQUIRED', 'False').lower() == 'true'
     MAX_REQUESTS_PER_MINUTE = int(os.getenv('MAX_REQUESTS_PER_MINUTE', 100))
+    MAX_REQUEST_SIZE = int(os.getenv('MAX_REQUEST_SIZE', 16 * 1024 * 1024))  # 16MB
     
     # 메모리 관리 설정
     MAX_MEMORY_ITEMS = int(os.getenv('MAX_MEMORY_ITEMS', 1000))
@@ -90,12 +90,8 @@ class Settings:
             errors.append("포트는 1024-65535 사이여야 합니다")
         
         # API 키 검증
-        if cls.LLM_TYPE == 'gemini' and not cls.GOOGLE_API_KEY:
-            errors.append("Gemini 모델 사용 시 GOOGLE_API_KEY가 필요합니다")
-        elif cls.LLM_TYPE == 'openai' and not cls.OPENAI_API_KEY:
+        if cls.LLM_TYPE == 'openai' and not cls.OPENAI_API_KEY:
             errors.append("OpenAI 모델 사용 시 OPENAI_API_KEY가 필요합니다")
-        elif cls.LLM_TYPE == 'claude' and not cls.ANTHROPIC_API_KEY:
-            errors.append("Claude 모델 사용 시 ANTHROPIC_API_KEY가 필요합니다")
         
         # MongoDB 설정 검증
         if cls.DB_ENGINE == 'mongodb' and not cls.MONGO_URI:
@@ -119,15 +115,12 @@ class Settings:
         """LLM 설정 반환"""
         config = {
             "type": cls.LLM_TYPE,
-            "device": cls.get_device()
+            "device": cls.get_device(),
+            "provider": cls.LLM_PROVIDER
         }
         
-        if cls.LLM_TYPE == 'gemini':
-            config["api_key"] = cls.GOOGLE_API_KEY
-        elif cls.LLM_TYPE == 'openai':
+        if cls.LLM_TYPE == 'openai':
             config["api_key"] = cls.OPENAI_API_KEY
-        elif cls.LLM_TYPE == 'claude':
-            config["api_key"] = cls.ANTHROPIC_API_KEY
         
         return config
     

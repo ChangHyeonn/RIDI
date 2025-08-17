@@ -62,8 +62,8 @@ pip install -r requirements.txt
 
 ```bash
 # .env 파일 생성
-export GOOGLE_API_KEY="your_google_api_key"
-export LLM_TYPE="gemini"
+export OPENAI_API_KEY="your_openai_api_key"
+export LLM_TYPE="openai"
 export AI_SERVER_HOST="0.0.0.0"
 export AI_SERVER_PORT="8080"
 export AI_SERVER_DEBUG="True"
@@ -72,29 +72,19 @@ export AI_SERVER_DEBUG="True"
 ### 3. 서버 실행
 
 ```bash
-cd AI_02/Server
-python3 app.py
+cd AI_02
+python3 main.py
 ```
 
 ## 📡 API 엔드포인트
 
-### 텍스트 처리
-- `POST /api/v1/process_text` - 텍스트 명령 처리
-
-### 일정 관리
-- `POST /api/v1/schedule/add` - 일정 추가
-- `GET /api/v1/schedule/list` - 일정 목록 조회
-- `DELETE /api/v1/schedule/delete` - 일정 삭제
-- `GET /api/v1/schedule/read` - 특정 날짜 일정 조회
-- `GET /api/v1/schedule/important` - 중요 일정 조회
-
-### 설정 관리
-- `PUT /api/v1/settings/accessibility` - 접근성 설정 업데이트
-- `GET /api/v1/settings/accessibility` - 접근성 설정 조회
+### 메인 처리
+- `POST /api/v1/process_text` - 텍스트 명령 처리 (일정 추가/조회/삭제, 일반 대화 등 모든 요청 통합)
 
 ### 기타
 - `GET /api/v1/health` - 서버 상태 확인
-- `GET /api/v1/test` - 테스트 엔드포인트
+
+**참고**: 모든 일정 관리, 설정 변경 등은 `/process_text` 엔드포인트를 통해 자연어로 처리됩니다.
 
 ## 📝 API 사용 예시
 
@@ -116,7 +106,7 @@ curl -X POST http://localhost:8080/api/v1/process_text \
   "success": true,
   "action": {
     "type": "schedule_add",
-    "priority": "high",
+    "is_important": true,
     "data": {
       "id": "schedule_1234567890",
       "title": "병원 예약",
@@ -223,9 +213,7 @@ print(errors)
 
 - Python 3.8+
 - Flask
-- Google Cloud API (Gemini)
-- 또는 OpenAI API
-- 또는 Anthropic API
+- OpenAI API (GPT-4o-mini)
 
 ## 🤝 기여하기
 

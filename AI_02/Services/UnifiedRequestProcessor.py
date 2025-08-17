@@ -79,16 +79,30 @@ class UnifiedRequestProcessor:
             return self._create_error_response(f"요청 처리 중 오류가 발생했습니다: {str(e)}")
     
     def _analyze_request_with_llm(self, user_request: str) -> Dict[str, Any]:
-        """LLM을 사용한 요청 분석"""
+        """단계별 LLM 요청 분석"""
         try:
-            # 프롬프트 매니저에서 통합 분석 프롬프트 가져오기
-            prompt = PromptManager.get_unified_request_analysis_prompt(user_request)
+            # 1단계: 의도 분류
+            intent_prompt = PromptManager.get_intent_classification_prompt(user_request)
+            intent_response = self.llm.generate(intent_prompt)
+            intent_analysis = self._parse_llm_response(intent_response)
             
-            # LLM에 분석 요청
-            response = self.llm.generate_response(prompt)
+            self.logger.info(f"Intent classified: {user_request} -> {intent_analysis.get('intent', 'unknown')}")
             
-            # JSON 파싱
-            analysis = self._parse_llm_response(response)
+            # 2단계: 정보 추출 (필요한 경우)
+            extracted_info = {}
+            if intent_analysis.get('requires_extraction', False):
+                extraction_prompt = PromptManager.get_schedule_extraction_prompt(user_request)
+                extraction_response = self.llm.generate(extraction_prompt)
+                extracted_info = self._parse_llm_response(extraction_response)
+                self.logger.info(f"Information extracted: {extracted_info}")
+            
+            # 3단계: 통합 분석 결과 생성
+            analysis = {
+                'category': intent_analysis.get('intent', 'other'),
+                'confidence': intent_analysis.get('confidence', 0.0),
+                'extracted_info': extracted_info,
+                'intent_analysis': intent_analysis
+            }
             
             self.logger.info(f"Request analyzed: {user_request} -> {analysis.get('category', 'unknown')}")
             return analysis
@@ -104,6 +118,15 @@ class UnifiedRequestProcessor:
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:
         """LLM 응답에서 JSON 파싱"""
         try:
+            # 응답이 비어있는지 확인
+            if not response or not response.strip():
+                self.logger.warning("Empty LLM response received")
+                return {
+                    'category': 'other',
+                    'confidence': 0.0,
+                    'error': '빈 응답을 받았습니다'
+                }
+            
             # JSON 블록 추출
             response = response.strip()
             if response.startswith("```json"):
@@ -112,15 +135,29 @@ class UnifiedRequestProcessor:
                 response = response[:-3]
             response = response.strip()
             
-            # JSON 파싱
-            return json.loads(response)
+            # JSON 파싱 시도
+            try:
+                return json.loads(response)
+            except json.JSONDecodeError as json_error:
+                self.logger.error(f"JSON parsing failed: {json_error}")
+                self.logger.error(f"Raw response: {response}")
+                
+                # JSON 파싱 실패 시 기본 응답 반환
+                return {
+                    'category': 'other',
+                    'confidence': 0.0,
+                    'error': f'JSON 파싱 실패: {str(json_error)}',
+                    'raw_response': response
+                }
             
         except Exception as e:
             self.logger.error(f"Failed to parse LLM response: {e}")
+            self.logger.error(f"Raw response: {response}")
             return {
                 'category': 'other',
                 'confidence': 0.0,
-                'error': f"응답 파싱 실패: {str(e)}"
+                'error': f"응답 파싱 실패: {str(e)}",
+                'raw_response': response
             }
     
     def _validate_analysis(self, analysis: Dict[str, Any]) -> bool:
@@ -194,10 +231,19 @@ class UnifiedRequestProcessor:
             'title': extracted_info.get('title', ''),
             'datetime': f"{extracted_info.get('date', '')} {extracted_info.get('time', '')}",
             'category': extracted_info.get('category', '일반'),
-            'priority': extracted_info.get('priority', 'normal'),
+            'is_important': self._convert_priority_to_boolean(extracted_info.get('priority', '')),
             'location': extracted_info.get('location', ''),
             'description': extracted_info.get('description', '')
         }
+        # 음성 출력용 한국어 메시지 ("~월 ~일 ~시에 ~ 일정을 추가하였습니다.")
+        try:
+            message = self._format_added_schedule_message(
+                title=schedule_data.get('title', ''),
+                date=extracted_info.get('date'),
+                time=extracted_info.get('time')
+            )
+        except Exception:
+            message = '일정이 성공적으로 추가되었습니다.'
         
         if user_id:
             add_result = self.schedule_manager.add_schedule(user_id, schedule_data)
@@ -207,15 +253,54 @@ class UnifiedRequestProcessor:
                 'action': 'schedule_added',
                 'schedule_id': schedule_id,
                 'schedule': schedule_data,
-                'message': '일정이 성공적으로 추가되었습니다.'
+                'message': message
             }
         else:
             return {
                 'success': True,
                 'action': 'schedule_added',
                 'schedule': schedule_data,
-                'message': '일정이 추가되었습니다.'
+                'message': message
             }
+
+    def _format_added_schedule_message(self, title: str, date: Optional[str], time: Optional[str]) -> str:
+        """추가된 일정에 대한 한국어 음성 안내 메시지 생성
+        - 형식: "{M}월 {D}일 {H}시{MM분}에 {title} 일정을 추가하였습니다."
+        - date: YYYY-MM-DD, time: HH:MM (옵션)
+        """
+        try:
+            month_day = ""
+            if date and len(date) == 10:
+                # YYYY-MM-DD
+                _, m, d = date.split('-')
+                month_day = f"{int(m)}월 {int(d)}일 "
+            hour_min = ""
+            if time and len(time) >= 4:
+                # HH:MM
+                h, mm = time.split(':')
+                h_i = int(h)
+                mm_i = int(mm) if mm.isdigit() else 0
+                if mm_i == 0:
+                    hour_min = f"{h_i}시에 "
+                else:
+                    hour_min = f"{h_i}시 {mm_i}분에 "
+            phrase = f"{month_day}{hour_min}{title} 일정을 추가하였습니다."
+            return phrase.strip()
+        except Exception:
+            return "일정이 성공적으로 추가되었습니다."
+
+    def _convert_priority_to_boolean(self, priority_str: str) -> bool:
+        """LLM에서 추출된 priority 문자열을 boolean으로 변환
+        - 중요한 경우: True
+        - 중요하지 않은 경우: False
+        """
+        if not priority_str:
+            return False
+        
+        priority_lower = priority_str.lower().strip()
+        important_keywords = ['high', 'important', '중요', '긴급', 'urgent', 'critical', '높음']
+        
+        return any(keyword in priority_lower for keyword in important_keywords)
     
     def _handle_schedule_modify(self, analysis: Dict[str, Any], user_id: Optional[str]) -> Dict[str, Any]:
         """일정 수정 처리"""

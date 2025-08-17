@@ -21,8 +21,8 @@ AI_02의 LLM 기능을 테스트하기 위한 테스트 코드들입니다.
 먼저 필요한 환경 변수를 설정하세요:
 
 ```bash
-# Google API 키 설정 (Gemini 사용 시)
-export GOOGLE_API_KEY="your_google_api_key_here"
+# OpenAI API 키 설정
+export OPENAI_API_KEY="your_openai_api_key_here"
 
 # AI 서버 설정
 export AI_SERVER_HOST="0.0.0.0"
@@ -30,7 +30,7 @@ export AI_SERVER_PORT="8080"
 export AI_SERVER_DEBUG="True"
 
 # LLM 설정
-export LLM_TYPE="gemini"
+export LLM_TYPE="openai"
 
 # 데이터베이스 설정 (선택사항)
 export DB_ENGINE="inmemory"  # 또는 "mongodb"
@@ -193,9 +193,9 @@ python3 Test/llm_text_test.py
 ### 1. API 키 오류
 ```
 ⚠️  API 키가 설정되지 않았습니다. 기본 응답 모드로 실행됩니다.
-   환경 변수 GOOGLE_API_KEY를 설정하세요.
+   환경 변수 OPENAI_API_KEY를 설정하세요.
 ```
-**해결방법:** `export GOOGLE_API_KEY="your_api_key"` 설정
+**해결방법:** `export OPENAI_API_KEY="your_api_key"` 설정
 
 ### 2. Import 오류
 ```
@@ -206,7 +206,7 @@ ModuleNotFoundError: No module named 'Processor'
 ### 3. 설정 검증 오류
 ```
 ❌ 설정 오류:
-   - Gemini 모델 사용 시 GOOGLE_API_KEY가 필요합니다
+   - OpenAI 모델 사용 시 OPENAI_API_KEY가 필요합니다
 ```
 **해결방법:** 환경 변수 설정 확인
 
@@ -218,7 +218,7 @@ ModuleNotFoundError: No module named 'Processor'
   "success": true,
   "action": {
     "type": "schedule_add",
-    "priority": "high",
+    "is_important": true,
     "data": {
       "schedule": {
         "id": "schedule_1234567890",

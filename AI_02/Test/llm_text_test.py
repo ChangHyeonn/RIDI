@@ -16,6 +16,7 @@ from Processor.unified_voice_pipeline import UnifiedTextPipeline
 from Config.settings import Settings
 from Services.ScheduleManager import ScheduleManager
 from Repositories.schedule_repository import InMemoryScheduleRepository
+from Models.LLM import LLMFactory
 
 class LLMTextTester:
     """LLM 텍스트 처리 테스터"""
@@ -25,6 +26,7 @@ class LLMTextTester:
         self.pipeline = None
         self.schedule_manager = None
         self.user_id = "test_user_123"
+        self.llm = None
         
         print("🤖 LLM 텍스트 처리 테스터 초기화 중...")
         self._initialize_components()
@@ -55,21 +57,42 @@ class LLMTextTester:
             self.pipeline = UnifiedTextPipeline(
                 llm_type=Settings.LLM_TYPE
             )
+            # 직접 LLM 호출용 클라이언트 (OpenAI)
+            self.llm = LLMFactory.create_llm(model_type=Settings.LLM_TYPE)
             
         except Exception as e:
             print(f"❌ 초기화 오류: {e}")
             raise
     
     def simulate_text_processing(self, user_text: str) -> Dict[str, Any]:
-        """텍스트 처리 시뮬레이션"""
+        """텍스트 처리 시뮬레이션
+        - 우선 직접 LLM 한 번 호출하여 답변 반환 (요청 1회)
+        - 실패 시 파이프라인으로 처리 시도
+        """
         try:
             print(f"📝 사용자 입력: {user_text}")
             print("🔄 AI 서버에서 처리 중...")
             
-            # 텍스트 파이프라인으로 처리
-            response = self.pipeline.process_text(user_text, user_id=self.user_id)
+            # 1) 직접 LLM 호출 (단일 호출)
+            if self.llm is not None:
+                answer = self.llm.generate_response(user_text)
+                if answer and isinstance(answer, str) and answer.strip():
+                    print("✅ 처리 완료! (Direct LLM)")
+                    return {
+                        "success": True,
+                        "text_response": {
+                            "text": answer.strip(),
+                            "display_automatically": True
+                        },
+                        "action": {
+                            "type": "general_response",
+                            "data": {}
+                        }
+                    }
             
-            print("✅ 처리 완료!")
+            # 2) 파이프라인 처리 (의도/추출 포함)
+            response = self.pipeline.process_text(user_text, user_id=self.user_id)
+            print("✅ 처리 완료! (Pipeline)")
             return response
             
         except Exception as e:

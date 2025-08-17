@@ -156,7 +156,7 @@ class MongoDBScheduleRepository(BaseScheduleRepository):
                 'title': schedule_data.get('title'),
                 'start_dt': start_dt,
                 'category': schedule_data.get('category', '일반'),
-                'priority': schedule_data.get('priority', 'not_important'),
+                'is_important': schedule_data.get('is_important', False),
                 'location': schedule_data.get('location'),
                 'description': schedule_data.get('description'),
                 'source': 'voice',
@@ -228,7 +228,7 @@ class MongoDBScheduleRepository(BaseScheduleRepository):
                         'title': doc['title'],
                         'datetime': doc['start_dt'].strftime('%Y-%m-%d %H:%M'),
                         'category': doc.get('category', '일반'),
-                        'priority': doc.get('priority', 'not_important'),
+                        'is_important': doc.get('is_important', False),
                         'location': doc.get('location'),
                         'description': doc.get('description')
                     }

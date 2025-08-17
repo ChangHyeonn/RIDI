@@ -111,9 +111,15 @@ Content-Type: application/json
 
 **요청 예시:**
 ```json
-// 일정 추가
+// 일정 추가 (일반)
 {
   "text": "내일 오후 3시에 병원 예약이 있어",
+  "user_id": "user123"
+}
+
+// 일정 추가 (중요)
+{
+  "text": "다음주 월요일 오전 9시에 중요한 회의가 있어",
   "user_id": "user123"
 }
 
@@ -239,6 +245,32 @@ Content-Type: application/json
 - `schedule_modify`: 일정 수정 요청
 - `accessibility`: 접근성 설정 변경
 - `other`: 일반 대화 또는 기타 요청
+
+### **일정 관련 데이터 구조**
+
+#### **일정 추가 응답에서 중요도 필드**
+```json
+{
+  "processing_result": {
+    "action": "schedule_add",
+    "result": {
+      "schedule_data": {
+        "title": "병원 예약",
+        "datetime": "2024-01-15 15:00",
+        "category": "건강",
+        "is_important": false,  // boolean: true=중요, false=일반
+        "location": "서울대병원",
+        "description": "정기 검진"
+      }
+    }
+  }
+}
+```
+
+#### **중요도 판단 기준**
+AI 서버는 다음 키워드를 기반으로 중요도를 자동 판단합니다:
+- **중요 (true)**: "중요", "긴급", "urgent", "critical", "high", "높음" 등
+- **일반 (false)**: 기본값, 중요 키워드가 없는 경우
 
 ## 🔧 Flutter 애플리케이션 구현
 
@@ -644,8 +676,8 @@ flutter build ios --release
 ### **3. 환경 변수 설정**
 ```bash
 # AI 서버 환경 변수
-export GOOGLE_API_KEY="your_google_api_key"
-export LLM_TYPE="gemini"
+export OPENAI_API_KEY="your_openai_api_key"
+export LLM_TYPE="openai"
 export AI_SERVER_HOST="0.0.0.0"
 export AI_SERVER_PORT="8080"
 

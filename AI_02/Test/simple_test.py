@@ -55,8 +55,8 @@ def test_basic_functionality():
                 
                 if response.get("success"):
                     print("✅ 성공")
-                    print(f"응답: {response.get('text_response', {}).get('text', 'N/A')}")
-                    print(f"액션: {response.get('action', {}).get('type', 'N/A')}")
+                    print(f"응답: {response.get('response_text', 'N/A')}")
+                    print(f"액션: {response.get('processing_result', {}).get('result', {}).get('action', 'N/A')}")
                 else:
                     print("❌ 실패")
                     print(f"오류: {response.get('error', 'N/A')}")

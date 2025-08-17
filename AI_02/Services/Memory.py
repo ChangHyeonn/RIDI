@@ -131,7 +131,7 @@ class MemoryManager:
                                 'title': schedule_data.get('title', ''),
                                 'datetime': schedule_datetime,
                                 'category': schedule_data.get('category', ''),
-                                'priority': schedule_data.get('priority', ''),
+                                'is_important': schedule_data.get('is_important', False),
                                 'reminder_message': self._generate_reminder_message(schedule_data)
                             })
                     except ValueError:
@@ -211,9 +211,9 @@ class MemoryManager:
         try:
             title = schedule_data.get('title', '')
             category = schedule_data.get('category', '')
-            priority = schedule_data.get('priority', '')
+            is_important = schedule_data.get('is_important', False)
             
-            if priority == 'important':
+            if is_important:
                 return f"중요한 일정입니다: {title}"
             elif category == '건강':
                 return f"건강 관련 일정입니다: {title}"

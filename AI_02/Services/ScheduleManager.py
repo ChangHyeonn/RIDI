@@ -92,9 +92,9 @@ class ScheduleManager:
             
             for schedule in user_schedules:
                 schedule_data = schedule.get('data', {})
-                priority = schedule_data.get('priority', 'not_important')
+                is_important = schedule_data.get('is_important', False)
                 
-                if priority == 'important':
+                if is_important:
                     important_schedules.append(schedule)
             
             # 최신순으로 정렬

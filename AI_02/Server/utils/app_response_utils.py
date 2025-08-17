@@ -13,7 +13,7 @@ def create_app_action_response(
     data: Dict[str, Any],
     text_response: Optional[Dict[str, Any]] = None,
     ui_instructions: Optional[Dict[str, Any]] = None,
-    priority: str = "medium"
+    is_important: bool = False
 ) -> tuple:
     """애플리케이션 액션 응답 생성"""
     
@@ -21,7 +21,7 @@ def create_app_action_response(
         "success": True,
         "action": {
             "type": action_type,
-            "priority": priority,
+            "is_important": is_important,
             "data": data,
             "ui_instructions": ui_instructions or {}
         },
@@ -75,7 +75,7 @@ def create_schedule_action_response(
         data=schedule_data,
         text_response=text_response_data,
         ui_instructions=ui_instructions,
-        priority="high"
+        is_important=True
     )
 
 def create_settings_action_response(
@@ -109,7 +109,7 @@ def create_settings_action_response(
         },
         text_response=text_response_data,
         ui_instructions=ui_instructions,
-        priority="medium"
+        is_important=False
     )
 
 def create_text_response(
@@ -134,7 +134,7 @@ def create_text_response(
         "success": True,
         "action": {
             "type": "text_response",
-            "priority": "low",
+            "is_important": False,
             "data": {},
             "ui_instructions": {
                 "show_text_indicator": True
@@ -169,7 +169,7 @@ def create_error_action_response(
         "success": False,
         "action": {
             "type": "error",
-            "priority": "high",
+            "is_important": True,
             "data": {
                 "error_type": error_type,
                 "message": error_message
@@ -188,7 +188,7 @@ def create_health_action_response(health_data: Dict[str, Any]) -> tuple:
         "success": True,
         "action": {
             "type": "health_check",
-            "priority": "low",
+            "is_important": False,
             "data": health_data,
             "ui_instructions": {
                 "show_status_indicator": True
