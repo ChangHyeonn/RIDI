@@ -1,12 +1,9 @@
 import os
 import logging
-import sys
 import time
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 
-# 프롬프트 매니저 import
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from Config.prompts import PromptManager
 
 class BaseLLM(ABC):

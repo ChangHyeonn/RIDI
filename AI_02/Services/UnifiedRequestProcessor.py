@@ -6,13 +6,9 @@ LLM 중심의 통합 요청 처리기
 
 import json
 import logging
-import sys
 import os
 from datetime import datetime
 from typing import Dict, Any, Optional
-
-# 프로젝트 루트를 Python 경로에 추가
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from Config.prompts import PromptManager
 from Models.LLM import LLMFactory

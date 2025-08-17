@@ -38,10 +38,7 @@ class UnifiedTextPipeline:
     def _initialize_components(self, llm_type: str, device: str):
         """컴포넌트 초기화"""
         try:
-            # 통합 요청 처리기 초기화
             self.request_processor = UnifiedRequestProcessor(llm_type=llm_type)
-            
-            # 디바이스 설정
             self.device = self._get_device(device)
             
         except Exception as e:

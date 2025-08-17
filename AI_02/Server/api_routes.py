@@ -4,13 +4,9 @@ API Routes for AI Server (Text-based)
 고령층 일정 메모 관리 AI 서버 API 라우트 (텍스트 기반)
 """
 
-import sys
 import os
 import logging
 import base64
-
-# 프로젝트 루트를 Python 경로에 추가
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime

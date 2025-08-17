@@ -10,17 +10,14 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from collections import defaultdict
 import os
-import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from Config.settings import Settings
-from Config.logging_config import get_logger
 
 class MemoryManager:
     """고령자 메모리 관리 시스템"""
     
     def __init__(self):
-        self.logger = get_logger(__name__)
+        self.logger = logging.getLogger(__name__)
         self._initialize_memory()
         self.logger.info("Memory Manager initialized successfully")
     
