@@ -58,12 +58,15 @@ class Settings:
     LOG_FILE = os.getenv('LOG_FILE', 'logs/ai_server.log')
     
     # 보안 설정
+    API_KEY = os.getenv('API_KEY', '')  # 선택적 API 키
     API_KEY_REQUIRED = os.getenv('API_KEY_REQUIRED', 'False').lower() == 'true'
     MAX_REQUESTS_PER_MINUTE = int(os.getenv('MAX_REQUESTS_PER_MINUTE', 100))
     MAX_REQUEST_SIZE = int(os.getenv('MAX_REQUEST_SIZE', 16 * 1024 * 1024))  # 16MB
     
     # 메모리 관리 설정
     MAX_MEMORY_ITEMS = int(os.getenv('MAX_MEMORY_ITEMS', 1000))
+    MAX_SCHEDULES_PER_USER = int(os.getenv('MAX_SCHEDULES_PER_USER', 100))
+    MEMORY_EXPIRY_HOURS = int(os.getenv('MEMORY_EXPIRY_HOURS', 24))
     MEMORY_CLEANUP_INTERVAL = int(os.getenv('MEMORY_CLEANUP_INTERVAL', 3600))  # 1시간
     
     @classmethod

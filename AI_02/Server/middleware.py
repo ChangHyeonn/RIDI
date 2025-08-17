@@ -12,10 +12,9 @@ import sys
 import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from Config.logging_config import get_logger
 from Config.settings import Settings
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 def setup_middleware(app):
     """미들웨어 설정"""

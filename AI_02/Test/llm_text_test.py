@@ -15,7 +15,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Processor.unified_voice_pipeline import UnifiedTextPipeline
 from Config.settings import Settings
 from Services.ScheduleManager import ScheduleManager
-from Repositories.schedule_repository import InMemoryScheduleRepository
 from Models.LLM import LLMFactory
 
 class LLMTextTester:

@@ -17,7 +17,6 @@ from Server.utils.app_response_utils import (
     create_error_action_response, create_health_action_response
 )
 from Server.utils.validation import validate_text_input, validate_schedule_data, validate_accessibility_settings
-from Server.utils.auth import require_api_key
 from Config.settings import Settings
 
 # Blueprint 생성
