@@ -32,7 +32,7 @@ class TextToSpeechService {
     print('🌐 Web 환경 여부: $kIsWeb');
 
     try {
-      // TTS 초기화
+      // iOS 크래시 방지를 위한 안전한 초기화
       if (kIsWeb) {
         print('🌐 Web 환경 TTS 설정');
         await _flutterTts.setLanguage('ko-KR');
@@ -41,6 +41,13 @@ class TextToSpeechService {
         await _flutterTts.setPitch(1.0);
       } else {
         print('📱 모바일 환경 TTS 설정');
+
+        // iOS에서 안전한 초기화를 위한 지연
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          print('🍎 iOS 환경 - 안전한 TTS 초기화');
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+
         await _flutterTts.setLanguage('ko-KR');
         await _flutterTts.setSpeechRate(0.5); // 0.0 ~ 1.0
         await _flutterTts.setVolume(1.0); // 0.0 ~ 1.0
