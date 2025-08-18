@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""
+Add Schedule Use Case
+일정 추가 Use Case
+"""
+
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Dict, Any, Optional
+
+from shared.logging.logger import LoggerFactory
+from core.entities.schedule import Schedule
+from core.interfaces.repositories.schedule_repository import IScheduleRepository
+
+
+@dataclass
+class AddScheduleResult:
+    """일정 추가 결과"""
+    success: bool
+    schedule_data: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+
+
+class AddScheduleUseCase:
+    """일정 추가 Use Case"""
+    
+    def __init__(self, schedule_repository: IScheduleRepository):
+        self.schedule_repository = schedule_repository
+        self.logger = LoggerFactory.get_logger(__name__)
+    
+    def execute(self, user_id: str, schedule_info: Dict[str, Any]) -> AddScheduleResult:
+        """일정 추가 실행"""
+        try:
+            # 1. 필수 정보 검증
+            if not schedule_info.get('title'):
+                return AddScheduleResult(False, error_message="일정 제목이 필요합니다.")
+            
+            if not schedule_info.get('date') or not schedule_info.get('time'):
+                return AddScheduleResult(False, error_message="일정 날짜와 시간이 필요합니다.")
+            
+            # 2. 날짜/시간 파싱
+            try:
+                date_str = schedule_info['date']
+                time_str = schedule_info['time']
+                datetime_str = f"{date_str} {time_str}"
+                start_datetime = datetime.fromisoformat(datetime_str)
+            except (ValueError, KeyError) as e:
+                self.logger.error(f"DateTime parsing failed: {e}")
+                return AddScheduleResult(False, error_message="날짜 형식이 올바르지 않습니다.")
+            
+            # 3. 일정 엔티티 생성
+            schedule = Schedule(
+                id=None,  # Repository에서 생성
+                user_id=user_id,
+                title=schedule_info['title'],
+                start_datetime=start_datetime,
+                category=schedule_info.get('category', '일반'),
+                is_important=schedule_info.get('is_important', False),
+                location=schedule_info.get('location'),
+                description=schedule_info.get('description')
+            )
+            
+            # 4. 저장
+            saved_schedule = self.schedule_repository.save(schedule)
+            
+            # 5. 결과 반환
+            schedule_data = {
+                'id': saved_schedule.id,
+                'title': saved_schedule.title,
+                'datetime': saved_schedule.start_datetime.isoformat(),
+                'category': saved_schedule.category,
+                'is_important': saved_schedule.is_important,
+                'location': saved_schedule.location,
+                'description': saved_schedule.description
+            }
+            
+            self.logger.info(f"Schedule added successfully: {saved_schedule.title}")
+            return AddScheduleResult(True, schedule_data=schedule_data)
+            
+        except Exception as e:
+            self.logger.error(f"Add schedule failed: {e}")
+            return AddScheduleResult(False, error_message=f"일정 추가 실패: {str(e)}")
