@@ -32,7 +32,7 @@ AI_02/
 │       ├── validation.py         # 검증 유틸리티 (텍스트 기반)
 │       └── response_utils.py     # 기본 응답 유틸리티
 ├── Processor/            # 처리 파이프라인
-│   └── unified_voice_pipeline.py  # 통합 텍스트 처리 파이프라인
+│   └── unified_text_pipeline.py   # 통합 텍스트 처리 파이프라인
 ├── Services/             # 비즈니스 로직
 │   ├── Memory.py         # 메모리 관리
 │   ├── ScheduleManager.py # 일정 관리
@@ -186,7 +186,7 @@ await textToSpeech.speak(responseText);
 
 ### 새로운 처리 로직 추가
 
-1. `Processor/unified_voice_pipeline.py`에 처리 로직 추가
+1. `Processor/unified_text_pipeline.py`에 처리 로직 추가
 2. `Services/` 폴더에 관련 서비스 추가
 3. `Config/prompts.py`에 프롬프트 추가
 

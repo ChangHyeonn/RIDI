@@ -12,7 +12,7 @@ from typing import Dict, Any
 # AI_02 모듈 import를 위한 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from Processor.unified_voice_pipeline import UnifiedTextPipeline
+from Processor.unified_text_pipeline import UnifiedTextPipeline
 from Config.settings import Settings
 from Services.ScheduleManager import ScheduleManager
 from Models.LLM import LLMFactory

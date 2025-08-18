@@ -14,7 +14,7 @@ from typing import Dict, Any, Optional
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from Config.settings import Settings
-from Processor.unified_voice_pipeline import UnifiedTextPipeline
+from Processor.unified_text_pipeline import UnifiedTextPipeline
 from Services.Memory import MemoryManager
 from Services.ScheduleManager import ScheduleManager
 from Services.AccessibilityManager import AccessibilityManager
