@@ -45,6 +45,11 @@ class _RecordScreenState extends State<RecordScreen> {
       final success = await _recordService.initialize();
       if (success) {
         print('✅ RecordService 초기화 성공');
+
+        // TaskProvider 설정
+        final taskProvider = Provider.of<TaskProvider>(context, listen: false);
+        _recordService.setTaskProvider(taskProvider);
+        print('✅ TaskProvider 설정 완료');
       } else {
         print('❌ RecordService 초기화 실패');
       }

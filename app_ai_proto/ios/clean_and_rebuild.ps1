@@ -34,6 +34,10 @@ pod deintegrate
 pod cache clean --all
 pod install --repo-update
 
+# 추가: flutter_tts 관련 캐시 정리
+Write-Host "flutter_tts 캐시 정리 중..." -ForegroundColor Yellow
+flutter pub cache clean
+
 Write-Host "✅ iOS 빌드 캐시 정리 완료!" -ForegroundColor Green
 Write-Host "이제 다음 명령어로 빌드해보세요:" -ForegroundColor Cyan
 Write-Host "flutter build ios --debug" -ForegroundColor White

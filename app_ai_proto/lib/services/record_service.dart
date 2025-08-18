@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:path_provider/path_provider.dart';
@@ -8,11 +9,14 @@ import 'speech_to_text_service.dart';
 import 'text_to_speech_service.dart';
 import 'ai_service.dart';
 import '../models/ai_response.dart';
+import '../models/task.dart';
 import '../providers/task_provider.dart';
+import '../main.dart';
 
 class RecordService {
   final SpeechToTextService _sttService = SpeechToTextService();
   final TextToSpeechService _ttsService = TextToSpeechService();
+  TaskProvider? _taskProvider; // TaskProvider 참조 추가
 
   bool _isRecording = false;
   bool _isPlaying = false;
@@ -368,13 +372,36 @@ class RecordService {
             parsedDateTime = DateTime.now();
           }
 
+          // Task 객체 생성
+          final task = Task(
+            id:
+                scheduleData['id'] ??
+                DateTime.now().millisecondsSinceEpoch.toString(),
+            title: title,
+            date: parsedDateTime,
+            isCompleted: false,
+            isImportant: scheduleData['priority'] == 'high',
+          );
+
+          print('📝 생성된 Task 객체:');
+          print('  - ID: ${task.id}');
+          print('  - 제목: ${task.title}');
+          print('  - 날짜: ${task.date.toString()}');
+          print('  - 중요도: ${task.isImportant}');
+
           // TaskProvider를 통해 실제 일정 추가
-          // TODO: TaskProvider 인스턴스에 접근하는 방법 필요
-          // 현재는 로그만 출력하고 실제 구현은 나중에 추가
-          print('✅ 일정 추가 완료 (TaskProvider 연동 필요)');
-          print('  - 제목: $title');
-          print('  - 날짜: ${parsedDateTime.toString()}');
-          print('  - 설명: $description');
+          try {
+            // Provider를 통해 TaskProvider에 접근
+            final taskProvider = _getTaskProvider();
+            if (taskProvider != null) {
+              await taskProvider.addTask(task);
+              print('✅ TaskProvider를 통해 일정 추가 완료');
+            } else {
+              print('❌ TaskProvider에 접근할 수 없습니다');
+            }
+          } catch (e) {
+            print('❌ TaskProvider 일정 추가 중 오류: $e');
+          }
         } else {
           print('⚠️ 일정 데이터 형식이 올바르지 않습니다: $scheduleData');
         }
@@ -386,14 +413,35 @@ class RecordService {
     }
   }
 
+  // TaskProvider 설정 메서드
+  void setTaskProvider(TaskProvider taskProvider) {
+    _taskProvider = taskProvider;
+    print('✅ TaskProvider 설정 완료');
+  }
+
+  // TaskProvider 인스턴스 가져오기
+  TaskProvider? _getTaskProvider() {
+    return _taskProvider;
+  }
+
   // 일정 조회 처리
   Future<void> _handleScheduleRead(AIAction action) async {
     try {
       print('📅 일정 조회 처리 시작');
 
-      // TODO: TaskProvider를 통해 실제 일정 조회
-      // 예시: final schedules = await TaskProvider.getTasks();
-      print('✅ 일정 조회 완료 (실제 데이터 반영 필요)');
+      final taskProvider = _getTaskProvider();
+      if (taskProvider != null) {
+        final tasks = taskProvider.tasks;
+        print('📋 조회된 일정 수: ${tasks.length}');
+
+        for (final task in tasks) {
+          print('  - ${task.title} (${task.date.toString()})');
+        }
+
+        print('✅ 일정 조회 완료');
+      } else {
+        print('❌ TaskProvider에 접근할 수 없습니다');
+      }
     } catch (e) {
       print('❌ 일정 조회 처리 중 오류: $e');
     }
@@ -404,9 +452,23 @@ class RecordService {
     try {
       print('📅 일정 삭제 처리 시작');
 
-      // TODO: TaskProvider를 통해 실제 일정 삭제
-      // 예시: await TaskProvider.deleteTask(taskId);
-      print('✅ 일정 삭제 완료 (실제 데이터 반영 필요)');
+      final scheduleData = action.data;
+      if (scheduleData != null && scheduleData is Map<String, dynamic>) {
+        final taskId = scheduleData['id'];
+        if (taskId != null) {
+          final taskProvider = _getTaskProvider();
+          if (taskProvider != null) {
+            await taskProvider.deleteTask(taskId);
+            print('✅ 일정 삭제 완료: $taskId');
+          } else {
+            print('❌ TaskProvider에 접근할 수 없습니다');
+          }
+        } else {
+          print('⚠️ 삭제할 일정 ID가 없습니다');
+        }
+      } else {
+        print('⚠️ 일정 삭제 데이터가 없습니다');
+      }
     } catch (e) {
       print('❌ 일정 삭제 처리 중 오류: $e');
     }
@@ -417,9 +479,40 @@ class RecordService {
     try {
       print('📅 일정 수정 처리 시작');
 
-      // TODO: TaskProvider를 통해 실제 일정 수정
-      // 예시: await TaskProvider.updateTask(taskId, newData);
-      print('✅ 일정 수정 완료 (실제 데이터 반영 필요)');
+      final scheduleData = action.data;
+      if (scheduleData != null && scheduleData is Map<String, dynamic>) {
+        final taskId = scheduleData['id'];
+        final title = scheduleData['title'];
+        final datetime = scheduleData['datetime'];
+
+        if (taskId != null) {
+          final taskProvider = _getTaskProvider();
+          if (taskProvider != null) {
+            // 기존 일정 찾기
+            final existingTask = taskProvider.tasks.firstWhere(
+              (task) => task.id == taskId,
+              orElse: () => throw Exception('일정을 찾을 수 없습니다: $taskId'),
+            );
+
+            // 수정된 일정 생성
+            final updatedTask = existingTask.copyWith(
+              title: title ?? existingTask.title,
+              date: datetime != null
+                  ? DateTime.parse(datetime)
+                  : existingTask.date,
+            );
+
+            await taskProvider.updateTask(updatedTask);
+            print('✅ 일정 수정 완료: $taskId');
+          } else {
+            print('❌ TaskProvider에 접근할 수 없습니다');
+          }
+        } else {
+          print('⚠️ 수정할 일정 ID가 없습니다');
+        }
+      } else {
+        print('⚠️ 일정 수정 데이터가 없습니다');
+      }
     } catch (e) {
       print('❌ 일정 수정 처리 중 오류: $e');
     }
