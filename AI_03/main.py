@@ -86,61 +86,17 @@ def main():
     local_ip = get_local_ip()
     network_type, ip_tip = analyze_network_type(local_ip)
     
-    # 시작 메시지
-    print("🚀 AI Text Processing Server (Clean Architecture)")
-    print("=" * 60)
-    print(f"📍 Host: {settings.server.host}")
-    print(f"📍 Port: {settings.server.port}")
-    print(f"🔧 Debug: {settings.server.debug}")
-    print(f"🗄️ Database: {settings.database.engine}")
-    print(f"🤖 LLM Provider: {settings.llm.provider}")
-    print("=" * 60)
-    print("🌐 서버 접속 주소:")
-    print(f"   📡 현재 IP: {local_ip} ({network_type})")
-    print(f"   {ip_tip}")
-    print()
-    
-    # 다양한 접속 주소 표시
-    if settings.server.host == "0.0.0.0":
-        print(f"   📱 로컬 접속:     http://localhost:{settings.server.port}")
-        print(f"   🌍 외부 접속:     http://{local_ip}:{settings.server.port}")
-        print(f"   📡 API 엔드포인트:")
-        print(f"      - 헬스체크:    http://{local_ip}:{settings.server.port}/api/v1/health")
-        print(f"      - 텍스트 처리:  http://{local_ip}:{settings.server.port}/api/v1/process_text")
-    else:
-        print(f"   🌐 서버 주소:     http://{settings.server.host}:{settings.server.port}")
-        print(f"   📡 API 엔드포인트:")
-        print(f"      - 헬스체크:    http://{settings.server.host}:{settings.server.port}/api/v1/health")
-        print(f"      - 텍스트 처리:  http://{settings.server.host}:{settings.server.port}/api/v1/process_text")
-    
-    # IP 변경 방지 팁
-    print()
-    print("🔧 IP 주소 고정 방법:")
-    if local_ip.startswith('172.20.'):
-        print("   1️⃣ WiFi 네트워크 사용 (더 안정적)")
-        print("   2️⃣ 라우터 설정에서 DHCP 예약")
-        print("   3️⃣ 서버 실행 시 --host 옵션으로 특정 IP 지정")
-    elif local_ip.startswith('192.168.'):
-        print("   1️⃣ 라우터 관리 페이지 → DHCP 설정 → IP 예약")
-        print("   2️⃣ MAC 주소 기반 고정 IP 할당")
-        print("   3️⃣ 정적 IP 설정 (시스템 네트워크 설정)")
-    
-    print("=" * 60)
-    
-    logger.info("Starting AI Text Processing Server")
-    logger.info(f"Configuration: {settings.to_dict()}")
+    # 시작 메시지 (AI_02 스타일)
+    print("🚀 AI Server 초기화 중...")
+    print(f"📍 서버 주소: {settings.server.host}:{settings.server.port}")
+    print(f"🔧 디버그 모드: {settings.server.debug}")
+    print(f"🤖 AI 모델: {settings.llm.provider}")
+    print("💻 디바이스: auto")
+    print("📝 텍스트 기반 처리 모드")
     
     try:
         # Flask 앱 생성
         app = create_app(settings)
-        
-        # 서버 실행
-        print("🚀 서버를 시작합니다...")
-        if settings.server.host == "0.0.0.0":
-            print(f"📶 Flutter 앱에서 사용할 주소: http://{local_ip}:{settings.server.port}")
-        
-        logger.info(f"Server starting on {settings.server.host}:{settings.server.port}")
-        logger.info(f"External access available at: http://{local_ip}:{settings.server.port}")
         
         app.run(
             host=settings.server.host,
