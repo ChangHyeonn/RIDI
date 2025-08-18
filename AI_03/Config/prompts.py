@@ -57,7 +57,7 @@ JSON 형식으로만 응답:
     "title": "일정 제목",
     "date": "YYYY-MM-DD",
     "time": "HH:MM",
-    "category": "건강/일반/업무/가족",
+    "category": "경조사/일반/건강",
     "is_important": true/false,
     "location": "장소 (있는 경우)",
     "description": "추가 설명 (있는 경우)"
@@ -107,7 +107,7 @@ JSON 형식으로만 응답:
     "schedule_info": {{
         "title": "일정 제목",
         "datetime": "YYYY-MM-DD HH:MM",
-        "category": "건강/일반/업무/가족",
+        "category": "경조사/일반/건강",
         "is_important": true/false
     }},
     "response": "사용자 응답",

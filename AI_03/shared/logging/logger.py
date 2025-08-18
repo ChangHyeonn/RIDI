@@ -59,7 +59,8 @@ class LoggerFactory:
             root_logger.addHandler(file_handler)
         
         # 외부 라이브러리 로그 레벨 조정
-        logging.getLogger('werkzeug').setLevel(logging.WARNING)
+        # Werkzeug: Flask 서버의 HTTP 요청 로그를 표시 (외부 연결 모니터링용)
+        logging.getLogger('werkzeug').setLevel(logging.INFO)
         logging.getLogger('urllib3').setLevel(logging.WARNING)
         
         cls._configured = True

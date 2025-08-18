@@ -30,7 +30,7 @@ class ProcessTextUseCase:
         self.logger = LoggerFactory.get_logger(__name__)
     
     def execute(self, request: TextRequest) -> TextProcessingResult:
-        """텍스트 요청 처리"""
+        """텍스트 요청 처리 (AI_02 호환 방식)"""
         start_time = time.time()
         
         try:
@@ -45,9 +45,16 @@ class ProcessTextUseCase:
             intent = self.llm_service.analyze_intent(request.text)
             self.logger.info(f"Intent analyzed: {intent.category} (confidence: {intent.confidence})")
             
-            # 3. 카테고리별 처리
+            # 3. 일정 관련 요청의 경우 정보 추출
             if intent.category == "schedule_add":
-                return self._handle_schedule_add(request, intent, start_time)
+                schedule_info = self.llm_service.extract_schedule_info(request.text)
+                if schedule_info.get('title'):  # 제목이 있으면 처리
+                    return self._handle_schedule_add_with_info(request, schedule_info, start_time)
+                else:
+                    return self._create_error_result(
+                        "일정 정보를 추출할 수 없습니다. 일정 제목과 시간을 명확히 말씀해주세요.", 
+                        time.time() - start_time
+                    )
             elif intent.category == "schedule_read":
                 return self._handle_schedule_read(request, intent, start_time)
             elif intent.category == "schedule_delete":
@@ -59,6 +66,30 @@ class ProcessTextUseCase:
             self.logger.error(f"Text processing failed: {e}")
             return self._create_error_result(
                 f"처리 중 오류가 발생했습니다: {str(e)}", 
+                time.time() - start_time
+            )
+    
+    def _handle_schedule_add_with_info(self, request: TextRequest, schedule_info: dict, start_time: float) -> TextProcessingResult:
+        """일정 추가 처리 (정보 추출 완료)"""
+        try:
+            result = self.add_schedule_usecase.execute(request.user_id, schedule_info)
+            
+            if result.success:
+                response_text = self._generate_add_response(result.schedule_data)
+                return TextProcessingResult(
+                    success=True,
+                    action_type="schedule_add",
+                    action_data={"schedule_data": result.schedule_data},
+                    response_text=response_text,
+                    processing_time=time.time() - start_time
+                )
+            else:
+                return self._create_error_result(result.error_message, time.time() - start_time)
+                
+        except Exception as e:
+            self.logger.error(f"Schedule add failed: {e}")
+            return self._create_error_result(
+                "일정 추가 중 오류가 발생했습니다.", 
                 time.time() - start_time
             )
     

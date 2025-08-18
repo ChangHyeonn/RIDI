@@ -48,13 +48,32 @@ def process_text():
         
         result = use_case.execute(text_request)
         
-        # 3. 응답 생성
-        response_dto = ProcessTextResponseDTO.from_processing_result(result)
-        
+        # 3. 응답 생성 (AI_02 호환 형식)
         if result.success:
-            return jsonify(response_dto.to_dict()), 200
+            # AI_02 호환 응답 구조
+            response = {
+                'success': True,
+                'action': result.action_type,
+                'text_response': result.response_text,
+                'timestamp': result.timestamp.isoformat()
+            }
+            
+            # 일정 추가의 경우 추가 정보 포함
+            if result.action_type == "schedule_add" and result.action_data.get("schedule_data"):
+                schedule_data = result.action_data["schedule_data"]
+                response['schedule_data'] = schedule_data
+            
+            return jsonify(response), 200
         else:
-            return jsonify(response_dto.to_dict()), 400
+            # 에러 응답도 AI_02 호환 형식
+            response = {
+                'success': False,
+                'action': 'error',
+                'text_response': result.response_text,
+                'error': result.error_message,
+                'timestamp': result.timestamp.isoformat()
+            }
+            return jsonify(response), 400
             
     except Exception as e:
         logger.error(f"Text processing API error: {e}")
