@@ -20,7 +20,7 @@ from Services.Memory import MemoryManager
 class UnifiedRequestProcessor:
     """LLM 중심의 통합 요청 처리기"""
     
-    def __init__(self, llm_type: str = "gemini"):
+    def __init__(self, llm_type: str = "openai"):
         self._setup_logging()
         self._initialize_components(llm_type)
         self.logger.info("Unified Request Processor initialized successfully")

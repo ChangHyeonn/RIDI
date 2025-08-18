@@ -22,7 +22,7 @@ class UnifiedTextPipeline:
     """LLM 중심의 통합 텍스트 처리 파이프라인"""
     
     def __init__(self, 
-                 llm_type: str = "gemini",
+                 llm_type: str = "openai",
                  device: str = "auto"):
         self._setup_logging()
         self._initialize_components(llm_type, device)

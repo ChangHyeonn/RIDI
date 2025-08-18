@@ -40,7 +40,7 @@ Flutter App에서 STT 처리
     ↓
 텍스트 명령 전송 (JSON)
     ↓
-LLM 분석 (Gemini)
+LLM 분석 (OpenAI GPT-4o-mini)
     ↓
 명령 분류 및 정보 추출
     ↓
@@ -201,8 +201,8 @@ Content-Type: application/json
       "request_processor": {
         "processor_type": "Unified Request Processor",
         "llm_model": {
-          "model_name": "gemini-1.5-flash",
-          "provider": "Google"
+          "model_name": "gpt-4o-mini",
+          "provider": "OpenAI"
         }
       }
     },

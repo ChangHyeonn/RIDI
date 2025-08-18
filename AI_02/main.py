@@ -17,7 +17,7 @@ def main():
     parser.add_argument('--port', type=int, default=Settings.PORT, help='Server port (default: 8080)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     parser.add_argument('--device', default=Settings.DEVICE, help='Device for AI models (auto/cpu/cuda)')
-    parser.add_argument('--llm-type', default=Settings.LLM_TYPE, help='LLM type (gemini/openai/claude)')
+    parser.add_argument('--llm-type', default=Settings.LLM_TYPE, help='LLM type (openai)')
     
     args = parser.parse_args()
     
