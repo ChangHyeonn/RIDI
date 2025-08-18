@@ -187,13 +187,17 @@ JSON 형식으로만 응답:
 - "다음 주" = 현재 날짜 + 7일
 - "오전/오후" = 24시간 형식
 
+중요도 설정 규칙:
+- 건강 관련 일정(병원, 치과, 검진 등): is_important = true
+- 그 외 모든 일정: is_important = false
+
 JSON 형식으로만 응답:
 {{
     "title": "일정 제목",
     "date": "YYYY-MM-DD",
     "time": "HH:MM",
-    "category": "건강/일반/업무/가족",
-    "is_important": true/false,
+    "category": "경조사/일반/건강",
+    "is_important": "건강 카테고리인 경우에만 true, 나머지는 false",
     "location": "장소 (있는 경우)",
     "description": "추가 설명 (있는 경우)"
 }}

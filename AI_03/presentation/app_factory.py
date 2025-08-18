@@ -11,6 +11,7 @@ from shared.logging.logger import LoggerFactory
 from shared.config.settings import AppSettings
 from shared.container import container
 from presentation.api.v1.text_controller import text_bp
+from presentation.middleware.request_logging import RequestLoggingMiddleware
 
 
 def create_app(settings: AppSettings = None) -> Flask:
@@ -36,6 +37,10 @@ def create_app(settings: AppSettings = None) -> Flask:
     
     # 의존성 컨테이너 설정
     _configure_dependencies(settings)
+    
+    # 요청 로깅 미들웨어 등록
+    request_logging = RequestLoggingMiddleware()
+    request_logging.init_app(app)
     
     # 블루프린트 등록
     app.register_blueprint(text_bp, url_prefix='/api/v1')

@@ -6,6 +6,7 @@ Clean Architecture 기반 메인 애플리케이션 진입점
 
 import sys
 import argparse
+import socket
 from pathlib import Path
 
 # 프로젝트 루트를 Python 경로에 추가
@@ -57,25 +58,46 @@ def main():
     
     logger = LoggerFactory.get_logger(__name__)
     
-    # 시작 메시지
-    print("🚀 AI Text Processing Server (Clean Architecture)")
-    print("=" * 50)
-    print(f"📍 Host: {settings.server.host}")
-    print(f"📍 Port: {settings.server.port}")
-    print(f"🔧 Debug: {settings.server.debug}")
-    print(f"🗄️ Database: {settings.database.engine}")
-    print(f"🤖 LLM Provider: {settings.llm.provider}")
-    print("=" * 50)
+    # 외부 접근용 IP 주소 가져오기
+    def get_local_ip():
+        """로컬 네트워크 IP 주소 가져오기"""
+        try:
+            # 임시 소켓을 만들어서 로컬 IP 확인
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                local_ip = s.getsockname()[0]
+            return local_ip
+        except Exception:
+            return "localhost"
     
-    logger.info("Starting AI Text Processing Server")
-    logger.info(f"Configuration: {settings.to_dict()}")
+    def analyze_network_type(ip):
+        """네트워크 타입 분석"""
+        if ip.startswith('172.20.'):
+            return "📱 개인용 핫스팟/모바일 테더링", "⚠️ 모바일 데이터 사용 시 IP가 자주 변경됩니다"
+        elif ip.startswith('192.168.'):
+            return "🏠 가정용 WiFi 라우터", "💡 라우터 설정에서 고정 IP 할당 가능"
+        elif ip.startswith('10.'):
+            return "🏢 기업/대형 네트워크", "🔧 네트워크 관리자에게 고정 IP 요청"
+        elif ip.startswith('172.'):
+            return "🏢 기업용 네트워크", "🔧 네트워크 관리자에게 고정 IP 요청"
+        else:
+            return "🌐 기타 네트워크", "📞 네트워크 관리자에게 문의"
+    
+    local_ip = get_local_ip()
+    network_type, ip_tip = analyze_network_type(local_ip)
+    
+    # 시작 메시지 (AI_02 스타일)
+    print("🚀 AI Server 초기화 중...")
+    print(f"📍 서버 주소: {settings.server.host}:{settings.server.port}")
+    print(f"🔧 디버그 모드: {settings.server.debug}")
+    print(f"🤖 AI 모델: {settings.llm.provider}")
+    print("💻 디바이스: auto")
+    print("📝 텍스트 기반 처리 모드")
     
     try:
         # Flask 앱 생성
         app = create_app(settings)
         
-        # 서버 실행
-        logger.info(f"Server starting on {settings.server.host}:{settings.server.port}")
         app.run(
             host=settings.server.host,
             port=settings.server.port,
