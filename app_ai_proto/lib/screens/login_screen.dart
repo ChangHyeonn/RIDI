@@ -87,225 +87,227 @@ class _LoginScreenState extends State<LoginScreen>
                     padding: const EdgeInsets.all(24.0),
                     child: Form(
                       key: _formKey,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // 앱 로고/아이콘
-                          Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF6366f1),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF6366f1,
-                                  ).withValues(alpha: 0.3),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // 앱 로고/아이콘
+                            Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF6366f1),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF6366f1,
+                                    ).withValues(alpha: 0.3),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.schedule,
+                                color: Colors.white,
+                                size: 60,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.schedule,
-                              color: Colors.white,
-                              size: 60,
-                            ),
-                          ),
-                          SizedBox(height: 32 * scaleFactor),
+                            SizedBox(height: 32 * scaleFactor),
 
-                          // 앱 제목
-                          Text(
-                            '일정알림앱',
-                            style: TextStyle(
-                              fontSize: 32 * scaleFactor,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF1f2937),
-                            ),
-                          ),
-                          SizedBox(height: 8 * scaleFactor),
-
-                          // 부제목
-                          Text(
-                            '일정을 쉽게 관리하세요',
-                            style: TextStyle(
-                              fontSize: 16 * scaleFactor,
-                              color: const Color(0xFF6b7280),
-                            ),
-                          ),
-                          SizedBox(height: 48 * scaleFactor),
-
-                          // 아이디 입력 필드
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: TextFormField(
-                              controller: _usernameController,
+                            // 앱 제목
+                            Text(
+                              '일정알림앱',
                               style: TextStyle(
-                                fontSize: 16 * scaleFactor,
+                                fontSize: 32 * scaleFactor,
+                                fontWeight: FontWeight.bold,
                                 color: const Color(0xFF1f2937),
                               ),
-                              decoration: InputDecoration(
-                                labelText: '아이디',
-                                labelStyle: TextStyle(
-                                  fontSize: 14 * scaleFactor,
-                                  color: const Color(0xFF6b7280),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide.none,
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide.none,
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF6366f1),
-                                    width: 2,
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: Colors.white,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 16,
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.person,
-                                  color: Color(0xFF6b7280),
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return '아이디를 입력해주세요';
-                                }
-                                return null;
-                              },
                             ),
-                          ),
-                          SizedBox(height: 16 * scaleFactor),
+                            SizedBox(height: 8 * scaleFactor),
 
-                          // 비밀번호 입력 필드
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: TextFormField(
-                              controller: _passwordController,
-                              obscureText: true,
+                            // 부제목
+                            Text(
+                              '일정을 쉽게 관리하세요',
                               style: TextStyle(
                                 fontSize: 16 * scaleFactor,
-                                color: const Color(0xFF1f2937),
+                                color: const Color(0xFF6b7280),
                               ),
-                              decoration: InputDecoration(
-                                labelText: '비밀번호',
-                                labelStyle: TextStyle(
-                                  fontSize: 14 * scaleFactor,
-                                  color: const Color(0xFF6b7280),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide.none,
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide.none,
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF6366f1),
-                                    width: 2,
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: Colors.white,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 16,
-                                ),
-                                prefixIcon: const Icon(
-                                  Icons.lock,
-                                  color: Color(0xFF6b7280),
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return '비밀번호를 입력해주세요';
-                                }
-                                return null;
-                              },
                             ),
-                          ),
-                          SizedBox(height: 32 * scaleFactor),
+                            SizedBox(height: 48 * scaleFactor),
 
-                          // 시작하기 버튼
-                          Container(
-                            width: double.infinity,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF6366f1,
-                                  ).withValues(alpha: 0.3),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
-                            ),
-                            child: ElevatedButton(
-                              onPressed: _login,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF6366f1),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                elevation: 0,
+                            // 아이디 입력 필드
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
                               ),
-                              child: Text(
-                                '시작하기',
+                              child: TextFormField(
+                                controller: _usernameController,
                                 style: TextStyle(
-                                  fontSize: 18 * scaleFactor,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16 * scaleFactor,
+                                  color: const Color(0xFF1f2937),
+                                ),
+                                decoration: InputDecoration(
+                                  labelText: '아이디',
+                                  labelStyle: TextStyle(
+                                    fontSize: 14 * scaleFactor,
+                                    color: const Color(0xFF6b7280),
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFF6366f1),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 16,
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.person,
+                                    color: Color(0xFF6b7280),
+                                  ),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return '아이디를 입력해주세요';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            SizedBox(height: 16 * scaleFactor),
+
+                            // 비밀번호 입력 필드
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: TextFormField(
+                                controller: _passwordController,
+                                obscureText: true,
+                                style: TextStyle(
+                                  fontSize: 16 * scaleFactor,
+                                  color: const Color(0xFF1f2937),
+                                ),
+                                decoration: InputDecoration(
+                                  labelText: '비밀번호',
+                                  labelStyle: TextStyle(
+                                    fontSize: 14 * scaleFactor,
+                                    color: const Color(0xFF6b7280),
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFF6366f1),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 16,
+                                  ),
+                                  prefixIcon: const Icon(
+                                    Icons.lock,
+                                    color: Color(0xFF6b7280),
+                                  ),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return '비밀번호를 입력해주세요';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            SizedBox(height: 32 * scaleFactor),
+
+                            // 시작하기 버튼
+                            Container(
+                              width: double.infinity,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF6366f1,
+                                    ).withValues(alpha: 0.3),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: _login,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF6366f1),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: Text(
+                                  '시작하기',
+                                  style: TextStyle(
+                                    fontSize: 18 * scaleFactor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          SizedBox(height: 24 * scaleFactor),
+                            SizedBox(height: 24 * scaleFactor),
 
-                          // 간단한 설명
-                          Text(
-                            '아이디와 비밀번호를 입력하고 시작하세요',
-                            style: TextStyle(
-                              fontSize: 12 * scaleFactor,
-                              color: const Color(0xFF9ca3af),
+                            // 간단한 설명
+                            Text(
+                              '아이디와 비밀번호를 입력하고 시작하세요',
+                              style: TextStyle(
+                                fontSize: 12 * scaleFactor,
+                                color: const Color(0xFF9ca3af),
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

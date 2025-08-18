@@ -22,8 +22,33 @@ class TaskProvider with ChangeNotifier {
     await loadTasks();
     await loadSettings();
 
+    // 알람 서비스 초기화 및 기존 일정들의 알람 복원
+    await _restoreAlarms();
+
     _isLoading = false;
     notifyListeners();
+  }
+
+  // 기존 일정들의 알람 복원
+  Future<void> _restoreAlarms() async {
+    try {
+      await _alarmService.initialize();
+
+      // 완료되지 않은 미래 일정들에 대해 알람 설정
+      final now = DateTime.now();
+      for (final task in _tasks) {
+        if (!task.isCompleted && task.date.isAfter(now)) {
+          _alarmService.scheduleAlarm(task);
+          print('✅ 알람 복원: ${task.title} (${task.date})');
+        }
+      }
+      print('✅ 알람 복원 완료');
+
+      // 디버깅을 위해 현재 설정된 알람 목록 출력
+      _alarmService.printScheduledAlarms();
+    } catch (e) {
+      print('❌ 알람 복원 중 오류: $e');
+    }
   }
 
   // 일정 로드
@@ -42,18 +67,33 @@ class TaskProvider with ChangeNotifier {
   Future<void> addTask(Task task) async {
     await _taskService.addTask(task);
     await loadTasks();
+
+    // 완료되지 않은 일정만 알람 설정
+    if (!task.isCompleted) {
+      _alarmService.scheduleAlarm(task);
+    }
   }
 
   // 일정 업데이트
   Future<void> updateTask(Task task) async {
     await _taskService.updateTask(task);
     await loadTasks();
+
+    // 완료되지 않은 일정만 알람 설정
+    if (!task.isCompleted) {
+      _alarmService.scheduleAlarm(task);
+    } else {
+      _alarmService.cancelAlarm(task.id);
+    }
   }
 
   // 일정 삭제
   Future<void> deleteTask(String taskId) async {
     await _taskService.deleteTask(taskId);
     await loadTasks();
+
+    // 알람 취소
+    _alarmService.cancelAlarm(taskId);
   }
 
   // 일정 완료 상태 토글
@@ -62,7 +102,7 @@ class TaskProvider with ChangeNotifier {
     if (taskIndex != -1) {
       final task = _tasks[taskIndex];
       final updatedTask = task.copyWith(isCompleted: !task.isCompleted);
-      await updateTask(updatedTask);
+      await updateTask(updatedTask); // updateTask에서 알람 관리
     }
   }
 

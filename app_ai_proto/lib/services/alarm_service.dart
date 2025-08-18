@@ -1,7 +1,12 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:audioplayers/audioplayers.dart';
 import '../models/task.dart';
 import '../screens/alarm_screen.dart';
 import '../providers/task_provider.dart';
@@ -18,8 +23,12 @@ class AlarmService {
 
   final Map<String, Timer> _alarmTimers = {};
   final Map<String, DateTime> _scheduledAlarms = {};
+  final Map<String, Timer> _alarmSoundTimers = {}; // 알람 소리 반복 재생용 타이머
   final TaskService _taskService = TaskService();
   final TextToSpeechService _ttsService = TextToSpeechService();
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
+  final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isInitialized = false;
 
   // 초기화
@@ -28,6 +37,28 @@ class AlarmService {
 
     try {
       await _ttsService.initialize();
+
+      // timezone 초기화
+      tz.initializeTimeZones();
+
+      // 로컬 알림 초기화
+      const AndroidInitializationSettings initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+
+      const DarwinInitializationSettings initializationSettingsIOS =
+          DarwinInitializationSettings();
+
+      const InitializationSettings initializationSettings =
+          InitializationSettings(
+            android: initializationSettingsAndroid,
+            iOS: initializationSettingsIOS,
+          );
+
+      await _notifications.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: _onNotificationTapped,
+      );
+
       _isInitialized = true;
       print('✅ AlarmService 초기화 성공');
     } catch (e) {
@@ -36,7 +67,7 @@ class AlarmService {
   }
 
   // 알람 설정
-  void scheduleAlarm(Task task, [BuildContext? context]) {
+  void scheduleAlarm(Task task, [BuildContext? context]) async {
     final now = DateTime.now();
     final alarmTime = DateTime(
       task.date.year,
@@ -48,39 +79,113 @@ class AlarmService {
 
     // 이미 지난 시간이면 알람 설정하지 않음
     if (alarmTime.isBefore(now)) {
+      print('❌ 알람 설정 실패: 이미 지난 시간');
+      print('  - 알람 시간: ${alarmTime.toString()}');
+      print('  - 현재 시간: ${now.toString()}');
+      print('  - 차이: ${now.difference(alarmTime).inMinutes}분 전');
       return;
     }
 
     // 이미 완료된 일정이면 알람 설정하지 않음
     if (task.isCompleted) {
+      print('❌ 알람 설정 실패: 이미 완료된 일정');
+      print('  - 일정: ${task.title}');
+      print('  - 완료 상태: ${task.isCompleted}');
       return;
     }
 
     // 기존 알람이 있으면 취소
     cancelAlarm(task.id);
 
-    // 새로운 알람 설정
-    final duration = alarmTime.difference(now);
-    final timer = Timer(duration, () {
-      if (context != null) {
+    // 초기화 확인
+    if (!_isInitialized) {
+      await initialize();
+    }
+
+    try {
+      // 로컬 알림 스케줄링
+      await _notifications.zonedSchedule(
+        int.parse(task.id), // 알림 ID로 task ID 사용
+        '일정 알람',
+        '${task.title} 일정이 시작되었습니다.',
+        tz.TZDateTime.from(alarmTime, tz.local),
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'schedule_alarm',
+            '일정 알람',
+            channelDescription: '일정 알람 알림',
+            importance: Importance.high,
+            priority: Priority.high,
+            sound: RawResourceAndroidNotificationSound('alarm'),
+            playSound: true,
+            enableVibration: true,
+            vibrationPattern: Int64List.fromList([0, 500, 200, 500, 200, 500]),
+          ),
+          iOS: DarwinNotificationDetails(
+            sound: 'alarm.aiff',
+            presentSound: true,
+            presentAlert: true,
+            presentBadge: true,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: task.id, // Task ID를 payload로 전달
+      );
+
+      // 기존 Timer 방식도 백업으로 유지
+      final duration = alarmTime.difference(now);
+      final timer = Timer(duration, () {
         _showAlarmScreen(task, context);
-      }
-    });
+      });
 
-    _alarmTimers[task.id] = timer;
-    _scheduledAlarms[task.id] = alarmTime;
+      _alarmTimers[task.id] = timer;
+      _scheduledAlarms[task.id] = alarmTime;
 
-    print('알람 설정됨: ${task.title} - ${alarmTime.toString()}');
+      print('✅ 알람 설정됨: ${task.title}');
+      print('  - 알람 시간: ${alarmTime.toString()}');
+      print('  - 현재 시간: ${now.toString()}');
+      print('  - 대기 시간: ${duration.inMinutes}분 ${duration.inSeconds % 60}초');
+      print('  - Task ID: ${task.id}');
+      print('  - 로컬 알림 스케줄링 완료');
+    } catch (e) {
+      print('❌ 로컬 알림 스케줄링 실패: $e');
+      // 로컬 알림 실패 시 Timer 방식으로 폴백
+      final duration = alarmTime.difference(now);
+      final timer = Timer(duration, () {
+        _showAlarmScreen(task, context);
+      });
+
+      _alarmTimers[task.id] = timer;
+      _scheduledAlarms[task.id] = alarmTime;
+      print('✅ Timer 방식으로 알람 설정됨 (폴백)');
+    }
   }
 
   // 알람 취소
-  void cancelAlarm(String taskId) {
+  void cancelAlarm(String taskId) async {
     final timer = _alarmTimers[taskId];
     if (timer != null) {
       timer.cancel();
       _alarmTimers.remove(taskId);
       _scheduledAlarms.remove(taskId);
-      print('알람 취소됨: $taskId');
+      print('Timer 알람 취소됨: $taskId');
+    }
+
+    // 반복 재생 타이머 취소
+    if (_alarmSoundTimers.containsKey(taskId)) {
+      _alarmSoundTimers[taskId]?.cancel();
+      _alarmSoundTimers.remove(taskId);
+      print('반복 재생 타이머 취소됨: $taskId');
+    }
+
+    // 로컬 알림도 취소
+    try {
+      await _notifications.cancel(int.parse(taskId));
+      print('로컬 알림 취소됨: $taskId');
+    } catch (e) {
+      print('로컬 알림 취소 실패: $e');
     }
   }
 
@@ -91,6 +196,13 @@ class AlarmService {
     }
     _alarmTimers.clear();
     _scheduledAlarms.clear();
+
+    // 모든 반복 재생 타이머 취소
+    for (final timer in _alarmSoundTimers.values) {
+      timer.cancel();
+    }
+    _alarmSoundTimers.clear();
+
     print('모든 알람 취소됨');
   }
 
@@ -100,22 +212,28 @@ class AlarmService {
     _playAlarmSound(task, context);
 
     // 전역 NavigatorKey를 사용하여 알람 화면 표시
-    navigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => AlarmScreen(task: task)),
-      (route) => false, // 모든 이전 화면 제거
-    );
+    if (navigatorKey.currentState != null) {
+      navigatorKey.currentState!.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => AlarmScreen(task: task)),
+        (route) => false, // 모든 이전 화면 제거
+      );
+      print('✅ 알람 화면 표시됨: ${task.title}');
+    } else {
+      print('❌ NavigatorKey가 null이어서 알람 화면을 표시할 수 없음');
+    }
   }
 
-  // 알람 소리 재생 (진동 + TTS)
+  // 알람 소리 재생 (진동 + 음성 파일) - 반복 재생
   void _playAlarmSound(Task task, [BuildContext? context]) async {
     try {
-      print('=== 알람 소리 재생 시작 ===');
+      print('=== 알람 소리 재생 시작 (반복 재생) ===');
 
-      // 진동으로 알람 효과 생성
-      HapticFeedback.heavyImpact();
-      HapticFeedback.heavyImpact();
-      HapticFeedback.heavyImpact();
-      print('진동 발생 완료');
+      // 기존 반복 재생 타이머가 있으면 취소
+      if (_alarmSoundTimers.containsKey(task.id)) {
+        _alarmSoundTimers[task.id]?.cancel();
+        _alarmSoundTimers.remove(task.id);
+        print('🔄 기존 반복 재생 타이머 취소');
+      }
 
       // 볼륨 설정 가져오기
       double volume = 0.5; // 기본값
@@ -150,27 +268,25 @@ class AlarmService {
         return;
       }
 
-      // TTS 서비스 초기화 확인
-      if (!_isInitialized) {
-        await initialize();
-      }
+      // 첫 번째 알람 소리 재생
+      await _playSingleAlarmSound(task, volume);
 
-      // 알람 메시지 생성
-      final alarmMessage = '알람입니다. ${task.title} 일정이 시작되었습니다.';
-      print('알람 메시지: $alarmMessage');
+      // 반복 재생 타이머 설정 (5초마다 반복)
+      final repeatTimer = Timer.periodic(const Duration(seconds: 5), (
+        timer,
+      ) async {
+        print('🔄 알람 소리 반복 재생: ${task.title}');
 
-      // TTS로 알람 메시지 재생
-      await _ttsService.setVoiceSettings(
-        speechRate: 0.8, // 조금 빠르게
-        volume: volume,
-        pitch: 1.2, // 조금 높은 톤
-      );
+        // 진동 추가
+        HapticFeedback.heavyImpact();
 
-      await _ttsService.speak(alarmMessage);
-      print('TTS 알람 메시지 재생 시작');
+        // 알람 소리 재생
+        await _playSingleAlarmSound(task, volume);
+      });
 
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      print('알람 진동 및 TTS 발생 완료 (타임스탬프: $timestamp)');
+      // 반복 재생 타이머 저장
+      _alarmSoundTimers[task.id] = repeatTimer;
+      print('✅ 반복 재생 타이머 설정 완료 (5초마다 반복)');
     } catch (e) {
       print('알람 소리/진동 실패: $e');
       print('에러 상세 정보: ${e.toString()}');
@@ -178,11 +294,56 @@ class AlarmService {
     }
   }
 
-  // 알람 소리 정지
-  void stopAlarmSound() async {
+  // 단일 알람 소리 재생 (반복 재생에서 사용)
+  Future<void> _playSingleAlarmSound(Task task, double volume) async {
     try {
+      // 음성 파일 재생 (assets/sounds/alarm.mp3)
+      print('🔊 음성 파일 재생: alarm.mp3');
+      try {
+        await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
+        print('✅ 음성 파일 재생 성공');
+      } catch (e) {
+        print('❌ 음성 파일 재생 실패: $e');
+        // 음성 파일 재생 실패 시 TTS로 폴백
+        print('🔄 TTS로 폴백 시도');
+        await _ttsService.setVoiceSettings(
+          speechRate: 0.8,
+          volume: volume,
+          pitch: 1.2,
+        );
+        await _ttsService.speak('알람입니다. ${task.title} 일정이 시작되었습니다.');
+      }
+    } catch (e) {
+      print('단일 알람 소리 재생 실패: $e');
+    }
+  }
+
+  // 알람 소리 정지 (반복 재생 포함)
+  void stopAlarmSound([String? taskId]) async {
+    try {
+      print('=== 알람 소리 정지 ===');
+
+      // 특정 태스크의 반복 재생 중지
+      if (taskId != null && _alarmSoundTimers.containsKey(taskId)) {
+        _alarmSoundTimers[taskId]?.cancel();
+        _alarmSoundTimers.remove(taskId);
+        print('✅ 특정 알람 반복 재생 중지: $taskId');
+      }
+
+      // 모든 반복 재생 중지
+      for (final timer in _alarmSoundTimers.values) {
+        timer.cancel();
+      }
+      _alarmSoundTimers.clear();
+      print('✅ 모든 알람 반복 재생 중지');
+
+      // TTS 중지
       await _ttsService.stop();
-      print('알람 소리 정지');
+
+      // 오디오 플레이어 중지
+      await _audioPlayer.stop();
+
+      print('✅ 알람 소리 정지 완료');
     } catch (e) {
       print('알람 소리 정지 실패: $e');
     }
@@ -196,8 +357,90 @@ class AlarmService {
     return _alarmTimers.containsKey(taskId);
   }
 
+  // 현재 설정된 모든 알람 정보 출력 (디버깅용)
+  void printScheduledAlarms() {
+    print('=== 현재 설정된 알람 목록 ===');
+    if (_scheduledAlarms.isEmpty) {
+      print('설정된 알람이 없습니다.');
+    } else {
+      _scheduledAlarms.forEach((taskId, alarmTime) {
+        final now = DateTime.now();
+        final remaining = alarmTime.difference(now);
+        print('Task ID: $taskId');
+        print('  - 알람 시간: $alarmTime');
+        print(
+          '  - 남은 시간: ${remaining.inMinutes}분 ${remaining.inSeconds % 60}초',
+        );
+        print('  - 활성 상태: ${_alarmTimers.containsKey(taskId)}');
+        print('---');
+      });
+    }
+  }
+
+  // 알림 탭 처리
+  void _onNotificationTapped(NotificationResponse response) {
+    print('알림이 탭됨: ${response.payload}');
+    // 알림을 탭하면 앱을 포그라운드로 가져오고 알람 화면 표시
+    if (response.payload != null) {
+      // Task ID를 payload에서 추출하여 알람 화면 표시
+      final taskId = response.payload!;
+      // 여기서 TaskProvider를 통해 task를 가져와서 알람 화면 표시
+      _showAlarmFromNotification(taskId);
+    }
+  }
+
+  // TaskProvider 가져오기 (RecordService에서 사용하는 방식과 동일)
+  TaskProvider? _getTaskProvider() {
+    try {
+      // 전역 NavigatorKey를 통해 context에 접근
+      if (navigatorKey.currentState != null) {
+        final context = navigatorKey.currentState!.context;
+        return Provider.of<TaskProvider>(context, listen: false);
+      }
+      return null;
+    } catch (e) {
+      print('❌ TaskProvider 가져오기 실패: $e');
+      return null;
+    }
+  }
+
+  // 알림에서 알람 화면 표시
+  void _showAlarmFromNotification(String taskId) {
+    try {
+      // TaskProvider를 통해 task를 가져와서 알람 화면 표시
+      final taskProvider = _getTaskProvider();
+      if (taskProvider != null) {
+        final task = taskProvider.tasks.firstWhere(
+          (task) => task.id == taskId,
+          orElse: () => throw Exception('Task를 찾을 수 없습니다: $taskId'),
+        );
+
+        // 알람 화면 표시
+        _showAlarmScreen(task, null);
+        print('✅ 알림에서 알람 화면 표시 성공: ${task.title}');
+      } else {
+        print('❌ TaskProvider에 접근할 수 없습니다');
+      }
+    } catch (e) {
+      print('❌ 알림에서 알람 화면 표시 실패: $e');
+    }
+  }
+
   // 리소스 해제
   void dispose() {
+    // 모든 반복 재생 타이머 취소
+    for (final timer in _alarmSoundTimers.values) {
+      timer.cancel();
+    }
+    _alarmSoundTimers.clear();
+
+    // 모든 알람 타이머 취소
+    for (final timer in _alarmTimers.values) {
+      timer.cancel();
+    }
+    _alarmTimers.clear();
+
     _ttsService.dispose();
+    _audioPlayer.dispose();
   }
 }

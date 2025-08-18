@@ -14,22 +14,22 @@ class AIService {
     // 웹 환경에서는 Platform 클래스 사용 불가
     if (kIsWeb) {
       // 웹 환경에서는 로컬 서버 IP 사용
-      return 'http://172.20.150.200:8080';
+      return 'http://172.20.150.203:8080';
     }
 
     // 디버그 모드에서 플랫폼별 다른 URL 사용
     if (kDebugMode) {
       if (Platform.isAndroid) {
         // Android 에뮬레이터에서 로컬 서버 접근
-        return 'http://172.20.150.200:8080';
+        return 'http://172.20.150.203:8080';
       } else if (Platform.isIOS) {
         // iOS 시뮬레이터에서 로컬 서버 접근
-        return 'http://172.20.150.200:8080';
+        return 'http://172.20.150.203:8080';
       }
     }
 
     // 실제 기기나 릴리즈 모드에서는 실제 IP 사용
-    return 'http://172.20.150.128:8080'; // 실제 서버 IP
+    return 'http://172.20.150.203:8080'; // 실제 서버 IP
   }
 
   static Future<AIResponse> processVoice(String audioPath) async {
@@ -250,7 +250,15 @@ class AIService {
       if (response.statusCode == 200) {
         try {
           final data = json.decode(response.body);
-          final success = data['success'] == true;
+          // 복잡한 응답 구조에서 status 찾기
+          String? status;
+          if (data['status'] != null) {
+            status = data['status'];
+          } else if (data['action'] != null && data['action']['data'] != null) {
+            status = data['action']['data']['status'];
+          }
+
+          final success = status == 'healthy';
           print('서버 상태: ${success ? "정상" : "오류"}');
           print('서버 정보: $data');
           return success;

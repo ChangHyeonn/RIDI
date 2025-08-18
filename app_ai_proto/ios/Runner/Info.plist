@@ -30,6 +30,11 @@
 	<string>음성을 텍스트로 변환하기 위해 음성 인식 권한이 필요합니다.</string>
 	<key>NSSpeechSynthesisUsageDescription</key>
 	<string>AI 응답을 음성으로 재생하기 위해 음성 합성 권한이 필요합니다.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
