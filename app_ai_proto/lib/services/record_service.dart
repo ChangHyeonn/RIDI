@@ -239,12 +239,18 @@ class RecordService {
       if (_recognizedText.isNotEmpty) {
         print('🔄 멈춤 버튼 클릭으로 AI 처리 시작: "$_recognizedText"');
         _processWithAI(_recognizedText);
+      } else {
+        // 텍스트가 없으면 AI 처리 상태 해제
+        print('⚠️ 인식된 텍스트가 없어 AI 처리를 건너뜁니다.');
+        _aiResponseStreamController.add(''); // 빈 응답으로 AI 처리 상태 해제
       }
 
       print('✅ 음성 인식 중지 완료');
       return _recognizedText.isNotEmpty ? _recognizedText : null;
     } catch (e) {
       print('❌ 음성 인식 중지 중 오류: $e');
+      // 오류 발생 시에도 AI 처리 상태 해제
+      _aiResponseStreamController.add('');
       return null;
     }
   }
@@ -345,6 +351,10 @@ class RecordService {
         print('❌ TTS 재생 중 오류: $ttsError');
       }
     }
+
+    // AI 처리 완료 후 상태 해제를 위한 빈 응답 전송
+    print('✅ AI 처리 완료 - 상태 해제');
+    _aiResponseStreamController.add('');
   }
 
   // AI 액션 처리 (가이드에 따른 구현)

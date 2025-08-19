@@ -44,8 +44,14 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     _slideController.forward();
     _fadeController.forward();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<TaskProvider>().initialize();
+    // iOS에서 검은 화면 문제 해결을 위한 초기화
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await context.read<TaskProvider>().initialize();
+        print('✅ iOS MainScreen TaskProvider 초기화 완료');
+      } catch (e) {
+        print('❌ iOS MainScreen TaskProvider 초기화 실패: $e');
+      }
     });
   }
 
@@ -540,38 +546,74 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                   // 일정 목록 (스크롤 가능하게 수정)
                                                   Expanded(
                                                     child: todayTasks.isEmpty
-                                                        ? Center(
-                                                            child: Column(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .center,
-                                                              children: [
-                                                                Icon(
-                                                                  Icons
-                                                                      .event_note,
-                                                                  color: const Color(
-                                                                    0xFFd1d5db,
-                                                                  ),
-                                                                  size: 48,
-                                                                ),
-                                                                const SizedBox(
-                                                                  height: 16,
-                                                                ),
-                                                                Text(
-                                                                  '오늘 일정이 없습니다',
-                                                                  style: TextStyle(
-                                                                    color: const Color(
-                                                                      0xFF9ca3af,
+                                                        ? LayoutBuilder(
+                                                            builder:
+                                                                (
+                                                                  context,
+                                                                  constraints,
+                                                                ) {
+                                                                  // 화면 높이에 따라 동적으로 조정
+                                                                  final availableHeight =
+                                                                      constraints
+                                                                          .maxHeight;
+                                                                  final isSmallScreen =
+                                                                      availableHeight <
+                                                                      100;
+
+                                                                  return Center(
+                                                                    child: Column(
+                                                                      mainAxisAlignment:
+                                                                          MainAxisAlignment
+                                                                              .center,
+                                                                      mainAxisSize:
+                                                                          MainAxisSize
+                                                                              .min,
+                                                                      children: [
+                                                                        if (!isSmallScreen) ...[
+                                                                          Icon(
+                                                                            Icons.event_note,
+                                                                            color: const Color(
+                                                                              0xFFd1d5db,
+                                                                            ),
+                                                                            size:
+                                                                                isSmallScreen
+                                                                                ? 24
+                                                                                : 48,
+                                                                          ),
+                                                                          SizedBox(
+                                                                            height:
+                                                                                isSmallScreen
+                                                                                ? 8
+                                                                                : 16,
+                                                                          ),
+                                                                        ],
+                                                                        Flexible(
+                                                                          child: Text(
+                                                                            isSmallScreen
+                                                                                ? '일정 없음'
+                                                                                : '오늘 일정이 없습니다',
+                                                                            style: TextStyle(
+                                                                              color: const Color(
+                                                                                0xFF9ca3af,
+                                                                              ),
+                                                                              fontSize: isSmallScreen
+                                                                                  ? taskFontSize *
+                                                                                        0.8
+                                                                                  : taskFontSize,
+                                                                              fontStyle: FontStyle.italic,
+                                                                            ),
+                                                                            textAlign:
+                                                                                TextAlign.center,
+                                                                            overflow:
+                                                                                TextOverflow.ellipsis,
+                                                                            maxLines:
+                                                                                2,
+                                                                          ),
+                                                                        ),
+                                                                      ],
                                                                     ),
-                                                                    fontSize:
-                                                                        taskFontSize,
-                                                                    fontStyle:
-                                                                        FontStyle
-                                                                            .italic,
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
+                                                                  );
+                                                                },
                                                           )
                                                         : SingleChildScrollView(
                                                             child: Column(
@@ -1180,38 +1222,74 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                   // 일정 목록 (스크롤 가능하게 수정)
                                                   Expanded(
                                                     child: tomorrowTasks.isEmpty
-                                                        ? Center(
-                                                            child: Column(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .center,
-                                                              children: [
-                                                                Icon(
-                                                                  Icons
-                                                                      .event_note,
-                                                                  color: const Color(
-                                                                    0xFFd1d5db,
-                                                                  ),
-                                                                  size: 48,
-                                                                ),
-                                                                const SizedBox(
-                                                                  height: 16,
-                                                                ),
-                                                                Text(
-                                                                  '내일 일정이 없습니다',
-                                                                  style: TextStyle(
-                                                                    color: const Color(
-                                                                      0xFF9ca3af,
+                                                        ? LayoutBuilder(
+                                                            builder:
+                                                                (
+                                                                  context,
+                                                                  constraints,
+                                                                ) {
+                                                                  // 화면 높이에 따라 동적으로 조정
+                                                                  final availableHeight =
+                                                                      constraints
+                                                                          .maxHeight;
+                                                                  final isSmallScreen =
+                                                                      availableHeight <
+                                                                      100;
+
+                                                                  return Center(
+                                                                    child: Column(
+                                                                      mainAxisAlignment:
+                                                                          MainAxisAlignment
+                                                                              .center,
+                                                                      mainAxisSize:
+                                                                          MainAxisSize
+                                                                              .min,
+                                                                      children: [
+                                                                        if (!isSmallScreen) ...[
+                                                                          Icon(
+                                                                            Icons.event_note,
+                                                                            color: const Color(
+                                                                              0xFFd1d5db,
+                                                                            ),
+                                                                            size:
+                                                                                isSmallScreen
+                                                                                ? 24
+                                                                                : 48,
+                                                                          ),
+                                                                          SizedBox(
+                                                                            height:
+                                                                                isSmallScreen
+                                                                                ? 8
+                                                                                : 16,
+                                                                          ),
+                                                                        ],
+                                                                        Flexible(
+                                                                          child: Text(
+                                                                            isSmallScreen
+                                                                                ? '일정 없음'
+                                                                                : '내일 일정이 없습니다',
+                                                                            style: TextStyle(
+                                                                              color: const Color(
+                                                                                0xFF9ca3af,
+                                                                              ),
+                                                                              fontSize: isSmallScreen
+                                                                                  ? taskFontSize *
+                                                                                        0.8
+                                                                                  : taskFontSize,
+                                                                              fontStyle: FontStyle.italic,
+                                                                            ),
+                                                                            textAlign:
+                                                                                TextAlign.center,
+                                                                            overflow:
+                                                                                TextOverflow.ellipsis,
+                                                                            maxLines:
+                                                                                2,
+                                                                          ),
+                                                                        ),
+                                                                      ],
                                                                     ),
-                                                                    fontSize:
-                                                                        taskFontSize,
-                                                                    fontStyle:
-                                                                        FontStyle
-                                                                            .italic,
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            ),
+                                                                  );
+                                                                },
                                                           )
                                                         : SingleChildScrollView(
                                                             child: Column(

@@ -6,10 +6,6 @@ import 'package:permission_handler/permission_handler.dart';
 import '../providers/task_provider.dart';
 import '../services/record_service.dart';
 import '../services/ai_service.dart';
-import '../services/action_handler.dart';
-import '../services/audio_player_service.dart';
-import '../models/ai_response.dart';
-import 'package:share_plus/share_plus.dart';
 import '../permissions_init.dart';
 
 class RecordScreen extends StatefulWidget {
@@ -64,8 +60,12 @@ class _RecordScreenState extends State<RecordScreen> {
         _recordService.aiResponseStream.listen((response) {
           setState(() {
             _aiResponseText = response;
-            // AI 응답이 오면 처리 중 상태 해제
-            if (response.isNotEmpty &&
+            // 빈 응답이 오면 AI 처리 상태 해제 (처리 완료 또는 텍스트 없음)
+            if (response.isEmpty) {
+              _isProcessingAI = false;
+            }
+            // AI 응답이 오면 처리 중 상태 해제 (단, "분석 중" 메시지는 제외)
+            else if (response.isNotEmpty &&
                 !response.contains('AI가 텍스트를 분석하고 있습니다')) {
               _isProcessingAI = false;
             }
@@ -184,11 +184,8 @@ class _RecordScreenState extends State<RecordScreen> {
         _currentRecognizedText = ''; // 실시간 텍스트 초기화
       });
 
-      // 즉시 메시지를 표시하지 않고 AI 처리 완료를 기다림
-      if (recognizedText != null && recognizedText.isNotEmpty) {
-        // AI 처리 시작 (TTS 음성 출력까지 기다림)
-        await _processWithAI(recognizedText);
-      } else {
+      // AI 처리는 RecordService에서 자동으로 수행되므로 여기서는 하지 않음
+      if (recognizedText == null || recognizedText.isEmpty) {
         // 텍스트가 없으면 즉시 실패 메시지
         _showErrorSnackBar('음성 인식 결과를 처리할 수 없습니다.');
       }
@@ -268,15 +265,6 @@ class _RecordScreenState extends State<RecordScreen> {
     }
   }
 
-  Future<void> _shareRecording(File file) async {
-    try {
-      // 음성 인식 기반에서는 텍스트 공유
-      await Share.share(_recordService.recognizedText, subject: '음성 인식 결과');
-    } catch (e) {
-      _showErrorSnackBar('텍스트 공유 실패: $e');
-    }
-  }
-
   void _showErrorSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -298,53 +286,6 @@ class _RecordScreenState extends State<RecordScreen> {
           duration: const Duration(seconds: 2),
         ),
       );
-    }
-  }
-
-  Future<void> _processWithAI(String recognizedText) async {
-    if (mounted) {
-      setState(() {
-        _isProcessingAI = true;
-        _aiResponseText = 'AI가 텍스트를 분석하고 있습니다...';
-      });
-    }
-
-    try {
-      // AI 서버에 텍스트 전송
-      final aiResponse = await AIService.processText(recognizedText);
-
-      if (mounted) {
-        setState(() {
-          _aiResponseText = aiResponse.textResponse?.text ?? '응답을 받지 못했습니다.';
-        });
-      }
-
-      // 액션 처리
-      if (aiResponse.action != null && mounted) {
-        ActionHandler.handleAction(aiResponse.action!, context);
-      }
-
-      // TTS는 RecordService에서 자동으로 처리되므로 여기서는 하지 않음
-      if (aiResponse.textResponse?.text != null) {
-        // AI 응답 성공 메시지
-        _showSuccessSnackBar('음성 인식 결과를 성공적으로 처리했습니다.');
-      } else {
-        // AI 응답 실패 메시지
-        _showErrorSnackBar('음성 인식 결과를 처리할 수 없습니다.');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _aiResponseText = 'AI 처리 중 오류가 발생했습니다: $e';
-        });
-      }
-      _showErrorSnackBar('AI 처리 실패: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isProcessingAI = false;
-        });
-      }
     }
   }
 

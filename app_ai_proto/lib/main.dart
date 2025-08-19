@@ -5,10 +5,22 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'providers/task_provider.dart';
 import 'screens/login_screen.dart';
 import 'services/alarm_service.dart';
+import 'permissions_init.dart';
 
 void main() async {
+  // iOS에서 검은 화면 문제 해결을 위한 초기화 순서
   WidgetsFlutterBinding.ensureInitialized();
+
+  // iOS 권한 초기화
   await initializeDateFormatting('ko_KR', null);
+
+  // iOS에서 앱 시작 시 권한 요청
+  try {
+    await PermissionsInit.requestNecessaryPermissions();
+  } catch (e) {
+    print('iOS 권한 초기화 중 오류: $e');
+  }
+
   runApp(const MyApp());
 }
 
