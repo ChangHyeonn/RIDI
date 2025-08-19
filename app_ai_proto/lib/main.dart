@@ -14,8 +14,11 @@ void main() async {
   // iOS 권한 초기화
   await initializeDateFormatting('ko_KR', null);
 
-  // iOS 18.6에서 앱 시작 시 권한 요청 (지연 처리)
-  Future.delayed(const Duration(milliseconds: 100), () async {
+  // 앱 실행 후 권한 요청 (첫 프레임 렌더링 방해 방지)
+  runApp(const MyApp());
+  
+  // 앱 실행 후 권한 요청
+  Future.delayed(const Duration(milliseconds: 1000), () async {
     try {
       await PermissionsInit.requestNecessaryPermissions();
       print('✅ iOS 18.6 권한 초기화 완료');
@@ -23,8 +26,6 @@ void main() async {
       print('❌ iOS 18.6 권한 초기화 중 오류: $e');
     }
   });
-
-  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {

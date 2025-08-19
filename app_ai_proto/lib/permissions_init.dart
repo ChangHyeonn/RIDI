@@ -30,14 +30,14 @@ class PermissionsInit {
           print('🍎 iOS 환경 - 실제 마이크 접근으로 권한 팝업 트리거');
           // 실제 마이크 접근을 먼저 시도하여 iOS가 권한 팝업을 띄우도록 함
           await _triggerIOSMicrophoneAccess();
-          
+
           // 실제 마이크 접근 후 잠시 대기
           await Future.delayed(const Duration(milliseconds: 500));
         }
 
         micStatus = await Permission.microphone.request();
         print('마이크 권한 요청 결과: $micStatus');
-        
+
         // iOS에서 권한이 거부된 경우 다시 한 번 시도
         if (Platform.isIOS && !micStatus.isGranted) {
           print('🔄 iOS에서 권한이 거부됨 - 다시 시도...');
@@ -100,14 +100,14 @@ class PermissionsInit {
       // 실제 마이크 접근을 시도하여 iOS가 권한 팝업을 띄우도록 함
       // 사용자가 보여준 글의 방법을 적용
       print('🎤 실제 마이크 접근 시도 중...');
-      
+
       // 방법 1: speech_to_text를 사용하여 실제 마이크 접근 시도
       final speechToText = stt.SpeechToText();
       final available = await speechToText.initialize();
-      
+
       if (available) {
         print('🎤 SpeechToText 초기화 성공 - 실제 마이크 접근 시도');
-        
+
         // 실제 마이크 접근을 위해 잠시 녹음 시도
         await speechToText.listen(
           onResult: (result) {
@@ -116,15 +116,15 @@ class PermissionsInit {
           listenFor: const Duration(milliseconds: 100),
           pauseFor: const Duration(milliseconds: 100),
         );
-        
+
         // 잠시 대기 후 중지
         await Future.delayed(const Duration(milliseconds: 200));
         await speechToText.stop();
-        
+
         print('🎤 실제 마이크 접근 완료');
       } else {
         print('⚠️ SpeechToText 초기화 실패 - 대체 방법 사용');
-        
+
         // 대체 방법: 권한 상태를 여러 번 확인하여 iOS가 반응하도록 함
         for (int i = 0; i < 5; i++) {
           final status = await Permission.microphone.status;
@@ -132,7 +132,7 @@ class PermissionsInit {
           await Future.delayed(const Duration(milliseconds: 300));
         }
       }
-      
+
       print('🎤 iOS 마이크 접근 트리거 완료');
     } catch (e) {
       print('❌ iOS 마이크 접근 트리거 중 오류: $e');

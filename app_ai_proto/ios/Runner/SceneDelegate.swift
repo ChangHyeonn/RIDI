@@ -3,25 +3,19 @@ import Flutter
 
 @available(iOS 13.0, *)
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
-    var window: UIWindow?
+  var window: UIWindow?
 
-    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-        guard let windowScene = (scene as? UIWindowScene) else { return }
-        
-        window = UIWindow(windowScene: windowScene)
-        
-        // Flutter 엔진 설정
-        let flutterEngine = FlutterEngine(name: "my flutter engine")
-        flutterEngine.run()
-        
-        // Flutter 뷰 컨트롤러 설정
-        let flutterViewController = FlutterViewController(engine: flutterEngine, nibName: nil, bundle: nil)
-        
-        // iOS 18.6 검은 화면 문제 해결
-        window?.backgroundColor = UIColor.white
-        window?.rootViewController = flutterViewController
-        window?.makeKeyAndVisible()
-    }
+  func scene(_ scene: UIScene,
+             willConnectTo session: UISceneSession,
+             options connectionOptions: UIScene.ConnectionOptions) {
+    guard let windowScene = (scene as? UIWindowScene) else { return }
+    let flutterEngine = (UIApplication.shared.delegate as! AppDelegate).flutterEngine
+    let flutterViewController = FlutterViewController(engine: flutterEngine, nibName: nil, bundle: nil)
+
+    window = UIWindow(windowScene: windowScene)
+    window?.rootViewController = flutterViewController
+    window?.makeKeyAndVisible()
+  }
 
     func sceneDidDisconnect(_ scene: UIScene) {
         // Called as the scene is being released by the system.
