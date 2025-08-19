@@ -8,6 +8,7 @@ import time
 from typing import Dict, Any
 
 from shared.logging.logger import LoggerFactory
+from shared.constants.error_types import ErrorTypes
 from core.entities.text_request import TextRequest, TextProcessingResult, IntentAnalysis
 from core.interfaces.services.llm_service import ILLMService
 from core.usecases.schedule.add_schedule_usecase import AddScheduleUseCase
@@ -38,7 +39,8 @@ class ProcessTextUseCase:
             if not request.is_valid():
                 return self._create_error_result(
                     "유효하지 않은 요청입니다.", 
-                    time.time() - start_time
+                    time.time() - start_time,
+                    ErrorTypes.INVALID_REQUEST
                 )
             
             # 2. 의도 분석
@@ -64,7 +66,8 @@ class ProcessTextUseCase:
                 else:
                     return self._create_error_result(
                         validation_result['error_message'], 
-                        time.time() - start_time
+                        time.time() - start_time,
+                        validation_result.get('error_type', ErrorTypes.SCHEDULE_VALIDATION_ERROR)
                     )
             elif intent.category == "schedule_read":
                 # AI_02 스타일 로그: Request Analysis
@@ -83,7 +86,8 @@ class ProcessTextUseCase:
             self.logger.error(f"Text processing failed: {e}")
             return self._create_error_result(
                 f"처리 중 오류가 발생했습니다: {str(e)}", 
-                time.time() - start_time
+                time.time() - start_time,
+                ErrorTypes.SYSTEM_ERROR
             )
     
     def _handle_schedule_add_with_info(self, request: TextRequest, schedule_info: dict, start_time: float) -> TextProcessingResult:
@@ -101,13 +105,18 @@ class ProcessTextUseCase:
                     processing_time=time.time() - start_time
                 )
             else:
-                return self._create_error_result(result.error_message, time.time() - start_time)
+                return self._create_error_result(
+                    result.error_message, 
+                    time.time() - start_time,
+                    ErrorTypes.SCHEDULE_SAVE_ERROR
+                )
                 
         except Exception as e:
             self.logger.error(f"Schedule add failed: {e}")
             return self._create_error_result(
                 "일정 추가 중 오류가 발생했습니다.", 
-                time.time() - start_time
+                time.time() - start_time,
+                ErrorTypes.AI_PROCESSING_ERROR
             )
     
     def _handle_schedule_add(self, request: TextRequest, intent: IntentAnalysis, start_time: float) -> TextProcessingResult:
@@ -152,7 +161,8 @@ class ProcessTextUseCase:
             self.logger.error(f"Schedule read failed: {e}")
             return self._create_error_result(
                 "일정 조회 중 오류가 발생했습니다.", 
-                time.time() - start_time
+                time.time() - start_time,
+                ErrorTypes.AI_PROCESSING_ERROR
             )
     
     def _handle_schedule_delete(self, request: TextRequest, intent: IntentAnalysis, start_time: float) -> TextProcessingResult:
@@ -176,7 +186,8 @@ class ProcessTextUseCase:
             self.logger.error(f"Schedule delete failed: {e}")
             return self._create_error_result(
                 "일정 삭제 중 오류가 발생했습니다.", 
-                time.time() - start_time
+                time.time() - start_time,
+                ErrorTypes.AI_PROCESSING_ERROR
             )
     
     def _handle_general_conversation(self, request: TextRequest, intent: IntentAnalysis, start_time: float) -> TextProcessingResult:
@@ -198,7 +209,8 @@ class ProcessTextUseCase:
             self.logger.error(f"General conversation failed: {e}")
             return self._create_error_result(
                 "응답 생성 중 오류가 발생했습니다.", 
-                time.time() - start_time
+                time.time() - start_time,
+                ErrorTypes.RESPONSE_GENERATION_ERROR
             )
     
     def _generate_add_response(self, schedule_data: Dict[str, Any]) -> str:
@@ -248,33 +260,38 @@ class ProcessTextUseCase:
         if not title:
             return {
                 'valid': False,
-                'error_message': '구체적인 일정 내용을 말씀해주세요. 예: "병원 진료", "친구 만남", "회사 회의" 등'
+                'error_message': '구체적인 일정 내용을 말씀해주세요. 예: "병원 진료", "친구 만남", "회사 회의" 등',
+                'error_type': ErrorTypes.MISSING_SCHEDULE_TITLE
             }
         
         if title.lower() in [t.lower() for t in generic_titles]:
             return {
                 'valid': False,
-                'error_message': f'"일정" 대신 구체적인 내용을 말씀해주세요. 예: "병원 진료", "친구 만남" 등'
+                'error_message': f'"일정" 대신 구체적인 내용을 말씀해주세요. 예: "병원 진료", "친구 만남" 등',
+                'error_type': ErrorTypes.GENERIC_SCHEDULE_TITLE
             }
         
         # 3. 제목 길이 및 의미 검증
         if len(title) < 2:
             return {
                 'valid': False,
-                'error_message': '일정 제목이 너무 짧습니다. 좀 더 구체적으로 설명해주세요.'
+                'error_message': '일정 제목이 너무 짧습니다. 좀 더 구체적으로 설명해주세요.',
+                'error_type': ErrorTypes.SHORT_SCHEDULE_TITLE
             }
         
         # 4. 날짜 및 시간 검증
         if not date:
             return {
                 'valid': False,
-                'error_message': '일정 날짜를 명확히 말씀해주세요. 예: "내일", "모레", "월요일" 등'
+                'error_message': '일정 날짜를 명확히 말씀해주세요. 예: "내일", "모레", "월요일" 등',
+                'error_type': ErrorTypes.MISSING_SCHEDULE_DATE
             }
         
         if not time:
             return {
                 'valid': False,
-                'error_message': '일정 시간을 명확히 말씀해주세요. 예: "오전 9시", "오후 3시 30분" 등'
+                'error_message': '일정 시간을 명확히 말씀해주세요. 예: "오전 9시", "오후 3시 30분" 등',
+                'error_type': ErrorTypes.MISSING_SCHEDULE_TIME
             }
         
         # 5. 날짜 형식 검증
@@ -284,7 +301,8 @@ class ProcessTextUseCase:
         except ValueError:
             return {
                 'valid': False,
-                'error_message': '잘못된 날짜 형식입니다. 날짜를 다시 명확히 말씀해주세요.'
+                'error_message': '잘못된 날짜 형식입니다. 날짜를 다시 명확히 말씀해주세요.',
+                'error_type': ErrorTypes.INVALID_DATE_FORMAT
             }
         
         # 6. 시간 형식 검증
@@ -297,17 +315,18 @@ class ProcessTextUseCase:
         except (ValueError, AttributeError):
             return {
                 'valid': False,
-                'error_message': '잘못된 시간 형식입니다. 시간을 다시 명확히 말씀해주세요.'
+                'error_message': '잘못된 시간 형식입니다. 시간을 다시 명확히 말씀해주세요.',
+                'error_type': ErrorTypes.INVALID_TIME_FORMAT
             }
         
         return {'valid': True}
     
-    def _create_error_result(self, error_message: str, processing_time: float) -> TextProcessingResult:
+    def _create_error_result(self, error_message: str, processing_time: float, error_type: str = ErrorTypes.SYSTEM_ERROR) -> TextProcessingResult:
         """에러 결과 생성"""
         return TextProcessingResult(
             success=False,
             action_type="error",
-            action_data={},
+            action_data={"error_type": error_type},
             response_text=error_message,
             processing_time=processing_time,
             error_message=error_message

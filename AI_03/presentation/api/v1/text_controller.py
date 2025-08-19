@@ -8,6 +8,7 @@ from flask import Blueprint, request, jsonify
 from typing import Dict, Any
 
 from shared.logging.logger import LoggerFactory
+from shared.constants.error_types import ErrorTypes
 from shared.container import container
 from core.entities.text_request import TextRequest
 from core.usecases.text_processing.process_text_usecase import ProcessTextUseCase
@@ -70,13 +71,14 @@ def _create_ai02_error_response(result):
     """AI_02 호환 에러 응답 생성"""
     from datetime import datetime
     
+    error_type = result.action_data.get("error_type", ErrorTypes.SYSTEM_ERROR)
     response = {
         "success": False,
         "action": {
             "type": "error",
             "is_important": True,
             "data": {
-                "error_type": "general",
+                "error_type": error_type,
                 "message": result.error_message or result.response_text
             },
             "ui_instructions": {
@@ -202,19 +204,19 @@ def process_text():
     try:
         # 1. 요청 데이터 검증
         if not request.is_json:
-            return jsonify(APIResponseDTO(
-                success=False,
-                error="Content-Type must be application/json"
-            ).to_dict()), 400
+            return _create_error_action_response(
+                "Content-Type must be application/json",
+                ErrorTypes.MISSING_CONTENT_TYPE
+            )
         
         data = request.get_json() or {}
         request_dto = ProcessTextRequestDTO.from_dict(data)
         
         if not request_dto.is_valid():
-            return jsonify(APIResponseDTO(
-                success=False,
-                error="텍스트와 사용자 ID가 필요합니다."
-            ).to_dict()), 400
+            return _create_error_action_response(
+                "텍스트와 사용자 ID가 필요합니다.",
+                ErrorTypes.MISSING_REQUIRED_DATA
+            )
         
         # AI_02 스타일 로그: 요청 수신
         logger.info(f"Text processing request received: '{request_dto.text}' from user: {request_dto.user_id}")
@@ -246,10 +248,10 @@ def process_text():
             
     except Exception as e:
         logger.error(f"Text processing API error: {e}")
-        return jsonify(APIResponseDTO(
-            success=False,
-            error="서버 내부 오류가 발생했습니다."
-        ).to_dict()), 500
+        return _create_error_action_response(
+            "서버 내부 오류가 발생했습니다.",
+            ErrorTypes.INTERNAL_ERROR
+        )
 
 
 @text_bp.route('/health', methods=['GET'])
@@ -261,7 +263,7 @@ def health_check():
         return _create_health_action_response(health_info)
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        return _create_error_action_response("서버 상태 확인 중 오류가 발생했습니다", "health_check")
+        return _create_error_action_response("서버 상태 확인 중 오류가 발생했습니다", ErrorTypes.HEALTH_CHECK_ERROR)
 
 
 def _get_health_info():
@@ -314,7 +316,7 @@ def _create_health_action_response(health_data: Dict[str, Any]):
     return jsonify(response), 200
 
 
-def _create_error_action_response(error_message: str, error_type: str = "general", fallback_action: Dict[str, Any] = None):
+def _create_error_action_response(error_message: str, error_type: str = ErrorTypes.SYSTEM_ERROR, fallback_action: Dict[str, Any] = None):
     """에러 액션 응답 생성 (AI_02 동일)"""
     from datetime import datetime
     
@@ -351,26 +353,26 @@ def _create_error_action_response(error_message: str, error_type: str = "general
 @text_bp.errorhandler(400)
 def bad_request(error):
     """잘못된 요청 에러 핸들러"""
-    return jsonify(APIResponseDTO(
-        success=False,
-        error="잘못된 요청입니다."
-    ).to_dict()), 400
+    return _create_error_action_response(
+        "잘못된 요청입니다.",
+        ErrorTypes.BAD_REQUEST
+    )
 
 
 @text_bp.errorhandler(404)
 def not_found(error):
     """찾을 수 없음 에러 핸들러"""
-    return jsonify(APIResponseDTO(
-        success=False,
-        error="요청한 리소스를 찾을 수 없습니다."
-    ).to_dict()), 404
+    return _create_error_action_response(
+        "요청한 리소스를 찾을 수 없습니다.",
+        ErrorTypes.NOT_FOUND
+    )
 
 
 @text_bp.errorhandler(500)
 def internal_error(error):
     """내부 서버 에러 핸들러"""
     logger.error(f"Internal server error: {error}")
-    return jsonify(APIResponseDTO(
-        success=False,
-        error="서버 내부 오류가 발생했습니다."
-    ).to_dict()), 500
+    return _create_error_action_response(
+        "서버 내부 오류가 발생했습니다.",
+        ErrorTypes.INTERNAL_ERROR
+    )
