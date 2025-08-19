@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
+import '../constants/categories.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
 import 'date_detail_screen.dart';
@@ -629,27 +630,55 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                               children: [
                                                                                 // 상태 아이콘
                                                                                 Container(
-                                                                                  padding: const EdgeInsets.all(
-                                                                                    6,
+                                                                                  padding: EdgeInsets.all(
+                                                                                    6 *
+                                                                                        scaleFactor,
                                                                                   ),
                                                                                   decoration: BoxDecoration(
-                                                                                    color: task.isCompleted
-                                                                                        ? const Color(
-                                                                                            0xFF22c55e,
-                                                                                          )
-                                                                                        : const Color(
-                                                                                            0xFFef4444,
-                                                                                          ),
+                                                                                    color: Color(
+                                                                                      TaskCategories.getCategoryColor(
+                                                                                        task.category,
+                                                                                      ),
+                                                                                    ),
                                                                                     borderRadius: BorderRadius.circular(
-                                                                                      8,
+                                                                                      8 *
+                                                                                          scaleFactor,
                                                                                     ),
                                                                                   ),
-                                                                                  child: Icon(
-                                                                                    task.isCompleted
-                                                                                        ? Icons.check
-                                                                                        : Icons.schedule,
-                                                                                    color: Colors.white,
-                                                                                    size: 16,
+                                                                                  child: Center(
+                                                                                    child: Row(
+                                                                                      mainAxisSize: MainAxisSize.min,
+                                                                                      children: [
+                                                                                        Text(
+                                                                                          TaskCategories.getCategoryIcon(
+                                                                                            task.category,
+                                                                                          ),
+                                                                                          style: TextStyle(
+                                                                                            fontSize:
+                                                                                                16 *
+                                                                                                scaleFactor,
+                                                                                          ),
+                                                                                        ),
+                                                                                        SizedBox(
+                                                                                          width:
+                                                                                              4 *
+                                                                                              scaleFactor,
+                                                                                        ),
+                                                                                        Text(
+                                                                                          TaskCategories.getCategoryInfo(
+                                                                                                task.category,
+                                                                                              )?['name'] ??
+                                                                                              task.category,
+                                                                                          style: TextStyle(
+                                                                                            fontSize:
+                                                                                                12 *
+                                                                                                scaleFactor,
+                                                                                            color: Colors.white,
+                                                                                            fontWeight: FontWeight.bold,
+                                                                                          ),
+                                                                                        ),
+                                                                                      ],
+                                                                                    ),
                                                                                   ),
                                                                                 ),
                                                                                 const SizedBox(
@@ -1241,27 +1270,55 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                               children: [
                                                                                 // 상태 아이콘
                                                                                 Container(
-                                                                                  padding: const EdgeInsets.all(
-                                                                                    6,
+                                                                                  padding: EdgeInsets.all(
+                                                                                    6 *
+                                                                                        scaleFactor,
                                                                                   ),
                                                                                   decoration: BoxDecoration(
-                                                                                    color: task.isCompleted
-                                                                                        ? const Color(
-                                                                                            0xFF22c55e,
-                                                                                          )
-                                                                                        : const Color(
-                                                                                            0xFFef4444,
-                                                                                          ),
+                                                                                    color: Color(
+                                                                                      TaskCategories.getCategoryColor(
+                                                                                        task.category,
+                                                                                      ),
+                                                                                    ),
                                                                                     borderRadius: BorderRadius.circular(
-                                                                                      8,
+                                                                                      8 *
+                                                                                          scaleFactor,
                                                                                     ),
                                                                                   ),
-                                                                                  child: Icon(
-                                                                                    task.isCompleted
-                                                                                        ? Icons.check
-                                                                                        : Icons.schedule,
-                                                                                    color: Colors.white,
-                                                                                    size: 16,
+                                                                                  child: Center(
+                                                                                    child: Row(
+                                                                                      mainAxisSize: MainAxisSize.min,
+                                                                                      children: [
+                                                                                        Text(
+                                                                                          TaskCategories.getCategoryIcon(
+                                                                                            task.category,
+                                                                                          ),
+                                                                                          style: TextStyle(
+                                                                                            fontSize:
+                                                                                                16 *
+                                                                                                scaleFactor,
+                                                                                          ),
+                                                                                        ),
+                                                                                        SizedBox(
+                                                                                          width:
+                                                                                              4 *
+                                                                                              scaleFactor,
+                                                                                        ),
+                                                                                        Text(
+                                                                                          TaskCategories.getCategoryInfo(
+                                                                                                task.category,
+                                                                                              )?['name'] ??
+                                                                                              task.category,
+                                                                                          style: TextStyle(
+                                                                                            fontSize:
+                                                                                                12 *
+                                                                                                scaleFactor,
+                                                                                            color: Colors.white,
+                                                                                            fontWeight: FontWeight.bold,
+                                                                                          ),
+                                                                                        ),
+                                                                                      ],
+                                                                                    ),
                                                                                   ),
                                                                                 ),
                                                                                 const SizedBox(

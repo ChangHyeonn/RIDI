@@ -22,6 +22,7 @@ class RecordService {
   bool _isPlaying = false;
   String _recognizedText = '';
   String _aiResponseText = '';
+  String _lastProcessedText = ''; // 중복 처리 방지를 위한 변수
   DateTime? _recordingStartTime;
 
   // 스트림 컨트롤러
@@ -113,12 +114,12 @@ class RecordService {
   }
 
   void _setupStreamSubscriptions() {
-    // STT 텍스트 스트림 구독 - 중간 결과는 무시하고 최종 결과만 저장
+    // STT 텍스트 스트림 구독 - 텍스트만 저장하고 AI 처리는 하지 않음
     _sttService.textStream.listen((text) {
       print('🎤 음성 인식 텍스트 수신: "$text"');
       _recognizedText = text;
       _textStreamController.add(text);
-      // 중간 결과는 AI 처리하지 않음 - 최종 결과만 처리
+      // AI 처리는 사용자가 멈춤 버튼을 누를 때만 수행
     });
 
     // STT 상태 스트림 구독
@@ -126,12 +127,6 @@ class RecordService {
       _isRecording = isListening;
       _recordingStateController.add(isListening);
       print('📊 녹음 상태 변경: $isListening');
-
-      // 음성 인식이 끝나면 최종 결과로 AI 처리
-      if (!isListening && _recognizedText.isNotEmpty) {
-        print('🔄 음성 인식 완료 - 최종 텍스트로 AI 처리 시작: "$_recognizedText"');
-        _processWithAI(_recognizedText);
-      }
     });
 
     // TTS 상태 스트림 구독
@@ -144,6 +139,15 @@ class RecordService {
     // STT 오류 스트림 구독
     _sttService.errorStream.listen((error) {
       print('❌ STT 오류: $error');
+      // 실제 오류인 경우에만 사용자에게 알림
+      if (!error.contains('타임아웃') &&
+          !error.contains('no_speech') &&
+          !error.contains('error_audio') &&
+          !error.contains('error_network')) {
+        print('⚠️ 실제 STT 오류로 판단: $error');
+      } else {
+        print('ℹ️ 일시적 STT 오류로 판단하여 무시: $error');
+      }
     });
 
     // TTS 오류 스트림 구독
@@ -221,17 +225,22 @@ class RecordService {
 
   // 음성 인식 중지 (기존 메서드명 유지)
   Future<String?> stopRecording() async {
-    if (!_isRecording) {
-      print('음성 인식이 진행 중이 아닙니다.');
-      return null;
-    }
-
     try {
       print('=== 음성 인식 중지 ===');
 
+      // STT 서비스 중지
       await _sttService.stopListening();
 
-      // AI 처리는 스트림에서 자동으로 처리되므로 여기서는 하지 않음
+      // 상태 업데이트
+      _isRecording = false;
+      _recordingStateController.add(false);
+
+      // 사용자가 멈춤 버튼을 눌렀을 때만 AI 처리 수행
+      if (_recognizedText.isNotEmpty) {
+        print('🔄 멈춤 버튼 클릭으로 AI 처리 시작: "$_recognizedText"');
+        _processWithAI(_recognizedText);
+      }
+
       print('✅ 음성 인식 중지 완료');
       return _recognizedText.isNotEmpty ? _recognizedText : null;
     } catch (e) {
@@ -251,6 +260,16 @@ class RecordService {
         print('⚠️ 빈 텍스트는 처리하지 않습니다.');
         return;
       }
+
+      // 중복 처리 방지 - 같은 텍스트가 연속으로 처리되지 않도록
+      if (_lastProcessedText == text) {
+        print('⚠️ 중복 텍스트 처리 방지: "$text"');
+        return;
+      }
+      _lastProcessedText = text;
+
+      // AI 처리 상태를 스트림으로 전송
+      _aiResponseStreamController.add('AI가 텍스트를 분석하고 있습니다...');
 
       // STT 텍스트 로그 저장 (AI 서버 성공/실패와 관계없이)
       print('🎤 STT 인식 결과 저장: "$text"');
@@ -279,17 +298,34 @@ class RecordService {
           await _handleAIAction(aiResponse.action!);
         }
 
-        // 3. TTS로 음성 재생
+        // 3. TTS로 음성 재생 (한 번만)
         if (_aiResponseText.isNotEmpty) {
           print('🔊 TTS 음성 재생 시작...');
-          await _ttsService.speak(_aiResponseText);
-          print('✅ TTS 음성 재생 완료');
+          try {
+            await _ttsService.speak(_aiResponseText);
+            print('✅ TTS 음성 재생 완료');
+          } catch (ttsError) {
+            print('❌ TTS 재생 실패: $ttsError');
+          }
         }
       } else {
         print('❌ AI 응답이 실패했습니다.');
         print('  - success: ${aiResponse.success}');
         print('  - textResponse: ${aiResponse.textResponse?.text}');
         print('⚠️ AI 서버 실패했지만 STT 텍스트는 저장됨: "$text"');
+
+        // AI 서버 응답 실패 시 오류 메시지 설정
+        _aiResponseText = '음성 인식 결과를 처리할 수 없습니다.';
+        _aiResponseStreamController.add(_aiResponseText);
+
+        // TTS로 오류 메시지 재생
+        try {
+          print('🔊 오류 메시지 TTS 재생 시작...');
+          await _ttsService.speak(_aiResponseText);
+          print('✅ 오류 메시지 TTS 재생 완료');
+        } catch (ttsError) {
+          print('❌ TTS 재생 중 오류: $ttsError');
+        }
       }
     } catch (e) {
       print('❌ AI 처리 중 오류: $e');
@@ -350,6 +386,10 @@ class RecordService {
       final scheduleData = action.data;
       if (scheduleData != null) {
         print('📋 일정 데이터: $scheduleData');
+        print('📋 일정 데이터 타입: ${scheduleData.runtimeType}');
+        print(
+          '📋 일정 데이터 키들: ${scheduleData is Map ? scheduleData.keys.toList() : 'Map이 아님'}',
+        );
 
         // AI 서버 응답에서 일정 정보 파싱
         if (scheduleData is Map<String, dynamic>) {
@@ -372,6 +412,25 @@ class RecordService {
             parsedDateTime = DateTime.now();
           }
 
+          // 서버에서 받은 카테고리와 중요도 정보 확인
+          print('🔍 원본 scheduleData: $scheduleData');
+          print('🔍 scheduleData 타입: ${scheduleData.runtimeType}');
+
+          // 서버에서 받은 카테고리 그대로 사용
+          String category = scheduleData['category'] ?? '일반';
+          final isImportant =
+              scheduleData['is_important'] == true ||
+              scheduleData['priority'] == 'high' ||
+              category == '건강';
+
+          print('📋 서버에서 받은 정보:');
+          print('  - 원본 category 값: ${scheduleData['category']}');
+          print('  - category 타입: ${scheduleData['category']?.runtimeType}');
+          print('  - 최종 카테고리: $category');
+          print('  - is_important: ${scheduleData['is_important']}');
+          print('  - priority: ${scheduleData['priority']}');
+          print('  - 최종 중요도: $isImportant');
+
           // Task 객체 생성
           final task = Task(
             id:
@@ -380,13 +439,15 @@ class RecordService {
             title: title,
             date: parsedDateTime,
             isCompleted: false,
-            isImportant: scheduleData['priority'] == 'high',
+            isImportant: isImportant,
+            category: category, // 서버에서 받은 카테고리 사용
           );
 
           print('📝 생성된 Task 객체:');
           print('  - ID: ${task.id}');
           print('  - 제목: ${task.title}');
           print('  - 날짜: ${task.date.toString()}');
+          print('  - 카테고리: ${task.category}');
           print('  - 중요도: ${task.isImportant}');
 
           // TaskProvider를 통해 실제 일정 추가
@@ -395,7 +456,7 @@ class RecordService {
             final taskProvider = _getTaskProvider();
             if (taskProvider != null) {
               await taskProvider.addTask(task);
-              print('✅ TaskProvider를 통해 일정 추가 완료');
+              print('✅ TaskProvider를 통해 일정 추가 완료 (알람은 TaskProvider에서 자동 설정됨)');
             } else {
               print('❌ TaskProvider에 접근할 수 없습니다');
             }
@@ -459,7 +520,7 @@ class RecordService {
           final taskProvider = _getTaskProvider();
           if (taskProvider != null) {
             await taskProvider.deleteTask(taskId);
-            print('✅ 일정 삭제 완료: $taskId');
+            print('✅ 일정 삭제 완료: $taskId (알람은 TaskProvider에서 자동 취소됨)');
           } else {
             print('❌ TaskProvider에 접근할 수 없습니다');
           }
@@ -503,7 +564,7 @@ class RecordService {
             );
 
             await taskProvider.updateTask(updatedTask);
-            print('✅ 일정 수정 완료: $taskId');
+            print('✅ 일정 수정 완료: $taskId (알람은 TaskProvider에서 자동 재설정됨)');
           } else {
             print('❌ TaskProvider에 접근할 수 없습니다');
           }

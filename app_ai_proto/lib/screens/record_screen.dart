@@ -29,6 +29,7 @@ class _RecordScreenState extends State<RecordScreen> {
   bool _isProcessingAI = false;
   String? _aiResponseText;
   String? _currentlyPlayingPath;
+  String _currentRecognizedText = ''; // 실시간 음성 인식 텍스트
 
   @override
   void initState() {
@@ -50,6 +51,29 @@ class _RecordScreenState extends State<RecordScreen> {
         final taskProvider = Provider.of<TaskProvider>(context, listen: false);
         _recordService.setTaskProvider(taskProvider);
         print('✅ TaskProvider 설정 완료');
+
+        // 실시간 음성 인식 텍스트 스트림 구독
+        _recordService.textStream.listen((text) {
+          setState(() {
+            _currentRecognizedText = text;
+          });
+          print('🎤 실시간 음성 인식 텍스트: "$text"');
+        });
+
+        // AI 응답 스트림 구독
+        _recordService.aiResponseStream.listen((response) {
+          setState(() {
+            _aiResponseText = response;
+            // AI 응답이 오면 처리 중 상태 해제
+            if (response.isNotEmpty &&
+                !response.contains('AI가 텍스트를 분석하고 있습니다')) {
+              _isProcessingAI = false;
+            }
+          });
+          print('🤖 AI 응답: "$response"');
+        });
+
+        print('✅ 스트림 구독 설정 완료');
       } else {
         print('❌ RecordService 초기화 실패');
       }
@@ -135,6 +159,7 @@ class _RecordScreenState extends State<RecordScreen> {
       if (success) {
         setState(() {
           _isRecording = true;
+          _currentRecognizedText = ''; // 실시간 텍스트 초기화
         });
         print('✅ 음성 인식 시작 성공');
 
@@ -151,17 +176,20 @@ class _RecordScreenState extends State<RecordScreen> {
 
   Future<void> _stopRecording() async {
     try {
-      final path = await _recordService.stopRecording();
+      final recognizedText = await _recordService.stopRecording();
       setState(() {
         _isRecording = false;
-        _recordingPath = path;
+        _recordingPath = recognizedText; // 텍스트를 저장 (호환성 유지)
+        _isProcessingAI = true; // AI 처리 중 표시
+        _currentRecognizedText = ''; // 실시간 텍스트 초기화
       });
 
-      if (path != null) {
-        _showSuccessSnackBar('음성 인식이 완료되었습니다.');
-        // AI 처리 시작
-        await _processWithAI(path);
+      // 즉시 메시지를 표시하지 않고 AI 처리 완료를 기다림
+      if (recognizedText != null && recognizedText.isNotEmpty) {
+        // AI 처리 시작 (TTS 음성 출력까지 기다림)
+        await _processWithAI(recognizedText);
       } else {
+        // 텍스트가 없으면 즉시 실패 메시지
         _showErrorSnackBar('음성 인식 결과를 처리할 수 없습니다.');
       }
     } catch (e) {
@@ -175,6 +203,7 @@ class _RecordScreenState extends State<RecordScreen> {
       setState(() {
         _isRecording = false;
         _recordingPath = null;
+        _currentRecognizedText = ''; // 실시간 텍스트 초기화
       });
       _showSuccessSnackBar('음성 인식이 취소되었습니다.');
     } catch (e) {
@@ -295,12 +324,14 @@ class _RecordScreenState extends State<RecordScreen> {
         ActionHandler.handleAction(aiResponse.action!, context);
       }
 
-      // TTS로 음성 응답 재생
+      // TTS는 RecordService에서 자동으로 처리되므로 여기서는 하지 않음
       if (aiResponse.textResponse?.text != null) {
-        await _recordService.playRecording(null);
+        // AI 응답 성공 메시지
+        _showSuccessSnackBar('음성 인식 결과를 성공적으로 처리했습니다.');
+      } else {
+        // AI 응답 실패 메시지
+        _showErrorSnackBar('음성 인식 결과를 처리할 수 없습니다.');
       }
-
-      _showSuccessSnackBar('AI 처리가 완료되었습니다.');
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -431,6 +462,21 @@ class _RecordScreenState extends State<RecordScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
+
+              // 실시간 음성 인식 텍스트 표시
+              if (_isRecording && _currentRecognizedText.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  _currentRecognizedText,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+
               const SizedBox(height: 60),
 
               // 음성 인식 버튼들
@@ -502,114 +548,6 @@ class _RecordScreenState extends State<RecordScreen> {
                 ),
 
               const SizedBox(height: 60),
-
-              // 인식된 텍스트 표시
-              if (_recordService.recognizedText.isNotEmpty) ...[
-                const Text(
-                  '인식된 텍스트',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.text_fields,
-                            color: Color(0xFF6366f1),
-                            size: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            '인식된 내용',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _recordService.recognizedText,
-                        style: const TextStyle(fontSize: 14, height: 1.5),
-                      ),
-                      if (_recordService.aiResponseText.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const Divider(),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.smart_toy,
-                              color: Color(0xFF10b981),
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'AI 응답',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                                color: Color(0xFF10b981),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _recordService.aiResponseText,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            height: 1.5,
-                            color: Color(0xFF10b981),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            // AI 응답 재생 버튼
-                            IconButton(
-                              onPressed: () async {
-                                await _recordService.playRecording(null);
-                              },
-                              icon: const Icon(
-                                Icons.play_arrow,
-                                color: Color(0xFF10b981),
-                                size: 20,
-                              ),
-                            ),
-                            // AI 응답 공유 버튼
-                            IconButton(
-                              onPressed: () async {
-                                await Share.share(
-                                  _recordService.aiResponseText,
-                                  subject: 'AI 응답',
-                                );
-                              },
-                              icon: const Icon(
-                                Icons.share,
-                                color: Color(0xFF10b981),
-                                size: 20,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
         ),

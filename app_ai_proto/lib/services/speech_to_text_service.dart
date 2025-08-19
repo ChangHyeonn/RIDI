@@ -47,16 +47,24 @@ class SpeechToTextService {
             print('❌ Web 음성 인식 오류: ${error.errorMsg}');
             print('  - errorCode: ${error.errorMsg}');
 
-            // 타임아웃 오류에 대한 특별 처리
-            if (error.errorMsg == 'error_speech_timeout') {
-              print('⏰ Web 음성 인식 타임아웃 - 말하기 전에 시간이 초과되었습니다.');
-              _errorStreamController.add('음성 인식 타임아웃. 다시 시도해주세요.');
+            // 실제 오류인지 확인 (타임아웃이나 일시적 오류는 무시)
+            if (error.errorMsg == 'error_speech_timeout' ||
+                error.errorMsg == 'error_no_speech' ||
+                error.errorMsg == 'error_audio' ||
+                error.errorMsg == 'error_network') {
+              print('⚠️ Web 일시적 오류로 판단하여 무시: ${error.errorMsg}');
+              // 오류 스트림으로 전송하지 않음
             } else {
-              _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+              print('❌ Web 실제 오류로 판단하여 전송: ${error.errorMsg}');
+              if (!_errorStreamController.isClosed) {
+                _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+              }
             }
 
             _isListening = false;
-            _listeningStateController.add(false);
+            if (!_listeningStateController.isClosed) {
+              _listeningStateController.add(false);
+            }
           },
           onStatus: (status) {
             print('📊 Web 음성 인식 상태: $status');
@@ -64,7 +72,10 @@ class SpeechToTextService {
                 status == 'notListening' ||
                 status == 'error') {
               _isListening = false;
-              _listeningStateController.add(false);
+              // 스트림이 닫히지 않았을 때만 이벤트 추가
+              if (!_listeningStateController.isClosed) {
+                _listeningStateController.add(false);
+              }
             }
           },
           debugLogging: true, // Web에서는 디버그 로깅 활성화
@@ -78,16 +89,24 @@ class SpeechToTextService {
             print('  - permanent: ${error.permanent}');
             print('  - errorCode: ${error.errorMsg}');
 
-            // 타임아웃 오류에 대한 특별 처리
-            if (error.errorMsg == 'error_speech_timeout') {
-              print('⏰ 음성 인식 타임아웃 - 말하기 전에 시간이 초과되었습니다.');
-              _errorStreamController.add('음성 인식 타임아웃. 다시 시도해주세요.');
+            // 실제 오류인지 확인 (타임아웃이나 일시적 오류는 무시)
+            if (error.errorMsg == 'error_speech_timeout' ||
+                error.errorMsg == 'error_no_speech' ||
+                error.errorMsg == 'error_audio' ||
+                error.errorMsg == 'error_network') {
+              print('⚠️ 모바일 일시적 오류로 판단하여 무시: ${error.errorMsg}');
+              // 오류 스트림으로 전송하지 않음
             } else {
-              _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+              print('❌ 모바일 실제 오류로 판단하여 전송: ${error.errorMsg}');
+              if (!_errorStreamController.isClosed) {
+                _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+              }
             }
 
             _isListening = false;
-            _listeningStateController.add(false);
+            if (!_listeningStateController.isClosed) {
+              _listeningStateController.add(false);
+            }
           },
           onStatus: (status) {
             print('📊 음성 인식 상태 변경: $status');
@@ -96,7 +115,10 @@ class SpeechToTextService {
                 status == 'error') {
               print('🛑 음성 인식 상태 종료: $status');
               _isListening = false;
-              _listeningStateController.add(false);
+              // 스트림이 닫히지 않았을 때만 이벤트 추가
+              if (!_listeningStateController.isClosed) {
+                _listeningStateController.add(false);
+              }
             }
           },
           debugLogging: kDebugMode,
@@ -213,9 +235,25 @@ class SpeechToTextService {
       bool available = await _speech.initialize(
         onError: (error) {
           print('❌ 음성 인식 오류: ${error.errorMsg}');
-          _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+
+          // 실제 오류인지 확인 (타임아웃이나 일시적 오류는 무시)
+          if (error.errorMsg == 'error_speech_timeout' ||
+              error.errorMsg == 'error_no_speech' ||
+              error.errorMsg == 'error_audio' ||
+              error.errorMsg == 'error_network') {
+            print('⚠️ 일시적 오류로 판단하여 무시: ${error.errorMsg}');
+            // 오류 스트림으로 전송하지 않음
+          } else {
+            print('❌ 실제 오류로 판단하여 전송: ${error.errorMsg}');
+            if (!_errorStreamController.isClosed) {
+              _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+            }
+          }
+
           _isListening = false;
-          _listeningStateController.add(false);
+          if (!_listeningStateController.isClosed) {
+            _listeningStateController.add(false);
+          }
         },
         onStatus: (status) {
           print('📊 음성 인식 상태: $status');
@@ -223,7 +261,10 @@ class SpeechToTextService {
               status == 'notListening' ||
               status == 'error') {
             _isListening = false;
-            _listeningStateController.add(false);
+            // 스트림이 닫히지 않았을 때만 이벤트 추가
+            if (!_listeningStateController.isClosed) {
+              _listeningStateController.add(false);
+            }
           }
         },
       );
@@ -243,20 +284,23 @@ class SpeechToTextService {
             );
             _currentWords = result.recognizedWords;
 
-            // 최종 결과만 스트림으로 전송 (중간 결과는 무시)
+            // 실시간 텍스트 표시를 위해 중간 결과도 스트림으로 전송
+            if (result.recognizedWords.isNotEmpty) {
+              print('🔄 실시간 텍스트 전송: "${result.recognizedWords}"');
+              _textStreamController.add(result.recognizedWords);
+            }
+
+            // 최종 결과 저장
             if (result.finalResult) {
               _lastWords = result.recognizedWords;
-              print('✅ 최종 결과 전송: "$_lastWords"');
-              _textStreamController.add(_lastWords);
-            } else {
-              print('⏳ 중간 결과 무시: "${result.recognizedWords}"');
+              print('✅ 최종 결과 저장: "$_lastWords"');
             }
           },
           onSoundLevelChange: (level) {
             print('🔊 소리 레벨: $level');
           },
-          listenFor: const Duration(seconds: 30),
-          pauseFor: const Duration(seconds: 30), // audio_app2와 동일하게 30초
+          listenFor: const Duration(seconds: 60), // 60초로 늘림
+          pauseFor: const Duration(seconds: 60), // 60초로 늘림
         );
 
         _isListening = true;

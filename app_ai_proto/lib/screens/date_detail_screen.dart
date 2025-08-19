@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
 import '../models/task.dart';
+import '../constants/categories.dart';
 import 'edit_task_screen.dart';
 
 class DateDetailScreen extends StatefulWidget {
@@ -178,34 +179,85 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  // 중요도 표시
-                                  if (task.isImportant) ...[
-                                    Icon(
-                                      Icons.star,
-                                      color: const Color(0xFFfbbf24),
-                                      size: 20 * scaleFactor,
+                                  // 카테고리 아이콘과 텍스트
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
                                     ),
-                                    const SizedBox(width: 8),
-                                  ],
-                                  // 일정 제목
-                                  Expanded(
-                                    child: Text(
-                                      task.title,
-                                      style: TextStyle(
-                                        color: const Color(0xFF1f2937),
-                                        fontSize: 20 * scaleFactor,
-                                        fontWeight: FontWeight.bold,
+                                    decoration: BoxDecoration(
+                                      color: Color(
+                                        TaskCategories.getCategoryColor(
+                                          task.category,
+                                        ),
                                       ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          TaskCategories.getCategoryIcon(
+                                            task.category,
+                                          ),
+                                          style: TextStyle(
+                                            fontSize: 14 * scaleFactor,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          TaskCategories.getCategoryInfo(
+                                                task.category,
+                                              )?['name'] ??
+                                              task.category,
+                                          style: TextStyle(
+                                            fontSize: 12 * scaleFactor,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  // 시간 표시
-                                  Text(
-                                    _formatTime(task.date),
-                                    style: TextStyle(
-                                      color: const Color(0xFF6b7280),
-                                      fontSize: 18 * scaleFactor,
-                                      fontWeight: FontWeight.w600,
+                                  const SizedBox(width: 12),
+                                  // 일정 제목
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          task.title,
+                                          style: TextStyle(
+                                            color: const Color(0xFF1f2937),
+                                            fontSize: 20 * scaleFactor,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            // 중요도 표시
+                                            if (task.isImportant) ...[
+                                              Icon(
+                                                Icons.star,
+                                                color: const Color(0xFFfbbf24),
+                                                size: 16 * scaleFactor,
+                                              ),
+                                              const SizedBox(width: 4),
+                                            ],
+                                            // 시간 표시
+                                            Text(
+                                              _formatTime(task.date),
+                                              style: TextStyle(
+                                                color: const Color(0xFF6b7280),
+                                                fontSize: 14 * scaleFactor,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
