@@ -31,11 +31,16 @@ class AddScheduleUseCase:
     def execute(self, user_id: str, schedule_info: Dict[str, Any]) -> AddScheduleResult:
         """일정 추가 실행"""
         try:
+            # AI_02 스타일 로그: 입력 정보 로깅
+            self.logger.info(f"Schedule add request: user={user_id}, info={schedule_info}")
+            
             # 1. 필수 정보 검증
             if not schedule_info.get('title'):
+                self.logger.warning("Schedule add failed: missing title")
                 return AddScheduleResult(False, error_message="일정 제목이 필요합니다.")
             
             if not schedule_info.get('date') or not schedule_info.get('time'):
+                self.logger.warning("Schedule add failed: missing date/time")
                 return AddScheduleResult(False, error_message="일정 날짜와 시간이 필요합니다.")
             
             # 2. 날짜/시간 파싱
@@ -60,8 +65,14 @@ class AddScheduleUseCase:
                 description=schedule_info.get('description')
             )
             
+            # AI_02 스타일 로그: 일정 생성 완료
+            self.logger.info(f"Schedule entity created: {schedule.title} at {start_datetime}")
+            
             # 4. 저장
             saved_schedule = self.schedule_repository.save(schedule)
+            
+            # AI_02 스타일 로그: 저장 완료
+            self.logger.info(f"Schedule saved to repository: {saved_schedule.title} (ID: {saved_schedule.id})")
             
             # 5. 결과 반환
             schedule_data = {
@@ -74,6 +85,7 @@ class AddScheduleUseCase:
                 'description': saved_schedule.description
             }
             
+            # AI_02 스타일 로그: 최종 성공
             self.logger.info(f"Schedule added successfully: {saved_schedule.title}")
             return AddScheduleResult(True, schedule_data=schedule_data)
             
