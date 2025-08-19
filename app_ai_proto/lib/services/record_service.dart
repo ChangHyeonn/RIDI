@@ -316,12 +316,21 @@ class RecordService {
         if (aiResponse.processingResult != null) {
           print('🎯 처리 결과 처리 시작: ${aiResponse.processingResult!.action}');
           await _handleProcessingResult(aiResponse.processingResult!);
+        } else {
+          // 구형 응답 구조 처리 (action + text_response)
+          print('🔄 구형 응답 구조 감지 - 호환성 처리 시작');
+          await _handleLegacyResponse(aiResponse);
         }
 
         // 2. 텍스트 응답 처리 및 TTS 재생
-        if (aiResponse.responseText != null &&
-            aiResponse.responseText!.isNotEmpty) {
-          _aiResponseText = aiResponse.responseText!;
+        String? responseText = aiResponse.responseText;
+        if (responseText == null || responseText.isEmpty) {
+          // 구형 구조에서 text_response 추출
+          responseText = _extractLegacyResponseText(aiResponse);
+        }
+
+        if (responseText != null && responseText.isNotEmpty) {
+          _aiResponseText = responseText;
           _aiResponseStreamController.add(_aiResponseText);
           print('✅ AI 텍스트 응답: "$_aiResponseText"');
 
@@ -1090,7 +1099,7 @@ class RecordService {
     return true;
   }
 
-  // APP_INTEGRATION_GUIDE에 따른 에러 응답 처리
+  // AI_03 구형 에러 응답 처리
   Future<void> _handleErrorResponse(AIResponse aiResponse) async {
     try {
       print('🚨 === 에러 응답 처리 시작 ===');
@@ -1099,7 +1108,31 @@ class RecordService {
       String errorType = 'general';
       String errorMessage = '음성 인식 결과를 처리할 수 없습니다.';
 
-      // 새로운 에러 응답 구조 확인 (APP_INTEGRATION_GUIDE 참조)
+      // AI_03 구형 에러 구조 처리 (action + text_response)
+      if (aiResponse.action != null && aiResponse.action!.type == 'error') {
+        print('🔍 AI_03 구형 에러 구조 감지');
+
+        final actionData = aiResponse.action!.data;
+        if (actionData.containsKey('error_type')) {
+          errorType = actionData['error_type'] ?? 'general';
+        }
+        if (actionData.containsKey('message')) {
+          errorMessage = actionData['message'] ?? errorMessage;
+        }
+
+        print('🔍 action.data에서 추출:');
+        print('  - error_type: $errorType');
+        print('  - message: $errorMessage');
+      }
+
+      // text_response에서 메시지 추출 (AI_03 구조)
+      if (aiResponse.textResponse != null &&
+          aiResponse.textResponse!.text.isNotEmpty) {
+        errorMessage = aiResponse.textResponse!.text;
+        print('🔍 text_response에서 추출: $errorMessage');
+      }
+
+      // 신형 구조도 확인 (APP_INTEGRATION_GUIDE 참조)
       if (aiResponse.processingResult != null) {
         final result = aiResponse.processingResult!.result;
         if (result.containsKey('error_type')) {
@@ -1116,8 +1149,8 @@ class RecordService {
         errorMessage = aiResponse.responseText!;
       }
 
-      print('🚨 에러 타입: $errorType');
-      print('🚨 에러 메시지: $errorMessage');
+      print('🚨 최종 에러 타입: $errorType');
+      print('🚨 최종 에러 메시지: $errorMessage');
 
       // 에러 타입별 처리
       await _processErrorByType(errorType, errorMessage);
@@ -1286,6 +1319,47 @@ class RecordService {
       print('✅ 에러 메시지 TTS 재생 완료');
     } catch (ttsError) {
       print('❌ 에러 메시지 TTS 재생 실패: $ttsError');
+    }
+  }
+
+  // 구형 응답 구조 처리 (action + text_response)
+  Future<void> _handleLegacyResponse(AIResponse aiResponse) async {
+    try {
+      print('🔄 === 구형 응답 구조 처리 시작 ===');
+
+      // AIResponse에서 action 정보 추출 시도
+      if (aiResponse.action != null) {
+        print('🎯 구형 action 처리: ${aiResponse.action!.type}');
+        await _handleAIAction(aiResponse.action!);
+      } else {
+        print('⚠️ 구형 action이 없습니다');
+      }
+
+      print('✅ 구형 응답 구조 처리 완료');
+    } catch (e) {
+      print('❌ 구형 응답 구조 처리 중 오류: $e');
+    }
+  }
+
+  // 구형 구조에서 텍스트 응답 추출
+  String? _extractLegacyResponseText(AIResponse aiResponse) {
+    try {
+      print('🔄 구형 텍스트 응답 추출 시도');
+
+      // text_response에서 텍스트 추출
+      if (aiResponse.textResponse != null &&
+          aiResponse.textResponse!.text.isNotEmpty) {
+        print(
+          '✅ 구형 text_response에서 텍스트 추출: "${aiResponse.textResponse!.text}"',
+        );
+        return aiResponse.textResponse!.text;
+      }
+
+      print('⚠️ 구형 text_response가 없거나 비어있습니다');
+      return null;
+    } catch (e) {
+      print('❌ 구형 텍스트 응답 추출 중 오류: $e');
+      return null;
     }
   }
 

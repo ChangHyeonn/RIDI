@@ -6,6 +6,10 @@ class AIResponse {
   final double? processingTime;
   final String timestamp;
 
+  // 구형 응답 구조 호환성을 위한 필드들
+  final AIAction? action;
+  final TextResponse? textResponse;
+
   AIResponse({
     required this.success,
     this.userText,
@@ -13,6 +17,8 @@ class AIResponse {
     this.responseText,
     this.processingTime,
     required this.timestamp,
+    this.action,
+    this.textResponse,
   });
 
   factory AIResponse.fromJson(Map<String, dynamic> json) {
@@ -39,6 +45,20 @@ class AIResponse {
     final timestamp = json['timestamp'] ?? '';
     print('🔍 timestamp: $timestamp');
 
+    // 구형 응답 구조 처리 (action + text_response)
+    AIAction? action;
+    TextResponse? textResponse;
+
+    if (json.containsKey('action')) {
+      print('🔍 구형 action 발견');
+      action = AIAction.fromJson(json['action']);
+    }
+
+    if (json.containsKey('text_response')) {
+      print('🔍 구형 text_response 발견');
+      textResponse = TextResponse.fromJson(json['text_response']);
+    }
+
     final response = AIResponse(
       success: success,
       userText: userText,
@@ -46,6 +66,8 @@ class AIResponse {
       responseText: responseText,
       processingTime: processingTime,
       timestamp: timestamp,
+      action: action,
+      textResponse: textResponse,
     );
 
     print('🔍 AIResponse 생성 완료 - success: ${response.success}');

@@ -36,9 +36,12 @@ class TextToSpeechService {
       if (kIsWeb) {
         print('🌐 Web 환경 TTS 설정');
         await _flutterTts.setLanguage('ko-KR');
-        await _flutterTts.setSpeechRate(0.5);
+        await _flutterTts.setSpeechRate(0.7); // 조금 더 빠르게
         await _flutterTts.setVolume(1.0);
-        await _flutterTts.setPitch(1.0);
+        await _flutterTts.setPitch(0.9); // 조금 더 낮은 톤
+        
+        // Web 환경에서 한국어 음성 설정 시도
+        await _trySetKoreanVoice();
       } else {
         print('📱 모바일 환경 TTS 설정');
 
@@ -49,9 +52,12 @@ class TextToSpeechService {
         }
 
         await _flutterTts.setLanguage('ko-KR');
-        await _flutterTts.setSpeechRate(0.5); // 0.0 ~ 1.0
+        await _flutterTts.setSpeechRate(0.7); // 0.0 ~ 1.0 (조금 더 빠르게)
         await _flutterTts.setVolume(1.0); // 0.0 ~ 1.0
-        await _flutterTts.setPitch(1.0); // 0.5 ~ 2.0
+        await _flutterTts.setPitch(0.9); // 0.5 ~ 2.0 (조금 더 낮은 톤)
+        
+        // 모바일 환경에서 한국어 음성 설정 시도
+        await _trySetKoreanVoice();
       }
 
       // 콜백 설정
@@ -211,27 +217,81 @@ class TextToSpeechService {
     try {
       if (language != null) {
         await _flutterTts.setLanguage(language);
-        print('언어 설정: $language');
+        print('🎤 언어 설정: $language');
       }
 
       if (speechRate != null) {
         await _flutterTts.setSpeechRate(speechRate);
-        print('속도 설정: $speechRate');
+        print('⚡ 속도 설정: $speechRate');
       }
 
       if (volume != null) {
         await _flutterTts.setVolume(volume);
-        print('볼륨 설정: $volume');
+        print('🔊 볼륨 설정: $volume');
       }
 
       if (pitch != null) {
         await _flutterTts.setPitch(pitch);
-        print('피치 설정: $pitch');
+        print('🎵 피치 설정: $pitch');
       }
     } catch (e) {
-      print('음성 설정 변경 중 오류: $e');
+      print('❌ 음성 설정 변경 중 오류: $e');
       _errorStreamController.add('음성 설정 변경 오류: $e');
     }
+  }
+
+  // 빠른 속도 설정 (편의 메서드)
+  Future<void> setSpeechSpeed({required String speed}) async {
+    double rate;
+    switch (speed.toLowerCase()) {
+      case 'very_slow':
+        rate = 0.3;
+        break;
+      case 'slow':
+        rate = 0.5;
+        break;
+      case 'normal':
+        rate = 0.7;
+        break;
+      case 'fast':
+        rate = 0.9;
+        break;
+      case 'very_fast':
+        rate = 1.0;
+        break;
+      default:
+        rate = 0.7;
+    }
+    
+    await setVoiceSettings(speechRate: rate);
+    print('🏃 TTS 속도 변경: $speed (${rate})');
+  }
+
+  // 음성 톤 설정 (편의 메서드)
+  Future<void> setVoiceTone({required String tone}) async {
+    double pitch;
+    switch (tone.toLowerCase()) {
+      case 'very_low':
+        pitch = 0.6;
+        break;
+      case 'low':
+        pitch = 0.8;
+        break;
+      case 'normal':
+        pitch = 1.0;
+        break;
+      case 'high':
+        pitch = 1.2;
+        break;
+      case 'very_high':
+        pitch = 1.4;
+        break;
+      default:
+        pitch = 0.9;
+    }
+    
+    await setVoiceSettings(pitch: pitch);
+    print('🎵 TTS 톤 변경: $tone (${pitch})');
   }
 
   // 사용 가능한 언어 목록 가져오기
@@ -256,6 +316,43 @@ class TextToSpeechService {
     }
   }
 
+  // 한국어 음성 설정 시도
+  Future<void> _trySetKoreanVoice() async {
+    try {
+      print('🎤 한국어 음성 설정 시도');
+      
+      final voices = await getAvailableVoices();
+      print('🎤 사용 가능한 음성 수: ${voices.length}');
+      
+      // 한국어 음성 찾기
+      Map<String, String>? koreanVoice;
+      
+      for (final voice in voices) {
+        final name = voice['name'] ?? '';
+        final locale = voice['locale'] ?? '';
+        
+        print('🎤 음성: $name (로케일: $locale)');
+        
+        // 한국어 음성 우선순위
+        if (locale.startsWith('ko') || name.toLowerCase().contains('korean')) {
+          koreanVoice = voice;
+          print('✅ 한국어 음성 발견: $name');
+          break;
+        }
+      }
+      
+      // 한국어 음성 설정
+      if (koreanVoice != null) {
+        await _flutterTts.setVoice(koreanVoice);
+        print('✅ 한국어 음성 설정 완료: ${koreanVoice['name']}');
+      } else {
+        print('⚠️ 한국어 음성을 찾을 수 없어 기본 설정 사용');
+      }
+    } catch (e) {
+      print('❌ 한국어 음성 설정 중 오류: $e');
+    }
+  }
+
   // 현재 설정 가져오기 (Flutter TTS에서는 getter를 지원하지 않음)
   Future<Map<String, dynamic>> getCurrentSettings() async {
     try {
@@ -263,9 +360,9 @@ class TextToSpeechService {
       // 설정 시 저장한 값들을 반환하거나 기본값 반환
       return {
         'language': 'ko-KR',
-        'speechRate': 0.5,
+        'speechRate': 0.7,
         'volume': 1.0,
-        'pitch': 1.0,
+        'pitch': 0.9,
       };
     } catch (e) {
       print('현재 설정 가져오기 오류: $e');
