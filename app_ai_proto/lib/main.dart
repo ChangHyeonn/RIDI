@@ -54,3 +54,17 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+
+class PatchedAppFallback extends StatelessWidget {
+  const PatchedAppFallback({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: const Scaffold(
+        body: Center(child: Text('🏁 Flutter iOS 초기화 완료 — 화면 구성 대기 중')),
+      ),
+    );
+  }
+}
