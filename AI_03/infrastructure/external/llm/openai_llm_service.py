@@ -36,12 +36,21 @@ class OpenAILLMService(ILLMService):
             prompt = self._get_intent_prompt(text)
             response = self._chat_completion(prompt, max_tokens=200)
             
+            # AI_02 스타일 로그: LLM 응답 로깅
+            self.logger.debug(f"LLM intent response: {response}")
+            
             # JSON 파싱
             try:
                 analysis_data = json.loads(response)
+                intent_category = analysis_data.get('intent', 'other')
+                confidence = analysis_data.get('confidence', 0.5)
+                
+                # AI_02 스타일 로그: 분석 결과
+                self.logger.info(f"LLM intent analysis: {text} -> {intent_category} (confidence: {confidence})")
+                
                 return IntentAnalysis(
-                    category=analysis_data.get('intent', 'other'),
-                    confidence=analysis_data.get('confidence', 0.5),
+                    category=intent_category,
+                    confidence=confidence,
                     extracted_info={},
                     raw_analysis=response
                 )
@@ -69,9 +78,17 @@ class OpenAILLMService(ILLMService):
             prompt = self._get_extraction_prompt(text)
             response = self._chat_completion(prompt, max_tokens=300)
             
+            # AI_02 스타일 로그: LLM 응답 로깅
+            self.logger.debug(f"LLM extraction response: {response}")
+            
             # JSON 파싱
             try:
-                return json.loads(response)
+                schedule_info = json.loads(response)
+                
+                # AI_02 스타일 로그: 추출 결과
+                self.logger.info(f"LLM schedule extraction: {text} -> {schedule_info}")
+                
+                return schedule_info
             except json.JSONDecodeError:
                 self.logger.warning(f"Failed to parse schedule info: {response}")
                 return {}

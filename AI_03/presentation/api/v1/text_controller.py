@@ -216,6 +216,9 @@ def process_text():
                 error="텍스트와 사용자 ID가 필요합니다."
             ).to_dict()), 400
         
+        # AI_02 스타일 로그: 요청 수신
+        logger.info(f"Text processing request received: '{request_dto.text}' from user: {request_dto.user_id}")
+        
         # 2. Use Case 실행
         use_case = container.get(ProcessTextUseCase)
         text_request = TextRequest(
@@ -225,11 +228,21 @@ def process_text():
         
         result = use_case.execute(text_request)
         
+        # AI_02 스타일 로그: 처리 완료
+        if result.success:
+            logger.info(f"Text processing completed: {result.action_type} -> {result.response_text[:50]}...")
+        else:
+            logger.error(f"Text processing failed: {result.error_message}")
+        
         # 3. AI_02 호환 응답 생성
         if result.success:
-            return _create_ai02_response(result)
+            response = _create_ai02_response(result)
+            logger.info(f"Response sent: {result.action_type} action with text: '{result.response_text[:30]}...'")
+            return response
         else:
-            return _create_ai02_error_response(result)
+            response = _create_ai02_error_response(result)
+            logger.error(f"Error response sent: {result.error_message}")
+            return response
             
     except Exception as e:
         logger.error(f"Text processing API error: {e}")

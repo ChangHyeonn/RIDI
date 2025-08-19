@@ -43,12 +43,21 @@ class ProcessTextUseCase:
             
             # 2. 의도 분석
             intent = self.llm_service.analyze_intent(request.text)
+            
+            # AI_02 스타일 로그: Intent Classification
+            self.logger.info(f"Intent classified: {request.text} -> {intent.category}")
             self.logger.info(f"Intent analyzed: {intent.category} (confidence: {intent.confidence})")
             
             # 3. 일정 관련 요청의 경우 정보 추출
             if intent.category == "schedule_add":
                 schedule_info = self.llm_service.extract_schedule_info(request.text)
+                
+                # AI_02 스타일 로그: Information Extraction
+                self.logger.info(f"Information extracted: {schedule_info}")
+                
                 if schedule_info.get('title'):  # 제목이 있으면 처리
+                    # AI_02 스타일 로그: Request Analysis
+                    self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
                     return self._handle_schedule_add_with_info(request, schedule_info, start_time)
                 else:
                     return self._create_error_result(
@@ -56,10 +65,16 @@ class ProcessTextUseCase:
                         time.time() - start_time
                     )
             elif intent.category == "schedule_read":
+                # AI_02 스타일 로그: Request Analysis
+                self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
                 return self._handle_schedule_read(request, intent, start_time)
             elif intent.category == "schedule_delete":
+                # AI_02 스타일 로그: Request Analysis
+                self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
                 return self._handle_schedule_delete(request, intent, start_time)
             else:
+                # AI_02 스타일 로그: Request Analysis
+                self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
                 return self._handle_general_conversation(request, intent, start_time)
                 
         except Exception as e:
