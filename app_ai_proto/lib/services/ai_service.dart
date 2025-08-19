@@ -78,14 +78,12 @@ class AIService {
         print('=== AI 응답 분석 ===');
         print('응답 성공 여부: ${aiResponse.success}');
         print('응답 타임스탬프: ${aiResponse.timestamp}');
-        if (aiResponse.action != null) {
-          print('액션 타입: ${aiResponse.action!.type}');
-          print('액션 우선순위: ${aiResponse.action!.priority}');
-          print('액션 데이터: ${aiResponse.action!.data}');
+        if (aiResponse.processingResult != null) {
+          print('처리 결과 액션: ${aiResponse.processingResult!.action}');
+          print('처리 결과 데이터: ${aiResponse.processingResult!.result}');
         }
-        if (aiResponse.textResponse != null) {
-          print('텍스트 응답: ${aiResponse.textResponse!.text}');
-          print('자동 표시: ${aiResponse.textResponse!.displayAutomatically}');
+        if (aiResponse.responseText != null) {
+          print('응답 텍스트: ${aiResponse.responseText}');
         }
         print('====================');
 
@@ -118,14 +116,14 @@ class AIService {
     print('처리할 텍스트: $text');
 
     try {
-      // 서버 연결 상태 먼저 확인
-      print('서버 연결 상태 확인 중...');
-      final isConnected = await testConnection();
-      if (!isConnected) {
-        print('❌ 서버 연결 실패 - 서버가 실행 중인지 확인하세요');
-        throw Exception('AI 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.');
-      }
-      print('✅ 서버 연결 성공');
+      // 서버 연결 확인 임시 비활성화 (디버깅용)
+      print('⚠️ 서버 연결 사전 확인 건너뜀 (디버깅)');
+      // final isConnected = await testConnection();
+      // if (!isConnected) {
+      //   print('❌ 서버 연결 실패 - 서버가 실행 중인지 확인하세요');
+      //   throw Exception('AI 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.');
+      // }
+      // print('✅ 서버 연결 성공');
 
       final requestBody = {
         'text': text,
@@ -137,6 +135,10 @@ class AIService {
       print('요청 데이터: $requestBody');
 
       print('📡 서버에 요청 전송 중...');
+      print('📡 요청 URL: $baseUrl/api/v1/process_text');
+      print('📡 요청 헤더: {"Content-Type": "application/json"}');
+      print('📡 요청 본문: ${json.encode(requestBody)}');
+
       final startTime = DateTime.now();
       final response = await http
           .post(
@@ -155,31 +157,38 @@ class AIService {
 
       var responseData = response.body;
       print('📄 응답 데이터 크기: ${responseData.length} bytes');
-      print('📄 응답 데이터: $responseData');
+      print('📄 원본 응답 데이터:');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print(responseData);
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       // 200(성공)과 400(오류) 모두 정상적인 응답으로 처리
       if (response.statusCode == 200 || response.statusCode == 400) {
         print('✅ 서버 응답 성공');
         print('📊 응답 상태 코드: ${response.statusCode}');
-        print('📄 응답 데이터: $responseData');
 
         try {
-          final aiResponse = AIResponse.fromJson(json.decode(responseData));
+          print('🔍 JSON 파싱 시작...');
+          final jsonData = json.decode(responseData);
+          print('🔍 JSON 파싱 완료');
+          print('📋 파싱된 JSON 구조:');
+          print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          _printJsonStructure(jsonData, 0);
+          print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          final aiResponse = AIResponse.fromJson(jsonData);
           print('🤖 === AI 응답 분석 ===');
           print('✅ 응답 성공 여부: ${aiResponse.success}');
           print('⏰ 응답 타임스탬프: ${aiResponse.timestamp}');
 
-          if (aiResponse.action != null) {
-            print('🎯 액션 정보:');
-            print('   타입: ${aiResponse.action!.type}');
-            print('   우선순위: ${aiResponse.action!.priority}');
-            print('   데이터: ${aiResponse.action!.data}');
+          if (aiResponse.processingResult != null) {
+            print('🎯 처리 결과 정보:');
+            print('   액션: ${aiResponse.processingResult!.action}');
+            print('   결과: ${aiResponse.processingResult!.result}');
           }
 
-          if (aiResponse.textResponse != null) {
-            print('🔊 텍스트 응답 정보:');
-            print('   텍스트: ${aiResponse.textResponse!.text}');
-            print('   자동 표시: ${aiResponse.textResponse!.displayAutomatically}');
+          if (aiResponse.responseText != null) {
+            print('🔊 응답 텍스트 정보:');
+            print('   텍스트: ${aiResponse.responseText}');
           }
 
           print('⏰ AI 처리 완료 시간: ${DateTime.now().toIso8601String()}');
@@ -414,6 +423,29 @@ class AIService {
         'message': '서버 정보 조회 실패',
         'details': e.toString(),
       };
+    }
+  }
+
+  // JSON 구조를 보기 좋게 출력하는 헬퍼 메서드
+  static void _printJsonStructure(dynamic data, int indent) {
+    final indentStr = '  ' * indent;
+
+    if (data is Map) {
+      data.forEach((key, value) {
+        if (value is Map || value is List) {
+          print('$indentStr$key:');
+          _printJsonStructure(value, indent + 1);
+        } else {
+          print('$indentStr$key: $value');
+        }
+      });
+    } else if (data is List) {
+      for (int i = 0; i < data.length; i++) {
+        print('$indentStr[$i]:');
+        _printJsonStructure(data[i], indent + 1);
+      }
+    } else {
+      print('$indentStr$data');
     }
   }
 }

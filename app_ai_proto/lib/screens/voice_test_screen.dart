@@ -325,7 +325,7 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _lastAIResponse!.textResponse?.text ?? '응답 없음',
+                              _lastAIResponse!.responseText ?? '응답 없음',
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             if (_isSpeaking) ...[

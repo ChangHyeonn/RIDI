@@ -1,25 +1,86 @@
 class AIResponse {
   final bool success;
-  final AIAction? action;
-  final TextResponse? textResponse; // voiceResponse를 textResponse로 변경
+  final String? userText;
+  final ProcessingResult? processingResult;
+  final String? responseText;
+  final double? processingTime;
   final String timestamp;
 
   AIResponse({
     required this.success,
-    this.action,
-    this.textResponse,
+    this.userText,
+    this.processingResult,
+    this.responseText,
+    this.processingTime,
     required this.timestamp,
   });
 
   factory AIResponse.fromJson(Map<String, dynamic> json) {
-    return AIResponse(
-      success: json['success'] ?? false,
-      action: json['action'] != null ? AIAction.fromJson(json['action']) : null,
-      textResponse: json['text_response'] != null
-          ? TextResponse.fromJson(json['text_response'])
-          : null,
-      timestamp: json['timestamp'] ?? '',
+    print('🔍 AIResponse.fromJson 파싱 시작');
+    print('🔍 JSON 데이터: $json');
+
+    final success = json['success'] ?? false;
+    print('🔍 success 값: $success (타입: ${success.runtimeType})');
+
+    final userText = json['user_text'];
+    print('🔍 userText: $userText');
+
+    final processingResult = json['processing_result'] != null
+        ? ProcessingResult.fromJson(json['processing_result'])
+        : null;
+    print('🔍 processingResult 파싱 완료: ${processingResult?.action}');
+
+    final responseText = json['response_text'];
+    print('🔍 responseText: $responseText');
+
+    final processingTime = json['processing_time']?.toDouble();
+    print('🔍 processingTime: $processingTime');
+
+    final timestamp = json['timestamp'] ?? '';
+    print('🔍 timestamp: $timestamp');
+
+    final response = AIResponse(
+      success: success,
+      userText: userText,
+      processingResult: processingResult,
+      responseText: responseText,
+      processingTime: processingTime,
+      timestamp: timestamp,
     );
+
+    print('🔍 AIResponse 생성 완료 - success: ${response.success}');
+    return response;
+  }
+}
+
+class ProcessingResult {
+  final String action;
+  final Map<String, dynamic> result;
+
+  ProcessingResult({required this.action, required this.result});
+
+  factory ProcessingResult.fromJson(Map<String, dynamic> json) {
+    print('🔍 ProcessingResult.fromJson 시작');
+    print('🔍 JSON 데이터: $json');
+
+    final action = json['action'] ?? '';
+    final result = json['result'] ?? {};
+
+    print('🔍 action: $action');
+    print('🔍 result: $result');
+    print('🔍 result 타입: ${result.runtimeType}');
+
+    if (result is Map<String, dynamic>) {
+      print('🔍 result 키들: ${result.keys.toList()}');
+      if (result.containsKey('schedule_data')) {
+        print('🔍 schedule_data 발견: ${result['schedule_data']}');
+      }
+    }
+
+    final processingResult = ProcessingResult(action: action, result: result);
+
+    print('🔍 ProcessingResult 생성 완료 - action: ${processingResult.action}');
+    return processingResult;
   }
 }
 

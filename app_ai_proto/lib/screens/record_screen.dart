@@ -26,6 +26,9 @@ class _RecordScreenState extends State<RecordScreen> {
   String? _aiResponseText;
   String? _currentlyPlayingPath;
   String _currentRecognizedText = ''; // 실시간 음성 인식 텍스트
+  bool _isClarificationMode = false; // 명확화 모드 상태
+  String _pendingClarification = ''; // 대기 중인 명확화 요청
+  String _originalRequest = ''; // 원본 요청 텍스트
 
   @override
   void initState() {
@@ -73,6 +76,9 @@ class _RecordScreenState extends State<RecordScreen> {
           print('🤖 AI 응답: "$response"');
         });
 
+        // 명확화 모드 상태 업데이트
+        _updateClarificationMode();
+
         print('✅ 스트림 구독 설정 완료');
       } else {
         print('❌ RecordService 초기화 실패');
@@ -90,6 +96,15 @@ class _RecordScreenState extends State<RecordScreen> {
     } catch (e) {
       print('❌ RecordScreen 권한 초기화 중 오류: $e');
     }
+  }
+
+  // 명확화 모드 상태 업데이트
+  void _updateClarificationMode() {
+    setState(() {
+      _isClarificationMode = _recordService.isClarificationMode;
+      _pendingClarification = _recordService.pendingClarification;
+      _originalRequest = _recordService.originalRequest;
+    });
   }
 
   void _checkPlatformSupport() {
@@ -205,6 +220,17 @@ class _RecordScreenState extends State<RecordScreen> {
       _showSuccessSnackBar('음성 인식이 취소되었습니다.');
     } catch (e) {
       _showErrorSnackBar('음성 인식을 취소할 수 없습니다: $e');
+    }
+  }
+
+  // 명확화 모드 취소
+  Future<void> _cancelClarification() async {
+    try {
+      _recordService.exitClarificationMode();
+      _updateClarificationMode();
+      _showSuccessSnackBar('명확화 모드가 취소되었습니다.');
+    } catch (e) {
+      _showErrorSnackBar('명확화 모드를 취소할 수 없습니다: $e');
     }
   }
 
@@ -381,9 +407,67 @@ class _RecordScreenState extends State<RecordScreen> {
               ),
               const SizedBox(height: 40),
 
+              // 명확화 모드 표시
+              if (_isClarificationMode) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue),
+                  ),
+                  child: Column(
+                    children: [
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.help_outline,
+                            color: Colors.blue,
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            '추가 정보가 필요합니다',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (_originalRequest.isNotEmpty) ...[
+                        Text(
+                          '원래 요청: $_originalRequest',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      Text(
+                        _pendingClarification,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.black87,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               // 상태 텍스트
               Text(
-                _isProcessingAI
+                _isClarificationMode
+                    ? '추가 정보를 말씀해주세요'
+                    : _isProcessingAI
                     ? 'AI 처리 중...'
                     : _isRecording
                     ? '음성 인식 중...'
@@ -393,7 +477,9 @@ class _RecordScreenState extends State<RecordScreen> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: _isProcessingAI
+                  color: _isClarificationMode
+                      ? Colors.blue
+                      : _isProcessingAI
                       ? const Color(0xFF6366f1)
                       : _isRecording
                       ? Colors.red
@@ -460,15 +546,19 @@ class _RecordScreenState extends State<RecordScreen> {
                       ),
                     ),
 
-                    // 취소 버튼 (음성 인식 중일 때만 표시)
-                    if (_isRecording)
+                    // 취소 버튼 (음성 인식 중이거나 명확화 모드일 때 표시)
+                    if (_isRecording || _isClarificationMode)
                       GestureDetector(
-                        onTap: _cancelRecording,
+                        onTap: _isClarificationMode
+                            ? _cancelClarification
+                            : _cancelRecording,
                         child: Container(
                           width: 60,
                           height: 60,
                           decoration: BoxDecoration(
-                            color: Colors.grey[400],
+                            color: _isClarificationMode
+                                ? Colors.orange
+                                : Colors.grey[400],
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
@@ -478,8 +568,8 @@ class _RecordScreenState extends State<RecordScreen> {
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.close,
+                          child: Icon(
+                            _isClarificationMode ? Icons.cancel : Icons.close,
                             color: Colors.white,
                             size: 30,
                           ),

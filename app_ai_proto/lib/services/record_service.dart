@@ -25,6 +25,12 @@ class RecordService {
   String _lastProcessedText = ''; // 중복 처리 방지를 위한 변수
   DateTime? _recordingStartTime;
 
+  // 명확화 요청 관련 변수
+  bool _isClarificationMode = false; // 명확화 모드 여부
+  String _pendingClarification = ''; // 대기 중인 명확화 요청
+  String _originalRequest = ''; // 원본 요청 텍스트
+  int _clarificationCount = 0; // 명확화 요청 횟수 (무한 루프 방지)
+
   // 스트림 컨트롤러
   final StreamController<String> _textStreamController =
       StreamController<String>.broadcast();
@@ -40,6 +46,11 @@ class RecordService {
   String get recognizedText => _recognizedText;
   String get aiResponseText => _aiResponseText;
   DateTime? get recordingStartTime => _recordingStartTime;
+
+  // 명확화 요청 관련 getter
+  bool get isClarificationMode => _isClarificationMode;
+  String get pendingClarification => _pendingClarification;
+  String get originalRequest => _originalRequest;
 
   // Streams
   Stream<String> get textStream => _textStreamController.stream;
@@ -261,9 +272,19 @@ class RecordService {
       print('=== AI 처리 시작 ===');
       print('📝 처리할 텍스트: "$text"');
       print('📏 텍스트 길이: ${text.length}');
+      print('❓ 명확화 모드: $_isClarificationMode');
 
-      if (text.isEmpty) {
-        print('⚠️ 빈 텍스트는 처리하지 않습니다.');
+      // 텍스트 유효성 검증
+      if (!_isValidTextForAI(text)) {
+        print('⚠️ 유효하지 않은 텍스트는 AI로 전송하지 않습니다: "$text"');
+        _aiResponseStreamController.add('음성을 다시 말씀해주세요.');
+        return;
+      }
+
+      // 명확화 모드에서 추가 정보가 들어온 경우
+      if (_isClarificationMode) {
+        print('🔄 명확화 모드에서 추가 정보 처리');
+        await processClarificationResponse(text);
         return;
       }
 
@@ -291,21 +312,20 @@ class RecordService {
         // 가이드에 따른 응답 처리
         print('✅ AI 응답 성공');
 
-        // 1. 텍스트 응답 처리
-        if (aiResponse.textResponse?.text != null) {
-          _aiResponseText = aiResponse.textResponse!.text;
+        // 1. 처리 결과 처리 먼저 (일정 추가 등)
+        if (aiResponse.processingResult != null) {
+          print('🎯 처리 결과 처리 시작: ${aiResponse.processingResult!.action}');
+          await _handleProcessingResult(aiResponse.processingResult!);
+        }
+
+        // 2. 텍스트 응답 처리 및 TTS 재생
+        if (aiResponse.responseText != null &&
+            aiResponse.responseText!.isNotEmpty) {
+          _aiResponseText = aiResponse.responseText!;
           _aiResponseStreamController.add(_aiResponseText);
           print('✅ AI 텍스트 응답: "$_aiResponseText"');
-        }
 
-        // 2. 액션 처리 (가이드에 따른 UI 업데이트)
-        if (aiResponse.action != null) {
-          print('🎯 액션 처리 시작: ${aiResponse.action!.type}');
-          await _handleAIAction(aiResponse.action!);
-        }
-
-        // 3. TTS로 음성 재생 (한 번만)
-        if (_aiResponseText.isNotEmpty) {
+          // 3. TTS로 음성 재생 (한 번만)
           print('🔊 TTS 음성 재생 시작...');
           try {
             await _ttsService.speak(_aiResponseText);
@@ -313,25 +333,17 @@ class RecordService {
           } catch (ttsError) {
             print('❌ TTS 재생 실패: $ttsError');
           }
+        } else {
+          print('⚠️ AI 응답 텍스트가 없습니다');
         }
       } else {
         print('❌ AI 응답이 실패했습니다.');
         print('  - success: ${aiResponse.success}');
-        print('  - textResponse: ${aiResponse.textResponse?.text}');
+        print('  - responseText: ${aiResponse.responseText}');
         print('⚠️ AI 서버 실패했지만 STT 텍스트는 저장됨: "$text"');
 
-        // AI 서버 응답 실패 시 오류 메시지 설정
-        _aiResponseText = '음성 인식 결과를 처리할 수 없습니다.';
-        _aiResponseStreamController.add(_aiResponseText);
-
-        // TTS로 오류 메시지 재생
-        try {
-          print('🔊 오류 메시지 TTS 재생 시작...');
-          await _ttsService.speak(_aiResponseText);
-          print('✅ 오류 메시지 TTS 재생 완료');
-        } catch (ttsError) {
-          print('❌ TTS 재생 중 오류: $ttsError');
-        }
+        // APP_INTEGRATION_GUIDE에 따른 에러 처리
+        await _handleErrorResponse(aiResponse);
       }
     } catch (e) {
       print('❌ AI 처리 중 오류: $e');
@@ -357,6 +369,38 @@ class RecordService {
     _aiResponseStreamController.add('');
   }
 
+  // 처리 결과 처리 (가이드에 따른 구현)
+  Future<void> _handleProcessingResult(
+    ProcessingResult processingResult,
+  ) async {
+    try {
+      print('🎯 === 처리 결과 처리 시작 ===');
+      print('처리 액션: ${processingResult.action}');
+      print('처리 결과: ${processingResult.result}');
+
+      switch (processingResult.action) {
+        case 'schedule_add':
+          await _handleScheduleAddFromResult(processingResult.result);
+          break;
+        case 'schedule_read':
+          await _handleScheduleReadFromResult(processingResult.result);
+          break;
+        case 'schedule_delete':
+          await _handleScheduleDeleteFromResult(processingResult.result);
+          break;
+        case 'schedule_modify':
+          await _handleScheduleModifyFromResult(processingResult.result);
+          break;
+        default:
+          print('⚠️ 알 수 없는 처리 액션: ${processingResult.action}');
+      }
+
+      print('✅ 처리 결과 처리 완료');
+    } catch (e) {
+      print('❌ 처리 결과 처리 중 오류: $e');
+    }
+  }
+
   // AI 액션 처리 (가이드에 따른 구현)
   Future<void> _handleAIAction(AIAction action) async {
     try {
@@ -377,6 +421,9 @@ class RecordService {
         case 'schedule_modify':
           await _handleScheduleModify(action);
           break;
+        case 'clarification_required':
+          await _handleClarificationRequired(action);
+          break;
         default:
           print('⚠️ 알 수 없는 액션 타입: ${action.type}');
       }
@@ -384,6 +431,180 @@ class RecordService {
       print('✅ AI 액션 처리 완료');
     } catch (e) {
       print('❌ AI 액션 처리 중 오류: $e');
+    }
+  }
+
+  // 일정 추가 처리 (ProcessingResult용)
+  Future<void> _handleScheduleAddFromResult(Map<String, dynamic> result) async {
+    try {
+      print('📅 일정 추가 처리 시작 (ProcessingResult)');
+
+      // result에서 schedule_data 추출
+      final scheduleData = result['schedule_data'];
+      if (scheduleData != null && scheduleData is Map<String, dynamic>) {
+        await _processScheduleData(scheduleData);
+      } else {
+        print('⚠️ schedule_data가 없거나 올바르지 않습니다: $scheduleData');
+      }
+    } catch (e) {
+      print('❌ 일정 추가 처리 중 오류: $e');
+    }
+  }
+
+  // 일정 조회 처리 (ProcessingResult용)
+  Future<void> _handleScheduleReadFromResult(
+    Map<String, dynamic> result,
+  ) async {
+    try {
+      print('📅 일정 조회 처리 시작 (ProcessingResult)');
+      // 일정 조회 로직 구현
+      print('📋 조회 결과: $result');
+    } catch (e) {
+      print('❌ 일정 조회 처리 중 오류: $e');
+    }
+  }
+
+  // 일정 삭제 처리 (ProcessingResult용)
+  Future<void> _handleScheduleDeleteFromResult(
+    Map<String, dynamic> result,
+  ) async {
+    try {
+      print('📅 일정 삭제 처리 시작 (ProcessingResult)');
+      // 일정 삭제 로직 구현
+      print('📋 삭제 결과: $result');
+    } catch (e) {
+      print('❌ 일정 삭제 처리 중 오류: $e');
+    }
+  }
+
+  // 일정 수정 처리 (ProcessingResult용)
+  Future<void> _handleScheduleModifyFromResult(
+    Map<String, dynamic> result,
+  ) async {
+    try {
+      print('📅 일정 수정 처리 시작 (ProcessingResult)');
+      // 일정 수정 로직 구현
+      print('📋 수정 결과: $result');
+    } catch (e) {
+      print('❌ 일정 수정 처리 중 오류: $e');
+    }
+  }
+
+  // 일정 데이터 처리 (공통 로직)
+  Future<void> _processScheduleData(Map<String, dynamic> scheduleData) async {
+    try {
+      print('📋 일정 데이터: $scheduleData');
+      print('📋 일정 데이터 타입: ${scheduleData.runtimeType}');
+      print('📋 일정 데이터 키들: ${scheduleData.keys.toList()}');
+
+      // AI 서버 응답에서 일정 정보 파싱
+      final title = scheduleData['title'] ?? '새 일정';
+      final datetime =
+          scheduleData['datetime'] ?? DateTime.now().toIso8601String();
+      final description = scheduleData['description'] ?? '';
+
+      print('📋 파싱된 일정 정보:');
+      print('  - 제목: $title');
+      print('  - 날짜: $datetime');
+      print('  - 설명: $description');
+
+      // DateTime 파싱
+      DateTime? parsedDateTime;
+      try {
+        parsedDateTime = DateTime.parse(datetime);
+      } catch (e) {
+        print('⚠️ 날짜 파싱 실패, 현재 시간 사용: $e');
+        parsedDateTime = DateTime.now();
+      }
+
+      // 지난 시간 검증 (가이드 방식에 따른 체계적 에러 처리)
+      final now = DateTime.now();
+      if (parsedDateTime.isBefore(now)) {
+        print('❌ 지난 시간의 일정은 추가할 수 없습니다');
+        print('  - 일정 시간: $parsedDateTime');
+        print('  - 현재 시간: $now');
+        print('  - 차이: ${now.difference(parsedDateTime).inMinutes}분 전');
+
+        // 가이드 방식에 따른 체계적 에러 메시지 생성
+        String errorMessage;
+        final timeDifference = now.difference(parsedDateTime);
+
+        if (timeDifference.inDays > 0) {
+          errorMessage = '지난 날짜의 일정은 추가할 수 없습니다. 미래의 날짜를 말씀해주세요.';
+        } else if (timeDifference.inHours > 0) {
+          errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
+        } else if (timeDifference.inMinutes > 0) {
+          errorMessage = '방금 지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
+        } else {
+          errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
+        }
+
+        // 가이드 방식에 따른 에러 처리
+        print('🚫 가이드 방식 에러 처리: $errorMessage');
+        _aiResponseText = errorMessage;
+        _aiResponseStreamController.add(_aiResponseText);
+
+        // TTS로 오류 메시지 재생 (가이드의 음성 피드백 방식)
+        try {
+          print('🔊 지난 시간 오류 메시지 TTS 재생 시작...');
+          await _ttsService.speak(_aiResponseText);
+          print('✅ 지난 시간 오류 메시지 TTS 재생 완료');
+        } catch (ttsError) {
+          print('❌ 지난 시간 오류 메시지 TTS 재생 실패: $ttsError');
+        }
+
+        return; // 일정 추가 중단 (가이드의 success: false 방식과 유사)
+      }
+
+      print('✅ 일정 시간 검증 통과: $parsedDateTime (현재 시간: $now)');
+
+      // 서버에서 받은 카테고리와 중요도 정보 확인
+      print('🔍 원본 scheduleData: $scheduleData');
+      print('🔍 scheduleData 타입: ${scheduleData.runtimeType}');
+
+      // 서버에서 받은 카테고리 그대로 사용
+      String category = scheduleData['category'] ?? '일반';
+      final isImportant =
+          scheduleData['is_important'] == true ||
+          scheduleData['priority'] == 'high' ||
+          category == '건강';
+
+      print('📋 서버에서 받은 정보:');
+      print('  - 원본 category 값: ${scheduleData['category']}');
+      print('  - category 타입: ${scheduleData['category']?.runtimeType}');
+      print('  - 최종 카테고리: $category');
+      print('  - is_important: ${scheduleData['is_important']}');
+      print('  - priority: ${scheduleData['priority']}');
+      print('  - 최종 중요도: $isImportant');
+
+      // Task 객체 생성
+      final task = Task(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: title,
+        date: parsedDateTime,
+        isCompleted: false,
+        isImportant: isImportant,
+        category: category,
+      );
+
+      print('📋 생성된 Task 객체:');
+      print('  - ID: ${task.id}');
+      print('  - 제목: ${task.title}');
+      print('  - 날짜: ${task.date}');
+      print('  - 완료: ${task.isCompleted}');
+      print('  - 중요: ${task.isImportant}');
+      print('  - 카테고리: ${task.category}');
+
+      // TaskProvider를 통해 일정 추가
+      final taskProvider = _getTaskProvider();
+      if (taskProvider != null) {
+        taskProvider.addTask(task);
+        print('✅ TaskProvider를 통해 일정 추가 완료');
+      } else {
+        print('❌ TaskProvider를 찾을 수 없습니다');
+      }
+    } catch (e) {
+      print('❌ 일정 데이터 처리 중 오류: $e');
     }
   }
 
@@ -420,6 +641,45 @@ class RecordService {
           } catch (e) {
             print('⚠️ 날짜 파싱 실패, 현재 시간 사용: $e');
             parsedDateTime = DateTime.now();
+          }
+
+          // 지난 시간 검증 (가이드 방식에 따른 체계적 에러 처리)
+          final now = DateTime.now();
+          if (parsedDateTime.isBefore(now)) {
+            print('❌ 지난 시간의 일정은 추가할 수 없습니다');
+            print('  - 일정 시간: $parsedDateTime');
+            print('  - 현재 시간: $now');
+            print('  - 차이: ${now.difference(parsedDateTime).inMinutes}분 전');
+
+            // 가이드 방식에 따른 체계적 에러 메시지 생성
+            String errorMessage;
+            final timeDifference = now.difference(parsedDateTime);
+
+            if (timeDifference.inDays > 0) {
+              errorMessage = '지난 날짜의 일정은 추가할 수 없습니다. 미래의 날짜를 말씀해주세요.';
+            } else if (timeDifference.inHours > 0) {
+              errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
+            } else if (timeDifference.inMinutes > 0) {
+              errorMessage = '방금 지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
+            } else {
+              errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
+            }
+
+            // 가이드 방식에 따른 에러 처리
+            print('🚫 가이드 방식 에러 처리: $errorMessage');
+            _aiResponseText = errorMessage;
+            _aiResponseStreamController.add(_aiResponseText);
+
+            // TTS로 오류 메시지 재생 (가이드의 음성 피드백 방식)
+            try {
+              print('🔊 지난 시간 오류 메시지 TTS 재생 시작...');
+              await _ttsService.speak(_aiResponseText);
+              print('✅ 지난 시간 오류 메시지 TTS 재생 완료');
+            } catch (ttsError) {
+              print('❌ 지난 시간 오류 메시지 TTS 재생 실패: $ttsError');
+            }
+
+            return; // 일정 추가 중단 (가이드의 success: false 방식과 유사)
           }
 
           // 서버에서 받은 카테고리와 중요도 정보 확인
@@ -467,6 +727,7 @@ class RecordService {
             if (taskProvider != null) {
               await taskProvider.addTask(task);
               print('✅ TaskProvider를 통해 일정 추가 완료 (알람은 TaskProvider에서 자동 설정됨)');
+              print('✅ 일정 시간 검증 통과: $parsedDateTime (현재 시간: $now)');
             } else {
               print('❌ TaskProvider에 접근할 수 없습니다');
             }
@@ -493,6 +754,84 @@ class RecordService {
   // TaskProvider 인스턴스 가져오기
   TaskProvider? _getTaskProvider() {
     return _taskProvider;
+  }
+
+  // 명확화 요청 처리
+  Future<void> _handleClarificationRequired(AIAction action) async {
+    try {
+      print('❓ === 명확화 요청 처리 시작 ===');
+
+      final clarificationData = action.data;
+      if (clarificationData != null &&
+          clarificationData is Map<String, dynamic>) {
+        // 명확화 요청 정보 추출
+        final clarificationText =
+            clarificationData['clarification_text'] ?? '추가 정보가 필요합니다.';
+        final originalRequest = clarificationData['original_request'] ?? '';
+        final missingFields = clarificationData['missing_fields'] ?? <String>[];
+
+        print('❓ 명확화 요청 정보:');
+        print('  - 명확화 텍스트: $clarificationText');
+        print('  - 원본 요청: $originalRequest');
+        print('  - 부족한 필드: $missingFields');
+
+        // 명확화 모드 활성화
+        _isClarificationMode = true;
+        _pendingClarification = clarificationText;
+        _originalRequest = originalRequest;
+        _clarificationCount++;
+
+        print('✅ 명확화 모드 활성화됨 (횟수: $_clarificationCount)');
+
+        // 명확화 요청을 AI 응답으로 설정
+        _aiResponseText = clarificationText;
+        _aiResponseStreamController.add(_aiResponseText);
+
+        // TTS로 명확화 요청 재생
+        try {
+          print('🔊 명확화 요청 TTS 재생 시작...');
+          await _ttsService.speak(clarificationText);
+          print('✅ 명확화 요청 TTS 재생 완료');
+        } catch (ttsError) {
+          print('❌ 명확화 요청 TTS 재생 실패: $ttsError');
+        }
+      } else {
+        print('⚠️ 명확화 요청 데이터가 올바르지 않습니다: $clarificationData');
+      }
+    } catch (e) {
+      print('❌ 명확화 요청 처리 중 오류: $e');
+    }
+  }
+
+  // 명확화 모드 종료
+  void exitClarificationMode() {
+    print('🚪 명확화 모드 종료');
+    _isClarificationMode = false;
+    _pendingClarification = '';
+    _originalRequest = '';
+    _clarificationCount = 0;
+  }
+
+  // 명확화 모드에서 추가 정보 처리
+  Future<void> processClarificationResponse(String additionalInfo) async {
+    try {
+      print('🔄 === 명확화 응답 처리 시작 ===');
+      print('추가 정보: $additionalInfo');
+      print('원본 요청: $_originalRequest');
+
+      // 원본 요청과 추가 정보를 합쳐서 새로운 요청 생성
+      final combinedRequest = '$_originalRequest $additionalInfo';
+      print('합쳐진 요청: $combinedRequest');
+
+      // 명확화 모드 종료
+      exitClarificationMode();
+
+      // 합쳐진 요청으로 AI 처리 재시도
+      print('🔄 합쳐진 요청으로 AI 처리 재시도...');
+      await _processWithAI(combinedRequest);
+    } catch (e) {
+      print('❌ 명확화 응답 처리 중 오류: $e');
+    }
   }
 
   // 일정 조회 처리
@@ -693,6 +1032,260 @@ class RecordService {
     } catch (e) {
       print('마이크 테스트 실패: $e');
       return false;
+    }
+  }
+
+  // 텍스트 유효성 검증 메서드 (더 관대하게 수정)
+  bool _isValidTextForAI(String text) {
+    // 1. 빈 텍스트 체크
+    if (text.isEmpty) {
+      print('🔍 텍스트 검증 실패: 빈 텍스트');
+      return false;
+    }
+
+    // 2. 공백만 있는 텍스트 체크
+    if (text.trim().isEmpty) {
+      print('🔍 텍스트 검증 실패: 공백만 있는 텍스트');
+      return false;
+    }
+
+    // 3. 너무 짧은 텍스트 체크 (1글자 미만으로 완화)
+    if (text.trim().length < 1) {
+      print('🔍 텍스트 검증 실패: 너무 짧은 텍스트 (${text.trim().length}글자)');
+      return false;
+    }
+
+    // 4. 의미없는 텍스트 패턴 체크 (더 엄격한 패턴만 체크)
+    final meaninglessPatterns = [
+      '음음음음음',
+      '아아아아아',
+      '어어어어어',
+      '으으으으으',
+      '그그그그그',
+      '저저저저저',
+      '그게그게그게그게그게',
+      '저게저게저게저게저게',
+      '뭐뭐뭐뭐뭐',
+      '어떻게어떻게어떻게어떻게어떻게',
+      '그래서그래서그래서그래서그래서',
+    ];
+
+    final trimmedText = text.trim();
+    for (final pattern in meaninglessPatterns) {
+      if (trimmedText == pattern) {
+        print('🔍 텍스트 검증 실패: 의미없는 패턴 "$pattern"');
+        return false;
+      }
+    }
+
+    // 5. 숫자나 특수문자만 있는 텍스트 체크 (완화)
+    final hasMeaningfulContent = RegExp(r'[가-힣a-zA-Z]').hasMatch(trimmedText);
+    if (!hasMeaningfulContent && trimmedText.length < 3) {
+      print('🔍 텍스트 검증 실패: 의미있는 텍스트가 없음 (숫자/특수문자만)');
+      return false;
+    }
+
+    // 6. 일정 관련 키워드 체크는 제거 (모든 텍스트를 AI로 전송)
+    print('✅ 텍스트 검증 통과: "$trimmedText" (AI로 전송)');
+    return true;
+  }
+
+  // APP_INTEGRATION_GUIDE에 따른 에러 응답 처리
+  Future<void> _handleErrorResponse(AIResponse aiResponse) async {
+    try {
+      print('🚨 === 에러 응답 처리 시작 ===');
+
+      // 에러 타입과 메시지 추출 시도
+      String errorType = 'general';
+      String errorMessage = '음성 인식 결과를 처리할 수 없습니다.';
+
+      // 새로운 에러 응답 구조 확인 (APP_INTEGRATION_GUIDE 참조)
+      if (aiResponse.processingResult != null) {
+        final result = aiResponse.processingResult!.result;
+        if (result.containsKey('error_type')) {
+          errorType = result['error_type'] ?? 'general';
+        }
+        if (result.containsKey('message')) {
+          errorMessage = result['message'] ?? errorMessage;
+        }
+      }
+
+      // responseText가 있으면 그것을 우선 사용
+      if (aiResponse.responseText != null &&
+          aiResponse.responseText!.isNotEmpty) {
+        errorMessage = aiResponse.responseText!;
+      }
+
+      print('🚨 에러 타입: $errorType');
+      print('🚨 에러 메시지: $errorMessage');
+
+      // 에러 타입별 처리
+      await _processErrorByType(errorType, errorMessage);
+    } catch (e) {
+      print('❌ 에러 응답 처리 중 오류: $e');
+
+      // 기본 에러 메시지로 폴백
+      _aiResponseText = '죄송합니다. 요청을 처리하는 중에 문제가 발생했습니다.';
+      _aiResponseStreamController.add(_aiResponseText);
+
+      try {
+        await _ttsService.speak(_aiResponseText);
+      } catch (ttsError) {
+        print('❌ 기본 에러 TTS 재생 실패: $ttsError');
+      }
+    }
+  }
+
+  // 에러 타입별 처리 (APP_INTEGRATION_GUIDE 기준)
+  Future<void> _processErrorByType(
+    String errorType,
+    String errorMessage,
+  ) async {
+    print('🔍 에러 타입별 처리: $errorType');
+
+    String userFriendlyMessage = errorMessage;
+    String logMessage = errorMessage;
+
+    switch (errorType) {
+      // 1. 입력 검증 에러
+      case 'validation_error':
+      case 'invalid_request':
+      case 'missing_content_type':
+      case 'missing_required_data':
+        logMessage = '입력 검증 오류: $errorMessage';
+        userFriendlyMessage = errorMessage;
+        break;
+
+      // 2. 일정 정보 검증 에러
+      case 'schedule_validation_error':
+      case 'missing_schedule_title':
+        logMessage = '일정 제목 누락: $errorMessage';
+        userFriendlyMessage = errorMessage.isNotEmpty
+            ? errorMessage
+            : '구체적인 일정 내용을 말씀해주세요. 예: 병원 진료, 친구 만남 등';
+        break;
+
+      case 'generic_schedule_title':
+        logMessage = '비구체적 일정 제목: $errorMessage';
+        userFriendlyMessage = errorMessage.isNotEmpty
+            ? errorMessage
+            : '좀 더 구체적인 일정 내용을 말씀해주세요.';
+        break;
+
+      case 'short_schedule_title':
+        logMessage = '일정 제목이 너무 짧음: $errorMessage';
+        userFriendlyMessage = errorMessage.isNotEmpty
+            ? errorMessage
+            : '일정 내용을 좀 더 자세히 말씀해주세요.';
+        break;
+
+      case 'missing_schedule_date':
+        logMessage = '일정 날짜 누락: $errorMessage';
+        userFriendlyMessage = errorMessage.isNotEmpty
+            ? errorMessage
+            : '언제 일정이 있는지 날짜를 말씀해주세요.';
+        break;
+
+      case 'missing_schedule_time':
+        logMessage = '일정 시간 누락: $errorMessage';
+        userFriendlyMessage = errorMessage.isNotEmpty
+            ? errorMessage
+            : '몇 시에 일정이 있는지 시간을 말씀해주세요.';
+        break;
+
+      case 'invalid_date_format':
+      case 'invalid_time_format':
+        logMessage = '잘못된 날짜/시간 형식: $errorMessage';
+        userFriendlyMessage = errorMessage.isNotEmpty
+            ? errorMessage
+            : '날짜와 시간을 다시 말씀해주세요.';
+        break;
+
+      // 3. 데이터베이스/저장 에러
+      case 'database_error':
+      case 'schedule_save_error':
+      case 'data_parsing_error':
+        logMessage = '데이터 저장 오류: $errorMessage';
+        userFriendlyMessage = '일정을 저장하는 중에 문제가 발생했습니다. 다시 시도해주세요.';
+        break;
+
+      // 4. 일정 조회/삭제 에러
+      case 'schedule_not_found':
+        logMessage = '일정을 찾을 수 없음: $errorMessage';
+        userFriendlyMessage = errorMessage.isNotEmpty
+            ? errorMessage
+            : '해당 일정을 찾을 수 없습니다.';
+        break;
+
+      case 'schedule_delete_error':
+        logMessage = '일정 삭제 실패: $errorMessage';
+        userFriendlyMessage = '일정을 삭제하는 중에 문제가 발생했습니다.';
+        break;
+
+      case 'insufficient_delete_info':
+        logMessage = '삭제 정보 부족: $errorMessage';
+        userFriendlyMessage = errorMessage.isNotEmpty
+            ? errorMessage
+            : '어떤 일정을 삭제할지 더 구체적으로 말씀해주세요.';
+        break;
+
+      // 5. AI 처리 에러
+      case 'ai_processing_error':
+      case 'llm_error':
+      case 'intent_analysis_error':
+      case 'response_generation_error':
+        logMessage = 'AI 처리 오류: $errorMessage';
+        userFriendlyMessage = '요청을 분석하는 중에 문제가 발생했습니다. 다시 말씀해주세요.';
+        break;
+
+      // 6. 서버 상태 에러
+      case 'health_check':
+      case 'server_error':
+        logMessage = '서버 오류: $errorMessage';
+        userFriendlyMessage = '서버에 일시적인 문제가 있습니다. 잠시 후 다시 시도해주세요.';
+        break;
+
+      // 7. HTTP 에러
+      case 'bad_request':
+        logMessage = '잘못된 요청: $errorMessage';
+        userFriendlyMessage = '요청에 문제가 있습니다. 다시 말씀해주세요.';
+        break;
+
+      case 'not_found':
+        logMessage = '리소스 없음: $errorMessage';
+        userFriendlyMessage = '요청한 정보를 찾을 수 없습니다.';
+        break;
+
+      case 'internal_error':
+        logMessage = '서버 내부 오류: $errorMessage';
+        userFriendlyMessage = '서버에 문제가 발생했습니다. 잠시 후 다시 시도해주세요.';
+        break;
+
+      // 8. 시스템 예외
+      case 'system_error':
+      case 'unexpected_error':
+      default:
+        logMessage = '일반 오류: $errorMessage';
+        userFriendlyMessage = errorMessage.isNotEmpty
+            ? errorMessage
+            : '요청을 처리하는 중에 문제가 발생했습니다. 다시 시도해주세요.';
+        break;
+    }
+
+    print('📝 로그 메시지: $logMessage');
+    print('🎤 사용자 메시지: $userFriendlyMessage');
+
+    // AI 응답으로 설정
+    _aiResponseText = userFriendlyMessage;
+    _aiResponseStreamController.add(_aiResponseText);
+
+    // TTS로 에러 메시지 재생
+    try {
+      print('🔊 에러 메시지 TTS 재생 시작...');
+      await _ttsService.speak(userFriendlyMessage);
+      print('✅ 에러 메시지 TTS 재생 완료');
+    } catch (ttsError) {
+      print('❌ 에러 메시지 TTS 재생 실패: $ttsError');
     }
   }
 
