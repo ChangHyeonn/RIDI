@@ -8,18 +8,21 @@ import 'services/alarm_service.dart';
 import 'permissions_init.dart';
 
 void main() async {
-  // iOS에서 검은 화면 문제 해결을 위한 초기화 순서
+  // iOS 18.6 검은 화면 문제 해결을 위한 초기화 순서
   WidgetsFlutterBinding.ensureInitialized();
 
   // iOS 권한 초기화
   await initializeDateFormatting('ko_KR', null);
 
-  // iOS에서 앱 시작 시 권한 요청
-  try {
-    await PermissionsInit.requestNecessaryPermissions();
-  } catch (e) {
-    print('iOS 권한 초기화 중 오류: $e');
-  }
+  // iOS 18.6에서 앱 시작 시 권한 요청 (지연 처리)
+  Future.delayed(const Duration(milliseconds: 100), () async {
+    try {
+      await PermissionsInit.requestNecessaryPermissions();
+      print('✅ iOS 18.6 권한 초기화 완료');
+    } catch (e) {
+      print('❌ iOS 18.6 권한 초기화 중 오류: $e');
+    }
+  });
 
   runApp(const MyApp());
 }
