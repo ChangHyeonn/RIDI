@@ -55,13 +55,15 @@ class ProcessTextUseCase:
                 # AI_02 스타일 로그: Information Extraction
                 self.logger.info(f"Information extracted: {schedule_info}")
                 
-                if schedule_info.get('title'):  # 제목이 있으면 처리
+                # 엄격한 일정 정보 검증
+                validation_result = self._validate_schedule_info(schedule_info)
+                if validation_result['valid']:
                     # AI_02 스타일 로그: Request Analysis
                     self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
                     return self._handle_schedule_add_with_info(request, schedule_info, start_time)
                 else:
                     return self._create_error_result(
-                        "일정 정보를 추출할 수 없습니다. 일정 제목과 시간을 명확히 말씀해주세요.", 
+                        validation_result['error_message'], 
                         time.time() - start_time
                     )
             elif intent.category == "schedule_read":
@@ -231,6 +233,74 @@ class ProcessTextUseCase:
         
         count = len(schedules)
         return f"{count}개의 일정을 찾았습니다."
+    
+    def _validate_schedule_info(self, schedule_info: Dict[str, Any]) -> Dict[str, Any]:
+        """일정 정보 엄격 검증"""
+        
+        # 1. 기본 정보 존재 확인
+        title = schedule_info.get('title', '').strip()
+        date = schedule_info.get('date', '').strip()
+        time = schedule_info.get('time', '').strip()
+        
+        # 2. 비구체적 제목 차단
+        generic_titles = ['일정', '예약', '할 일', '미팅', '약속', '행사']
+        
+        if not title:
+            return {
+                'valid': False,
+                'error_message': '구체적인 일정 내용을 말씀해주세요. 예: "병원 진료", "친구 만남", "회사 회의" 등'
+            }
+        
+        if title.lower() in [t.lower() for t in generic_titles]:
+            return {
+                'valid': False,
+                'error_message': f'"일정" 대신 구체적인 내용을 말씀해주세요. 예: "병원 진료", "친구 만남" 등'
+            }
+        
+        # 3. 제목 길이 및 의미 검증
+        if len(title) < 2:
+            return {
+                'valid': False,
+                'error_message': '일정 제목이 너무 짧습니다. 좀 더 구체적으로 설명해주세요.'
+            }
+        
+        # 4. 날짜 및 시간 검증
+        if not date:
+            return {
+                'valid': False,
+                'error_message': '일정 날짜를 명확히 말씀해주세요. 예: "내일", "모레", "월요일" 등'
+            }
+        
+        if not time:
+            return {
+                'valid': False,
+                'error_message': '일정 시간을 명확히 말씀해주세요. 예: "오전 9시", "오후 3시 30분" 등'
+            }
+        
+        # 5. 날짜 형식 검증
+        try:
+            from datetime import datetime
+            datetime.strptime(date, '%Y-%m-%d')
+        except ValueError:
+            return {
+                'valid': False,
+                'error_message': '잘못된 날짜 형식입니다. 날짜를 다시 명확히 말씀해주세요.'
+            }
+        
+        # 6. 시간 형식 검증
+        try:
+            hour, minute = time.split(':')
+            hour_int = int(hour)
+            minute_int = int(minute)
+            if not (0 <= hour_int <= 23 and 0 <= minute_int <= 59):
+                raise ValueError()
+        except (ValueError, AttributeError):
+            return {
+                'valid': False,
+                'error_message': '잘못된 시간 형식입니다. 시간을 다시 명확히 말씀해주세요.'
+            }
+        
+        return {'valid': True}
     
     def _create_error_result(self, error_message: str, processing_time: float) -> TextProcessingResult:
         """에러 결과 생성"""
