@@ -215,28 +215,76 @@ Content-Type: application/json
 }
 ```
 
-#### **에러 응답 구조**
+#### **에러 응답 구조 (새로운 형식)**
 ```json
 {
   "success": false,
-  "error": "텍스트 처리 중 오류가 발생했습니다",
-  "processing_time": 0.123,
-  "timestamp": "2024-01-14T10:30:00.123456",
-  "pipeline_info": {
-    "pipeline_type": "Unified Text Pipeline",
-    "components": {
-      "request_processor": {
-        "processor_type": "Unified Request Processor"
-      }
+  "action": {
+    "type": "error",
+    "is_important": true,
+    "data": {
+      "error_type": "missing_schedule_title",
+      "message": "구체적인 일정 내용을 말씀해주세요. 예: '병원 진룼', '친구 만남' 등"
     },
-    "features": {
-      "llm_centered": true,
-      "text_to_text": true,
-      "no_stt_tts": true
+    "ui_instructions": {
+      "notification": {
+        "type": "error",
+        "title": "오류 발생",
+        "message": "구체적인 일정 내용을 말씀해주세요. 예: '병원 진료', '친구 만남' 등",
+        "duration": 5000
+      }
     }
-  }
+  },
+  "timestamp": "2024-01-14T10:30:00.123456"
 }
 ```
+
+#### **에러 타입 목록**
+
+**1. 입력 검증 에러**
+- `validation_error`: 일반적인 입력 검증 실패
+- `invalid_request`: 유효하지 않은 요청
+- `missing_content_type`: Content-Type 헤더 누락
+- `missing_required_data`: 필수 데이터 누락
+
+**2. 일정 정보 검증 에러**
+- `schedule_validation_error`: 일반적인 일정 검증 실패
+- `missing_schedule_title`: 일정 제목 누락
+- `generic_schedule_title`: 비구체적 일정 제목 ("일정", "예약" 등)
+- `short_schedule_title`: 일정 제목이 너무 짧음
+- `missing_schedule_date`: 일정 날짜 누락
+- `missing_schedule_time`: 일정 시간 누락
+- `invalid_date_format`: 잘못된 날짜 형식
+- `invalid_time_format`: 잘못된 시간 형식
+
+**3. 데이터베이스/저장 에러**
+- `database_error`: 데이터베이스 오류
+- `schedule_save_error`: 일정 저장 실패
+- `data_parsing_error`: 데이터 파싱 오류
+
+**4. 일정 조회/삭제 에러**
+- `schedule_not_found`: 일정을 찾을 수 없음
+- `schedule_delete_error`: 일정 삭제 실패
+- `insufficient_delete_info`: 삭제 정보 부족
+
+**5. AI 처리 에러**
+- `ai_processing_error`: AI 처리 오류
+- `llm_error`: 언어모델 오류
+- `intent_analysis_error`: 의도 분석 실패
+- `response_generation_error`: 응답 생성 실패
+
+**6. 서버 상태 에러**
+- `health_check`: 서버 상태 확인 오류
+- `server_error`: 서버 오류
+
+**7. HTTP 에러**
+- `bad_request`: 잘못된 요청 (400)
+- `not_found`: 리소스를 찾을 수 없음 (404)
+- `internal_error`: 서버 내부 오류 (500)
+
+**8. 시스템 예외**
+- `system_error`: 시스템 오류
+- `unexpected_error`: 예상치 못한 오류
 
 ### **액션 타입별 의미**
 - `schedule_add`: 일정 추가 요청
@@ -557,14 +605,171 @@ Future<Map<String, dynamic>> processText(String text, String userId) async {
 }
 ```
 
-### **AI 서버 에러**
+### **AI 서버 에러 타입별 처리**
 ```dart
-   void _handleError(Map<String, dynamic> response) {
-     final errorMessage = response['error'];
-     
-     // 일반적인 에러 처리
-     _showErrorDialog('오류', errorMessage);
-   }
+void _handleError(Map<String, dynamic> response) {
+  final actionData = response['action']?['data'] ?? {};
+  final errorType = actionData['error_type'] ?? 'general';
+  final errorMessage = actionData['message'] ?? '알 수 없는 오류가 발생했습니다';
+  
+  // 에러 타입별 처리
+  switch (errorType) {
+    // 1. 입력 검증 에러
+    case 'validation_error':
+    case 'invalid_request':
+    case 'missing_content_type':
+    case 'missing_required_data':
+      _showValidationError(errorMessage);
+      break;
+    
+    // 2. 일정 정보 검증 에러
+    case 'schedule_validation_error':
+    case 'missing_schedule_title':
+    case 'generic_schedule_title':
+    case 'short_schedule_title':
+    case 'missing_schedule_date':
+    case 'missing_schedule_time':
+    case 'invalid_date_format':
+    case 'invalid_time_format':
+      _showScheduleValidationError(errorMessage);
+      break;
+    
+    // 3. 데이터베이스/저장 에러
+    case 'database_error':
+    case 'schedule_save_error':
+    case 'data_parsing_error':
+      _showDatabaseError(errorMessage);
+      break;
+    
+    // 4. 일정 조회/삭제 에러
+    case 'schedule_not_found':
+    case 'schedule_delete_error':
+    case 'insufficient_delete_info':
+      _showScheduleOperationError(errorMessage);
+      break;
+    
+    // 5. AI 처리 에러
+    case 'ai_processing_error':
+    case 'llm_error':
+    case 'intent_analysis_error':
+    case 'response_generation_error':
+      _showAIProcessingError(errorMessage);
+      break;
+    
+    // 6. 서버 상태 에러
+    case 'health_check':
+    case 'server_error':
+      _showServerError(errorMessage);
+      break;
+    
+    // 7. HTTP 에러
+    case 'bad_request':
+    case 'not_found':
+    case 'internal_error':
+      _showHttpError(errorType, errorMessage);
+      break;
+    
+    // 8. 시스템 예외
+    case 'system_error':
+    case 'unexpected_error':
+    default:
+      _showGeneralError(errorMessage);
+      break;
+  }
+}
+
+// 에러 타입별 UI 처리 함수들
+void _showValidationError(String message) {
+  _showErrorDialog(
+    '입력 오류', 
+    message,
+    icon: Icons.edit,
+    color: Colors.orange,
+    autoClose: false // 사용자가 수정할 수 있도록
+  );
+}
+
+void _showScheduleValidationError(String message) {
+  _showErrorDialog(
+    '일정 정보 오류', 
+    message,
+    icon: Icons.event_note,
+    color: Colors.blue,
+    showRetryButton: true // 다시 시도 버튼 표시
+  );
+}
+
+void _showDatabaseError(String message) {
+  _showErrorDialog(
+    '저장 오류', 
+    message,
+    icon: Icons.storage,
+    color: Colors.red,
+    showContactSupport: true // 지원팀 연락 버튼
+  );
+}
+
+void _showScheduleOperationError(String message) {
+  _showErrorDialog(
+    '일정 처리 오류', 
+    message,
+    icon: Icons.event_busy,
+    color: Colors.amber
+  );
+}
+
+void _showAIProcessingError(String message) {
+  _showErrorDialog(
+    'AI 처리 오류', 
+    message,
+    icon: Icons.psychology,
+    color: Colors.purple,
+    showRetryButton: true
+  );
+}
+
+void _showServerError(String message) {
+  _showErrorDialog(
+    '서버 오류', 
+    message,
+    icon: Icons.cloud_off,
+    color: Colors.grey,
+    showContactSupport: true
+  );
+}
+
+void _showHttpError(String errorType, String message) {
+  String title = '';
+  switch (errorType) {
+    case 'bad_request':
+      title = '잘못된 요청';
+      break;
+    case 'not_found':
+      title = '리소스 없음';
+      break;
+    case 'internal_error':
+      title = '서버 내부 오류';
+      break;
+    default:
+      title = 'HTTP 오류';
+  }
+  
+  _showErrorDialog(
+    title, 
+    message,
+    icon: Icons.network_check,
+    color: Colors.red
+  );
+}
+
+void _showGeneralError(String message) {
+  _showErrorDialog(
+    '오류', 
+    message,
+    icon: Icons.error,
+    color: Colors.red
+  );
+}
 ```
 
 ## 📊 성능 최적화
