@@ -24,6 +24,12 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void initState() {
     super.initState();
+
+    // iOS에서 검은 화면 문제 해결을 위한 초기화
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeForIOS();
+    });
+
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -41,6 +47,18 @@ class _LoginScreenState extends State<LoginScreen>
     );
     _slideController.forward();
     _fadeController.forward();
+  }
+
+  // iOS 초기화 메서드
+  Future<void> _initializeForIOS() async {
+    try {
+      // iOS에서 TaskProvider 초기화
+      final taskProvider = Provider.of<TaskProvider>(context, listen: false);
+      await taskProvider.initialize();
+      print('✅ iOS TaskProvider 초기화 완료');
+    } catch (e) {
+      print('❌ iOS TaskProvider 초기화 실패: $e');
+    }
   }
 
   @override
