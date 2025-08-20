@@ -162,6 +162,22 @@ class AIService {
       print(responseData);
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
+      // JSON 형식 검증
+      if (responseData.trim().isEmpty) {
+        print('❌ 응답 데이터가 비어있습니다!');
+        throw Exception('서버에서 빈 응답을 받았습니다.');
+      }
+
+      // JSON 형식인지 확인
+      if (!responseData.trim().startsWith('{') &&
+          !responseData.trim().startsWith('[')) {
+        print('❌ 응답이 JSON 형식이 아닙니다!');
+        print(
+          '응답 시작 부분: ${responseData.substring(0, responseData.length > 100 ? 100 : responseData.length)}',
+        );
+        throw Exception('서버 응답이 JSON 형식이 아닙니다.');
+      }
+
       // 200(성공)과 400(오류) 모두 정상적인 응답으로 처리
       if (response.statusCode == 200 || response.statusCode == 400) {
         print('✅ 서버 응답 성공');
@@ -171,10 +187,73 @@ class AIService {
           print('🔍 JSON 파싱 시작...');
           final jsonData = json.decode(responseData);
           print('🔍 JSON 파싱 완료');
+
+          // JSON 구조 분석
           print('📋 파싱된 JSON 구조:');
           print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
           _printJsonStructure(jsonData, 0);
           print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+          // JSON 키 분석
+          print('🔍 JSON 키 분석:');
+          if (jsonData is Map<String, dynamic>) {
+            print('📋 최상위 키들: ${jsonData.keys.toList()}');
+
+            // success 필드 확인
+            if (jsonData.containsKey('success')) {
+              print(
+                '✅ success 필드 발견: ${jsonData['success']} (타입: ${jsonData['success'].runtimeType})',
+              );
+            } else {
+              print('⚠️ success 필드 없음');
+            }
+
+            // action 필드 확인 (AI_03 구형 구조)
+            if (jsonData.containsKey('action')) {
+              print('✅ action 필드 발견 (AI_03 구형 구조)');
+              final action = jsonData['action'];
+              if (action is Map<String, dynamic>) {
+                print('  - action.type: ${action['type']}');
+                print(
+                  '  - action.data 키들: ${action['data'] is Map ? (action['data'] as Map).keys.toList() : 'data가 Map이 아님'}',
+                );
+              }
+            } else {
+              print('⚠️ action 필드 없음');
+            }
+
+            // text_response 필드 확인 (AI_03 구형 구조)
+            if (jsonData.containsKey('text_response')) {
+              print('✅ text_response 필드 발견 (AI_03 구형 구조)');
+              final textResponse = jsonData['text_response'];
+              if (textResponse is Map<String, dynamic>) {
+                print('  - text_response.text: ${textResponse['text']}');
+                print(
+                  '  - text_response.display_automatically: ${textResponse['display_automatically']}',
+                );
+              }
+            } else {
+              print('⚠️ text_response 필드 없음');
+            }
+
+            // processing_result 필드 확인 (AI_02 신형 구조)
+            if (jsonData.containsKey('processing_result')) {
+              print('✅ processing_result 필드 발견 (AI_02 신형 구조)');
+            } else {
+              print('⚠️ processing_result 필드 없음');
+            }
+
+            // response_text 필드 확인 (AI_02 신형 구조)
+            if (jsonData.containsKey('response_text')) {
+              print(
+                '✅ response_text 필드 발견 (AI_02 신형 구조): ${jsonData['response_text']}',
+              );
+            } else {
+              print('⚠️ response_text 필드 없음');
+            }
+          }
+
+          print('🔍 AIResponse.fromJson 호출 시작...');
           final aiResponse = AIResponse.fromJson(jsonData);
           print('🤖 === AI 응답 분석 ===');
           print('✅ 응답 성공 여부: ${aiResponse.success}');

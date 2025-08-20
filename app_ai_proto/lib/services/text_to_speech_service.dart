@@ -39,7 +39,7 @@ class TextToSpeechService {
         await _flutterTts.setSpeechRate(0.7); // 조금 더 빠르게
         await _flutterTts.setVolume(1.0);
         await _flutterTts.setPitch(0.9); // 조금 더 낮은 톤
-        
+
         // Web 환경에서 한국어 음성 설정 시도
         await _trySetKoreanVoice();
       } else {
@@ -55,7 +55,7 @@ class TextToSpeechService {
         await _flutterTts.setSpeechRate(0.7); // 0.0 ~ 1.0 (조금 더 빠르게)
         await _flutterTts.setVolume(1.0); // 0.0 ~ 1.0
         await _flutterTts.setPitch(0.9); // 0.5 ~ 2.0 (조금 더 낮은 톤)
-        
+
         // 모바일 환경에서 한국어 음성 설정 시도
         await _trySetKoreanVoice();
       }
@@ -262,7 +262,7 @@ class TextToSpeechService {
       default:
         rate = 0.7;
     }
-    
+
     await setVoiceSettings(speechRate: rate);
     print('🏃 TTS 속도 변경: $speed (${rate})');
   }
@@ -289,7 +289,7 @@ class TextToSpeechService {
       default:
         pitch = 0.9;
     }
-    
+
     await setVoiceSettings(pitch: pitch);
     print('🎵 TTS 톤 변경: $tone (${pitch})');
   }
@@ -320,19 +320,19 @@ class TextToSpeechService {
   Future<void> _trySetKoreanVoice() async {
     try {
       print('🎤 한국어 음성 설정 시도');
-      
+
       final voices = await getAvailableVoices();
       print('🎤 사용 가능한 음성 수: ${voices.length}');
-      
+
       // 한국어 음성 찾기
       Map<String, String>? koreanVoice;
-      
+
       for (final voice in voices) {
         final name = voice['name'] ?? '';
         final locale = voice['locale'] ?? '';
-        
+
         print('🎤 음성: $name (로케일: $locale)');
-        
+
         // 한국어 음성 우선순위
         if (locale.startsWith('ko') || name.toLowerCase().contains('korean')) {
           koreanVoice = voice;
@@ -340,7 +340,7 @@ class TextToSpeechService {
           break;
         }
       }
-      
+
       // 한국어 음성 설정
       if (koreanVoice != null) {
         await _flutterTts.setVoice(koreanVoice);

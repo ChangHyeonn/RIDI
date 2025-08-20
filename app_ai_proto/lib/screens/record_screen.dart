@@ -76,6 +76,14 @@ class _RecordScreenState extends State<RecordScreen> {
           print('🤖 AI 응답: "$response"');
         });
 
+        // 녹음 상태 스트림 구독 (자동 재시작을 위해)
+        _recordService.recordingStateStream.listen((isRecording) {
+          setState(() {
+            _isRecording = isRecording;
+          });
+          print('🎤 녹음 상태 변경: $isRecording');
+        });
+
         // 명확화 모드 상태 업데이트
         _updateClarificationMode();
 

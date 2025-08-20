@@ -16,7 +16,7 @@ void main() async {
 
   // 앱 실행 후 권한 요청 (첫 프레임 렌더링 방해 방지)
   runApp(const MyApp());
-
+  
   // 앱 실행 후 권한 요청
   Future.delayed(const Duration(milliseconds: 1000), () async {
     try {
@@ -50,19 +50,6 @@ class MyApp extends StatelessWidget {
         supportedLocales: const [Locale('ko', 'KR')],
         home: const LoginScreen(),
         debugShowCheckedModeBanner: false,
-      ),
-    );
-  }
-}
-
-class PatchedAppFallback extends StatelessWidget {
-  const PatchedAppFallback({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: const Scaffold(
-        body: Center(child: Text('🏁 Flutter iOS 초기화 완료 — 화면 구성 대기 중')),
       ),
     );
   }

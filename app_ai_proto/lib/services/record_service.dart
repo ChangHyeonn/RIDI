@@ -281,6 +281,31 @@ class RecordService {
         return;
       }
 
+      // 불완전한 일정 요청 감지 (클라이언트 측 검증) - AI 서버 호출 전에 체크
+      if (_isIncompleteScheduleRequest(text)) {
+        print('⚠️ 불완전한 일정 요청 감지: "$text"');
+        _aiResponseText =
+            '구체적인 일정 내용을 말씀해주세요. 예: "내일 오후 3시에 병원 진료", "다음 주 월요일 오전 10시에 회사 회의" 등';
+        _aiResponseStreamController.add(_aiResponseText);
+
+        try {
+          print('🔊 불완전한 일정 요청 안내 TTS 재생 시작...');
+          await _ttsService.speak(_aiResponseText);
+          print('✅ 불완전한 일정 요청 안내 TTS 재생 완료');
+
+          // TTS 재생 완료 후 자동으로 녹음 재시작
+          print('🔄 TTS 완료 후 자동 녹음 재시작...');
+          await Future.delayed(const Duration(milliseconds: 500)); // 잠시 대기
+          await _autoRestartRecording();
+        } catch (ttsError) {
+          print('❌ TTS 재생 실패: $ttsError');
+        }
+
+        // AI 처리 상태 해제
+        _aiResponseStreamController.add('');
+        return;
+      }
+
       // 명확화 모드에서 추가 정보가 들어온 경우
       if (_isClarificationMode) {
         print('🔄 명확화 모드에서 추가 정보 처리');
@@ -1044,6 +1069,85 @@ class RecordService {
     }
   }
 
+  // 특정 에러 타입에 대해서만 자동 재시작할지 판단
+  bool _shouldAutoRestartForError(String errorType) {
+    // 자동 재시작이 필요한 에러 타입들
+    final autoRestartErrorTypes = [
+      'missing_schedule_title',
+      'generic_schedule_title',
+      'short_schedule_title',
+      'missing_schedule_date',
+      'missing_schedule_time',
+      'invalid_date_format',
+      'invalid_time_format',
+      'insufficient_delete_info',
+    ];
+
+    return autoRestartErrorTypes.contains(errorType);
+  }
+
+  // 자동 녹음 재시작 메서드
+  Future<void> _autoRestartRecording() async {
+    try {
+      print('🔄 === 자동 녹음 재시작 시작 ===');
+
+      // 현재 녹음 상태 확인
+      if (_isRecording) {
+        print('⚠️ 이미 녹음 중이므로 재시작하지 않습니다.');
+        return;
+      }
+
+      // 이전 텍스트 초기화
+      _recognizedText = '';
+      _lastProcessedText = '';
+
+      // 녹음 시작
+      final success = await startRecording();
+      if (success) {
+        print('✅ 자동 녹음 재시작 성공');
+        // 녹음 상태를 스트림으로 전송
+        _recordingStateController.add(true);
+      } else {
+        print('❌ 자동 녹음 재시작 실패');
+      }
+    } catch (e) {
+      print('❌ 자동 녹음 재시작 중 오류: $e');
+    }
+  }
+
+  // 불완전한 일정 요청 감지 (클라이언트 측 검증)
+  bool _isIncompleteScheduleRequest(String text) {
+    final scheduleKeywords = ['일정', '추가', '만들', '등록', '예약'];
+    final incompletePatterns = [
+      '일정 추가',
+      '일정 만들어',
+      '일정 등록',
+      '일정 예약',
+      '추가해 줘',
+      '만들어 줘',
+      '등록해 줘',
+      '예약해 줘',
+    ];
+
+    // 불완전한 일정 요청 패턴 감지
+    for (final pattern in incompletePatterns) {
+      if (text.toLowerCase().contains(pattern.toLowerCase())) {
+        return true;
+      }
+    }
+
+    // 일정 키워드만 있고 구체적 내용이 없는 경우
+    bool hasScheduleKeyword = scheduleKeywords.any(
+      (keyword) => text.toLowerCase().contains(keyword.toLowerCase()),
+    );
+
+    if (hasScheduleKeyword && text.length < 10) {
+      return true;
+    }
+
+    return false;
+  }
+
   // 텍스트 유효성 검증 메서드 (더 관대하게 수정)
   bool _isValidTextForAI(String text) {
     // 1. 빈 텍스트 체크
@@ -1317,6 +1421,13 @@ class RecordService {
       print('🔊 에러 메시지 TTS 재생 시작...');
       await _ttsService.speak(userFriendlyMessage);
       print('✅ 에러 메시지 TTS 재생 완료');
+
+      // 특정 에러 타입에 대해서만 자동 재시작
+      if (_shouldAutoRestartForError(errorType)) {
+        print('🔄 에러 타입 "$errorType"에 대해 자동 녹음 재시작...');
+        await Future.delayed(const Duration(milliseconds: 500)); // 잠시 대기
+        await _autoRestartRecording();
+      }
     } catch (ttsError) {
       print('❌ 에러 메시지 TTS 재생 실패: $ttsError');
     }

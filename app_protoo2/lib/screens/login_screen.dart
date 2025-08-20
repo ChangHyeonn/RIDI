@@ -87,9 +87,10 @@ class _LoginScreenState extends State<LoginScreen>
                     padding: const EdgeInsets.all(24.0),
                     child: Form(
                       key: _formKey,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
                           // 앱 로고/아이콘
                           Container(
                             width: 120,
