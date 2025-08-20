@@ -163,104 +163,11 @@ class OpenAILLMService(ILLMService):
         raise Exception("OpenAI API call failed after all retries")
     
     def _get_intent_prompt(self, text: str) -> str:
-        """의도 분석 프롬프트 생성"""
-        from datetime import datetime
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        
-        return f"""
-사용자 요청을 분석하여 의도를 파악해주세요.
-
-현재 날짜: {current_date}
-사용자 요청: {text}
-
-다음 카테고리 중 하나로 분류:
-- schedule_add: 일정 추가 요청
-- schedule_read: 일정 조회 요청  
-- schedule_delete: 일정 삭제 요청
-- other: 일반 대화
-
-JSON 형식으로만 응답:
-{{
-    "intent": "카테고리명",
-    "confidence": 0.0-1.0,
-    "requires_extraction": true/false
-}}
-"""
+        """의도 분석 프롬프트 생성 (Config/prompts.py 사용)"""
+        from Config.prompts import PromptManager
+        return PromptManager.get_intent_classification_prompt(text)
     
     def _get_extraction_prompt(self, text: str) -> str:
-        """정보 추출 프롬프트 생성 (반복 일정 지원)"""
-        from datetime import datetime
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        
-        return f"""
-일정 관련 정보를 추출해주세요.
-
-현재 날짜: {current_date}
-사용자 요청: {text}
-
-중요: 반드시 구체적이고 의미있는 일정 제목이 명시되어야 합니다.
-"일정", "예약", "할 일" 같은 비구체적 제목은 거부합니다.
-예시: "병원 진료", "친구 만남", "회사 회의" 같은 구체적 내용이 필요합니다.
-
-시간 변환:
-- "내일" = 현재 날짜 + 1일
-- "모레" = 현재 날짜 + 2일
-- "다음 주" = 현재 날짜 + 7일
-- "오전/오후" = 24시간 형식
-
-카테고리 및 중요도 설정 규칙:
-- 건강: 병원, 치과, 검진, 약 복용, 운동, 다이어트, 건강관리, 예방접종, 물리치료, 심리상담, 건강검진 등 모든 건강 관련 일정 (is_important = true)
-- 경조사: 결혼식, 장례식, 돌있을, 생일잉이, 기념일 등 경조사 관련 일정 (is_important = false)
-- 일반: 그 외 모든 일상적인 일정 (is_important = false)
-
-반복 일정 감지 규칙:
-1. 반복 키워드:
-   - "매일", "매일마다" → daily
-   - "평일", "평일마다", "월요일부터 금요일" → weekdays  
-   - "주말", "주말마다", "토요일 일요일" → weekends
-   - "월, 수, 금", "화목토", 특정 요일들 → custom_days
-
-2. 요일 매핑 (custom_days용):
-   - 월요일=0, 화요일=1, 수요일=2, 목요일=3, 금요일=4, 토요일=5, 일요일=6
-
-3. 다중 시간 감지:
-   - "아침 7시, 저녁 6시"
-   - "오전 8시, 오후 1시, 저녁 8시"
-   - "하루 2번", "하루 3번"
-
-4. 종료 조건:
-   - "~까지", "~년 ~월까지" → 특정 날짜
-   - 명시 없음 → 무기한 (end_date: null)
-
-추출 규칙:
-1. 구체적인 일정 내용이 없으면 title을 비워두세요 ("")
-2. 명확한 날짜/시간이 없으면 해당 필드를 비워두세요
-3. 추측이나 가정으로 정보를 만들지 마세요
-
-JSON 형식으로만 응답:
-{{
-    "title": "구체적인 일정 제목 (비구체적이면 빈 문자열)",
-    "date": "YYYY-MM-DD (명시되지 않으면 빈 문자열)",
-    "time": "HH:MM (명시되지 않으면 빈 문자열)",
-    "category": "경조사/일반/건강",
-    "is_important": "건강 카테고리인 경우에만 true, 경조사와 일반은 false",
-    "location": "장소 (있는 경우)",
-    "description": "추가 설명 (있는 경우)",
-    "is_recurring": "반복 일정 여부 (true/false)",
-    "recurrence": {{
-        "type": "daily/weekdays/weekends/custom_days (is_recurring이 true인 경우만)",
-        "times": [
-            {{"time": "07:00", "label": "아침"}},
-            {{"time": "18:00", "label": "저녁"}}
-        ],
-        "end_date": "YYYY-MM-DD 또는 null (무기한)",
-        "days_of_week": "[0,2,4] (custom_days인 경우만, 월=0, 화=1, ...)"
-    }}
-}}
-
-예시:
-- "내일 오후 3시에 병원 진료" → is_recurring: false
-- "매일 아침 7시, 저녁 6시에 약 복용" → is_recurring: true, type: "daily", times: [07:00, 18:00]
-- "평일마다 오전 9시에 회의" → is_recurring: true, type: "weekdays", times: [09:00]
-- "월, 수, 금요일 오전 6시, 오후 5시에 기상 알람" → is_recurring: true, type: "custom_days", days_of_week: [0,2,4], times: [06:00, 17:00]
-"""
+        """정보 추출 프롬프트 생성 (Config/prompts.py 사용)"""
+        from Config.prompts import PromptManager
+        return PromptManager.get_schedule_extraction_prompt(text)
