@@ -1,4 +1,4 @@
-# 메모알림앱 (Memo Notification App)
+# 일정알림앱 (schedule Notification App)
 
 **Flutter로 개발한 일정 관리 모바일 앱**
 
