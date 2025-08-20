@@ -138,11 +138,35 @@ def _create_schedule_action_response(action_type: str, schedule_data: Dict[str, 
     
     if action_type == "schedule_add":
         ui_instructions["show_confirmation"] = True
-        ui_instructions["notification"] = {
-            "type": "success",
-            "title": "일정 추가됨",
-            "message": f"{schedule_data.get('title', '일정')}이 추가되었습니다"
-        }
+        
+        # 반복 일정 UI 지시사항 추가
+        is_recurring = schedule_data.get('is_recurring', False)
+        if is_recurring:
+            ui_instructions["highlight_recurring"] = True
+            recurrence = schedule_data.get('recurrence', {})
+            if recurrence.get('times') and len(recurrence['times']) > 1:
+                ui_instructions["show_multiple_times"] = True
+            if recurrence.get('end_date'):
+                ui_instructions["show_end_date"] = True
+            else:
+                ui_instructions["show_indefinite"] = True
+            if recurrence.get('type') == 'custom_days':
+                ui_instructions["show_custom_days"] = True
+            
+            # 반복 일정 전용 알림
+            recurrence_desc = _get_recurrence_description(recurrence)
+            ui_instructions["notification"] = {
+                "type": "success",
+                "title": "반복 일정 추가됨",
+                "message": f"{schedule_data.get('title', '일정')} {recurrence_desc}이 추가되었습니다"
+            }
+        else:
+            # 일반 일정 알림
+            ui_instructions["notification"] = {
+                "type": "success",
+                "title": "일정 추가됨",
+                "message": f"{schedule_data.get('title', '일정')}이 추가되었습니다"
+            }
     elif action_type == "schedule_delete":
         ui_instructions["remove_item"] = schedule_data.get("id")
         ui_instructions["notification"] = {
@@ -163,6 +187,47 @@ def _create_schedule_action_response(action_type: str, schedule_data: Dict[str, 
         ui_instructions=ui_instructions,
         is_important=True
     )
+
+
+def _get_recurrence_description(recurrence: Dict[str, Any]) -> str:
+    """반복 패턴 설명 생성"""
+    try:
+        recurrence_type = recurrence.get('type', 'daily')
+        times = recurrence.get('times', [])
+        days_of_week = recurrence.get('days_of_week', [])
+        
+        # 반복 주기 설명
+        type_desc = {
+            'daily': '매일',
+            'weekdays': '평일마다',
+            'weekends': '주말마다',
+            'custom_days': _get_custom_days_description(days_of_week)
+        }.get(recurrence_type, '반복')
+        
+        # 시간 설명 (간단히)
+        if len(times) > 1:
+            return f"{type_desc} {len(times)}회"
+        else:
+            return type_desc
+            
+    except:
+        return "반복"
+
+
+def _get_custom_days_description(days_of_week: list) -> str:
+    """요일 목록을 한국어로 변환"""
+    if not days_of_week:
+        return "특정 요일마다"
+    
+    day_names = ['월', '화', '수', '목', '금', '토', '일']
+    try:
+        selected_days = [day_names[day] for day in days_of_week if 0 <= day <= 6]
+        if len(selected_days) <= 2:
+            return ", ".join(selected_days) + "요일마다"
+        else:
+            return f"{len(selected_days)}개 요일마다"
+    except:
+        return "특정 요일마다"
 
 
 def _create_text_response(text: str, response_text: str = None, simple_text: str = None):

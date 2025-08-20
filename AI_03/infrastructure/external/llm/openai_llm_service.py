@@ -188,7 +188,7 @@ JSON 형식으로만 응답:
 """
     
     def _get_extraction_prompt(self, text: str) -> str:
-        """정보 추출 프롬프트 생성"""
+        """정보 추출 프롬프트 생성 (반복 일정 지원)"""
         from datetime import datetime
         current_date = datetime.now().strftime("%Y-%m-%d")
         
@@ -213,6 +213,25 @@ JSON 형식으로만 응답:
 - 경조사: 결혼식, 장례식, 돌있을, 생일잉이, 기념일 등 경조사 관련 일정 (is_important = false)
 - 일반: 그 외 모든 일상적인 일정 (is_important = false)
 
+반복 일정 감지 규칙:
+1. 반복 키워드:
+   - "매일", "매일마다" → daily
+   - "평일", "평일마다", "월요일부터 금요일" → weekdays  
+   - "주말", "주말마다", "토요일 일요일" → weekends
+   - "월, 수, 금", "화목토", 특정 요일들 → custom_days
+
+2. 요일 매핑 (custom_days용):
+   - 월요일=0, 화요일=1, 수요일=2, 목요일=3, 금요일=4, 토요일=5, 일요일=6
+
+3. 다중 시간 감지:
+   - "아침 7시, 저녁 6시"
+   - "오전 8시, 오후 1시, 저녁 8시"
+   - "하루 2번", "하루 3번"
+
+4. 종료 조건:
+   - "~까지", "~년 ~월까지" → 특정 날짜
+   - 명시 없음 → 무기한 (end_date: null)
+
 추출 규칙:
 1. 구체적인 일정 내용이 없으면 title을 비워두세요 ("")
 2. 명확한 날짜/시간이 없으면 해당 필드를 비워두세요
@@ -226,6 +245,22 @@ JSON 형식으로만 응답:
     "category": "경조사/일반/건강",
     "is_important": "건강 카테고리인 경우에만 true, 경조사와 일반은 false",
     "location": "장소 (있는 경우)",
-    "description": "추가 설명 (있는 경우)"
+    "description": "추가 설명 (있는 경우)",
+    "is_recurring": "반복 일정 여부 (true/false)",
+    "recurrence": {{
+        "type": "daily/weekdays/weekends/custom_days (is_recurring이 true인 경우만)",
+        "times": [
+            {{"time": "07:00", "label": "아침"}},
+            {{"time": "18:00", "label": "저녁"}}
+        ],
+        "end_date": "YYYY-MM-DD 또는 null (무기한)",
+        "days_of_week": "[0,2,4] (custom_days인 경우만, 월=0, 화=1, ...)"
+    }}
 }}
+
+예시:
+- "내일 오후 3시에 병원 진료" → is_recurring: false
+- "매일 아침 7시, 저녁 6시에 약 복용" → is_recurring: true, type: "daily", times: [07:00, 18:00]
+- "평일마다 오전 9시에 회의" → is_recurring: true, type: "weekdays", times: [09:00]
+- "월, 수, 금요일 오전 6시, 오후 5시에 기상 알람" → is_recurring: true, type: "custom_days", days_of_week: [0,2,4], times: [06:00, 17:00]
 """

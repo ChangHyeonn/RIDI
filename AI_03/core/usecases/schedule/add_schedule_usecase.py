@@ -53,7 +53,29 @@ class AddScheduleUseCase:
                 self.logger.error(f"DateTime parsing failed: {e}")
                 return AddScheduleResult(False, error_message="날짜 형식이 올바르지 않습니다.")
             
-            # 3. 일정 엔티티 생성
+            # 3. 일정 엔티티 생성 (반복 일정 지원)
+            is_recurring = schedule_info.get('is_recurring', False)
+            recurrence_pattern = None
+            
+            if is_recurring and 'recurrence' in schedule_info:
+                # 반복 패턴 생성
+                from core.entities.schedule import RecurrencePattern, RecurrenceTime
+                
+                recurrence_data = schedule_info['recurrence']
+                times = []
+                for time_info in recurrence_data.get('times', []):
+                    times.append(RecurrenceTime(
+                        time=time_info.get('time', ''),
+                        label=time_info.get('label')
+                    ))
+                
+                recurrence_pattern = RecurrencePattern(
+                    type=recurrence_data.get('type', 'daily'),
+                    times=times,
+                    end_date=recurrence_data.get('end_date'),
+                    days_of_week=recurrence_data.get('days_of_week')
+                )
+            
             schedule = Schedule(
                 id=None,  # Repository에서 생성
                 user_id=user_id,
@@ -62,7 +84,9 @@ class AddScheduleUseCase:
                 category=schedule_info.get('category', '일반'),
                 is_important=schedule_info.get('is_important', False),
                 location=schedule_info.get('location'),
-                description=schedule_info.get('description')
+                description=schedule_info.get('description'),
+                is_recurring=is_recurring,
+                recurrence_pattern=recurrence_pattern
             )
             
             # AI_02 스타일 로그: 일정 생성 완료
@@ -74,7 +98,7 @@ class AddScheduleUseCase:
             # AI_02 스타일 로그: 저장 완료
             self.logger.info(f"Schedule saved to repository: {saved_schedule.title} (ID: {saved_schedule.id})")
             
-            # 5. 결과 반환
+            # 5. 결과 반환 (반복 일정 정보 포함)
             schedule_data = {
                 'id': saved_schedule.id,
                 'title': saved_schedule.title,
@@ -82,8 +106,21 @@ class AddScheduleUseCase:
                 'category': saved_schedule.category,
                 'is_important': saved_schedule.is_important,
                 'location': saved_schedule.location,
-                'description': saved_schedule.description
+                'description': saved_schedule.description,
+                'is_recurring': saved_schedule.is_recurring
             }
+            
+            # 반복 일정 정보 추가
+            if saved_schedule.is_recurring and saved_schedule.recurrence_pattern:
+                schedule_data['recurrence'] = {
+                    'type': saved_schedule.recurrence_pattern.type,
+                    'times': [{
+                        'time': rt.time,
+                        'label': rt.label
+                    } for rt in saved_schedule.recurrence_pattern.times],
+                    'end_date': saved_schedule.recurrence_pattern.end_date,
+                    'days_of_week': saved_schedule.recurrence_pattern.days_of_week
+                }
             
             # AI_02 스타일 로그: 최종 성공
             self.logger.info(f"Schedule added successfully: {saved_schedule.title}")

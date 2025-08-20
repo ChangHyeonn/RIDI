@@ -214,29 +214,124 @@ class ProcessTextUseCase:
             )
     
     def _generate_add_response(self, schedule_data: Dict[str, Any]) -> str:
-        """일정 추가 응답 메시지 생성"""
+        """일정 추가 응답 메시지 생성 (반복 일정 지원)"""
         try:
             title = schedule_data.get('title', '일정')
             datetime_str = schedule_data.get('datetime', '')
+            is_recurring = schedule_data.get('is_recurring', False)
+            recurrence = schedule_data.get('recurrence', {})
             
-            if datetime_str:
-                # YYYY-MM-DD HH:MM 형식 파싱
-                from datetime import datetime
-                dt = datetime.fromisoformat(datetime_str.replace('T', ' ')[:16])
-                month = dt.month
-                day = dt.day
-                hour = dt.hour
-                minute = dt.minute
-                
-                if minute == 0:
-                    return f"{month}월 {day}일 {hour}시에 {title} 일정을 추가하였습니다."
-                else:
-                    return f"{month}월 {day}일 {hour}시 {minute}분에 {title} 일정을 추가하였습니다."
+            if is_recurring and recurrence:
+                # 반복 일정 응답 생성
+                return self._generate_recurring_response(title, datetime_str, recurrence)
             else:
-                return f"{title} 일정을 추가하였습니다."
+                # 일반 일정 응답 생성 (기존 로직)
+                if datetime_str:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(datetime_str.replace('T', ' ')[:16])
+                    month = dt.month
+                    day = dt.day
+                    hour = dt.hour
+                    minute = dt.minute
+                    
+                    if minute == 0:
+                        return f"{month}월 {day}일 {hour}시에 {title} 일정을 추가하였습니다."
+                    else:
+                        return f"{month}월 {day}일 {hour}시 {minute}분에 {title} 일정을 추가하였습니다."
+                else:
+                    return f"{title} 일정을 추가하였습니다."
                 
         except Exception:
             return "일정이 성공적으로 추가되었습니다."
+    
+    def _generate_recurring_response(self, title: str, datetime_str: str, recurrence: Dict[str, Any]) -> str:
+        """반복 일정 응답 메시지 생성"""
+        try:
+            recurrence_type = recurrence.get('type', 'daily')
+            times = recurrence.get('times', [])
+            end_date = recurrence.get('end_date')
+            days_of_week = recurrence.get('days_of_week', [])
+            
+            # 반복 주기 설명
+            type_desc = {
+                'daily': '매일',
+                'weekdays': '평일마다',
+                'weekends': '주말마다',
+                'custom_days': self._get_custom_days_description(days_of_week)
+            }.get(recurrence_type, '반복으로')
+            
+            # 시간 설명
+            times_desc = ""
+            if len(times) == 1:
+                time_str = times[0].get('time', '').split(':')
+                if len(time_str) == 2:
+                    hour = int(time_str[0])
+                    minute = int(time_str[1])
+                    if minute == 0:
+                        times_desc = f"{hour}시"
+                    else:
+                        times_desc = f"{hour}시 {minute}분"
+            elif len(times) > 1:
+                time_labels = []
+                for time_info in times:
+                    time_str = time_info.get('time', '').split(':')
+                    label = time_info.get('label', '')
+                    if len(time_str) == 2:
+                        hour = int(time_str[0])
+                        minute = int(time_str[1])
+                        if label:
+                            time_labels.append(f"{label} {hour}시")
+                        else:
+                            if minute == 0:
+                                time_labels.append(f"{hour}시")
+                            else:
+                                time_labels.append(f"{hour}시 {minute}분")
+                
+                if len(time_labels) == 2:
+                    times_desc = f"{time_labels[0]}와 {time_labels[1]}"
+                else:
+                    times_desc = ", ".join(time_labels[:-1]) + f"와 {time_labels[-1]}"
+            
+            # 종료 조건 설명
+            end_desc = ""
+            if end_date:
+                try:
+                    from datetime import datetime
+                    end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                    end_month = end_dt.month
+                    end_year = end_dt.year
+                    if end_year != datetime.now().year:
+                        end_desc = f"{end_year}년 {end_month}월까지 "
+                    else:
+                        end_desc = f"{end_month}월까지 "
+                except:
+                    end_desc = f"{end_date}까지 "
+            
+            # 최종 메시지 조합
+            if times_desc:
+                return f"{end_desc}{type_desc} {times_desc}에 {title} 일정을 추가하였습니다."
+            else:
+                return f"{end_desc}{type_desc} {title} 일정을 추가하였습니다."
+                
+        except Exception:
+            return f"{title} 반복 일정이 성공적으로 추가되었습니다."
+    
+    def _get_custom_days_description(self, days_of_week: list) -> str:
+        """요일 목록을 한국어로 변환"""
+        if not days_of_week:
+            return "특정 요일마다"
+        
+        day_names = ['월', '화', '수', '목', '금', '토', '일']
+        try:
+            selected_days = [day_names[day] for day in days_of_week if 0 <= day <= 6]
+            if len(selected_days) == 1:
+                return f"{selected_days[0]}요일마다"
+            elif len(selected_days) == 2:
+                return f"{selected_days[0]}, {selected_days[1]}요일마다"
+            else:
+                return ", ".join(selected_days[:-1]) + f", {selected_days[-1]}요일마다"
+        except:
+            return "특정 요일마다"
     
     def _generate_read_response(self, schedules: list) -> str:
         """일정 조회 응답 메시지 생성"""
