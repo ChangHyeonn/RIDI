@@ -7,6 +7,7 @@ import 'settings_screen.dart';
 import 'date_detail_screen.dart';
 import 'record_screen.dart';
 import 'voice_test_screen.dart';
+import 'recurring_tasks_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -691,6 +692,16 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                                     child: Row(
                                                                                       mainAxisSize: MainAxisSize.min,
                                                                                       children: [
+                                                                                        // 반복 일정 아이콘 (반복 일정인 경우)
+                                                                                        if (task.isRecurring)
+                                                                                          Text(
+                                                                                            '🔄',
+                                                                                            style: TextStyle(
+                                                                                              fontSize:
+                                                                                                  12 *
+                                                                                                  scaleFactor,
+                                                                                            ),
+                                                                                          ),
                                                                                         Text(
                                                                                           TaskCategories.getCategoryIcon(
                                                                                             task.category,
@@ -1367,6 +1378,16 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                                     child: Row(
                                                                                       mainAxisSize: MainAxisSize.min,
                                                                                       children: [
+                                                                                        // 반복 일정 아이콘 (반복 일정인 경우)
+                                                                                        if (task.isRecurring)
+                                                                                          Text(
+                                                                                            '🔄',
+                                                                                            style: TextStyle(
+                                                                                              fontSize:
+                                                                                                  12 *
+                                                                                                  scaleFactor,
+                                                                                            ),
+                                                                                          ),
                                                                                         Text(
                                                                                           TaskCategories.getCategoryIcon(
                                                                                             task.category,
@@ -1661,6 +1682,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 16),
                             ],
                           ),
                         ),

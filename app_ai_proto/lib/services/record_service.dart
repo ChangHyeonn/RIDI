@@ -603,6 +603,45 @@ class RecordService {
           scheduleData['priority'] == 'high' ||
           category == '건강';
 
+      // 반복 일정 정보 처리
+      bool isRecurring = scheduleData['is_recurring'] ?? false;
+      RecurrenceInfo? recurrence;
+
+      if (isRecurring && scheduleData['recurrence'] != null) {
+        try {
+          final recurrenceData =
+              scheduleData['recurrence'] as Map<String, dynamic>;
+          final times =
+              (recurrenceData['times'] as List?)
+                  ?.map((time) => RecurrenceTime.fromJson(time))
+                  .toList() ??
+              [];
+
+          recurrence = RecurrenceInfo(
+            type: recurrenceData['type'] ?? 'daily',
+            times: times,
+            endDate: recurrenceData['end_date'] != null
+                ? DateTime.parse(recurrenceData['end_date'])
+                : null,
+            daysOfWeek: recurrenceData['days_of_week'] != null
+                ? List<int>.from(recurrenceData['days_of_week'])
+                : null,
+          );
+
+          print('📋 반복 일정 정보:');
+          print('  - 반복 타입: ${recurrence.type}');
+          print(
+            '  - 반복 시간: ${recurrence.times.map((t) => '${t.label} ${t.time}').join(', ')}',
+          );
+          print('  - 종료 날짜: ${recurrence.endDate}');
+          print('  - 요일: ${recurrence.daysOfWeek}');
+        } catch (e) {
+          print('⚠️ 반복 일정 정보 파싱 실패: $e');
+          isRecurring = false;
+          recurrence = null;
+        }
+      }
+
       print('📋 서버에서 받은 정보:');
       print('  - 원본 category 값: ${scheduleData['category']}');
       print('  - category 타입: ${scheduleData['category']?.runtimeType}');
@@ -610,6 +649,7 @@ class RecordService {
       print('  - is_important: ${scheduleData['is_important']}');
       print('  - priority: ${scheduleData['priority']}');
       print('  - 최종 중요도: $isImportant');
+      print('  - 반복 일정: $isRecurring');
 
       // Task 객체 생성
       final task = Task(
@@ -619,6 +659,8 @@ class RecordService {
         isCompleted: false,
         isImportant: isImportant,
         category: category,
+        isRecurring: isRecurring,
+        recurrence: recurrence,
       );
 
       print('📋 생성된 Task 객체:');

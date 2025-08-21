@@ -46,10 +46,10 @@ dependencies:
   share_plus: ^11.1.0
   speech_to_text: ^7.3.0
   flutter_tts: ^4.2.3
-  device_info_plus: ^10.1.0
-  flutter_local_notifications: ^17.2.2
-  timezone: ^0.9.4
-  audioplayers: ^5.2.1
+  device_info_plus: ^11.5.0
+  flutter_local_notifications: ^19.4.0
+  timezone: ^0.10.1
+  audioplayers: ^6.5.0
 
 dev_dependencies:
   flutter_test:

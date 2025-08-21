@@ -129,8 +129,6 @@ class AlarmService {
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
         payload: task.id, // Task ID를 payload로 전달
       );
 
@@ -208,6 +206,38 @@ class AlarmService {
 
   // 알람 화면 표시
   void _showAlarmScreen(Task task, BuildContext? context) {
+    final now = DateTime.now();
+    final alarmTime = DateTime(
+      task.date.year,
+      task.date.month,
+      task.date.day,
+      task.date.hour,
+      task.date.minute,
+    );
+
+    // 정확한 시간 체크: 설정된 시간과 1분 이내 차이여야 함
+    final timeDifference = now.difference(alarmTime).abs();
+    if (timeDifference.inMinutes > 1) {
+      print('❌ 알람 시간 불일치로 알람 취소');
+      print('  - 설정 시간: $alarmTime');
+      print('  - 현재 시간: $now');
+      print(
+        '  - 시간 차이: ${timeDifference.inMinutes}분 ${timeDifference.inSeconds % 60}초',
+      );
+      return;
+    }
+
+    // 이미 완료된 일정이면 알람 표시하지 않음
+    if (task.isCompleted) {
+      print('❌ 이미 완료된 일정으로 알람 취소: ${task.title}');
+      return;
+    }
+
+    print('⏰ 정확한 시간에 알람 실행');
+    print('  - 설정 시간: $alarmTime');
+    print('  - 현재 시간: $now');
+    print('  - 시간 차이: ${timeDifference.inSeconds}초');
+
     // 알람 소리 재생 (진동 + TTS)
     _playAlarmSound(task, context);
 
@@ -262,6 +292,15 @@ class AlarmService {
         }
       }
 
+      // 중요한 일정인 경우 볼륨을 1.5배로 증가
+      if (task.isImportant) {
+        final originalVolume = volume;
+        volume = (volume * 1.5).clamp(0.0, 1.0); // 최대 1.0으로 제한
+        print(
+          '⭐ 중요한 일정: 볼륨 ${(originalVolume * 100).toInt()}% → ${(volume * 100).toInt()}% (1.5배 증가)',
+        );
+      }
+
       // 볼륨이 0이면 소리 재생하지 않음
       if (volume <= 0.0) {
         print('🔇 볼륨이 0이므로 소리 재생하지 않음 (진동만 발생)');
@@ -271,8 +310,8 @@ class AlarmService {
       // 첫 번째 알람 소리 재생
       await _playSingleAlarmSound(task, volume);
 
-      // 반복 재생 타이머 설정 (5초마다 반복)
-      final repeatTimer = Timer.periodic(const Duration(seconds: 5), (
+      // 반복 재생 타이머 설정 (알람 소리 길이 + 1초 간격으로 반복)
+      final repeatTimer = Timer.periodic(const Duration(seconds: 6), (
         timer,
       ) async {
         print('🔄 알람 소리 반복 재생: ${task.title}');
@@ -286,7 +325,7 @@ class AlarmService {
 
       // 반복 재생 타이머 저장
       _alarmSoundTimers[task.id] = repeatTimer;
-      print('✅ 반복 재생 타이머 설정 완료 (5초마다 반복)');
+      print('✅ 반복 재생 타이머 설정 완료 (6초마다 반복)');
     } catch (e) {
       print('알람 소리/진동 실패: $e');
       print('에러 상세 정보: ${e.toString()}');
@@ -298,10 +337,21 @@ class AlarmService {
   Future<void> _playSingleAlarmSound(Task task, double volume) async {
     try {
       // 음성 파일 재생 (assets/sounds/alarm.mp3)
-      print('🔊 음성 파일 재생: alarm.mp3');
+      print('🔊 음성 파일 재생: alarm.mp3 (볼륨: ${(volume * 100).toInt()}%)');
       try {
+        // 기존 재생 중지
+        await _audioPlayer.stop();
+
+        // 볼륨 설정
+        await _audioPlayer.setVolume(volume);
+
+        // 음성 파일 재생
         await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
-        print('✅ 음성 파일 재생 성공');
+
+        // 재생 완료 대기 (알람 소리 길이만큼)
+        await Future.delayed(const Duration(seconds: 5));
+
+        print('✅ 음성 파일 재생 완료');
       } catch (e) {
         print('❌ 음성 파일 재생 실패: $e');
         // 음성 파일 재생 실패 시 TTS로 폴백

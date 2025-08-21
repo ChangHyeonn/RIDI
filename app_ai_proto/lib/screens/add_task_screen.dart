@@ -962,7 +962,13 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => setState(() => _isImportant = false),
+                        onTap: () {
+                          // 건강 카테고리일 때는 일반 일정 선택 불가
+                          if (_selectedCategory == TaskCategories.health) {
+                            return;
+                          }
+                          setState(() => _isImportant = false);
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -984,18 +990,24 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                             children: [
                               Icon(
                                 Icons.star_border,
-                                color: !_isImportant
-                                    ? Colors.white
-                                    : Colors.grey,
+                                color:
+                                    _selectedCategory == TaskCategories.health
+                                    ? Colors.grey[400] // 건강 카테고리일 때 더 어둡게
+                                    : (!_isImportant
+                                          ? Colors.white
+                                          : Colors.grey),
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 '일반 일정',
                                 style: TextStyle(
-                                  color: !_isImportant
-                                      ? Colors.white
-                                      : Colors.grey,
+                                  color:
+                                      _selectedCategory == TaskCategories.health
+                                      ? Colors.grey[400] // 건강 카테고리일 때 더 어둡게
+                                      : (!_isImportant
+                                            ? Colors.white
+                                            : Colors.grey),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
