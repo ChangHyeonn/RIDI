@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'speech_to_text_service.dart';
 import 'text_to_speech_service.dart';
 import 'ai_service.dart';
@@ -122,7 +121,18 @@ class UnifiedVoiceService {
       print('=== 음성 인식 시작 ===');
       _statusStreamController.add('음성 인식을 시작합니다. 말씀해주세요.');
 
-      final success = await _sttService.startListening();
+      // STT 시작 전 TTS 재생 중이면 중지
+      if (_ttsService.isSpeaking) {
+        print('🔇 STT 시작 전 TTS 중지');
+        await _ttsService.stop();
+      }
+
+      final success = await _sttService.startListening(
+        localeId: 'ko_KR',
+        partialResults: true,
+        onDevice: false,
+        assumePermissionGranted: false,
+      );
       if (success) {
         print('✅ 음성 인식 시작 성공');
         return true;
@@ -180,24 +190,32 @@ class UnifiedVoiceService {
       print('=== AI 처리 시작 ===');
       print('처리할 텍스트: $text');
 
-      // AI 서비스에 텍스트 전송 (임시로 더미 응답 생성)
-      // TODO: AI 서버에 텍스트 처리 API 추가 후 실제 호출
-      // final aiResponse = await AIService.processText(text);
+      // 의미/품질 검사 (간략화 버전)
+      final trimmed = text.trim();
+      if (trimmed.isEmpty) {
+        _errorStreamController.add('처리할 텍스트가 비어있습니다.');
+        _statusStreamController.add('인식 결과가 비어있습니다. 다시 말씀해주세요.');
+        _isProcessing = false;
+        return;
+      }
 
-      // 임시 더미 응답 생성
-      final aiResponse = AIResponse(
-        success: true,
-        timestamp: DateTime.now().toIso8601String(),
-        processingResult: null,
-        responseText:
-            '음성 인식이 완료되었습니다. 인식된 텍스트: "$text". AI 서버의 텍스트 처리 API가 준비되면 실제 AI 응답을 받을 수 있습니다.',
-      );
+      // 중복 방지
+      if (_lastProcessedText == trimmed) {
+        print('중복 텍스트 처리 방지: "$trimmed"');
+        _isProcessing = false;
+        return;
+      }
+      _lastProcessedText = trimmed;
+
+      // 모든 문장은 서버로 전송 (필터링은 서버가 담당)
+      final aiResponse = await AIService.processText(trimmed);
 
       _aiResponseStreamController.add(aiResponse);
       print('AI 응답: ${aiResponse.responseText}');
 
-      // TTS로 응답 재생
-      if (aiResponse.responseText != null) {
+      // TTS로 응답 재생 (응답 텍스트가 있을 때)
+      if (aiResponse.responseText != null &&
+          aiResponse.responseText!.trim().isNotEmpty) {
         await _ttsService.speak(aiResponse.responseText!);
       }
 

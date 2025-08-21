@@ -27,6 +27,14 @@ class TaskService {
     await saveTasks(tasks);
   }
 
+  // 일정 여러 개 추가하기 (경쟁 상태 방지용 일괄 저장)
+  Future<void> addTasks(List<Task> newTasks) async {
+    if (newTasks.isEmpty) return;
+    final tasks = await getTasks();
+    tasks.addAll(newTasks);
+    await saveTasks(tasks);
+  }
+
   // 일정 업데이트하기
   Future<void> updateTask(Task task) async {
     final tasks = await getTasks();
@@ -41,6 +49,14 @@ class TaskService {
   Future<void> deleteTask(String taskId) async {
     final tasks = await getTasks();
     tasks.removeWhere((task) => task.id == taskId);
+    await saveTasks(tasks);
+  }
+
+  // 일정 여러 개 삭제하기
+  Future<void> deleteTasks(List<String> taskIds) async {
+    if (taskIds.isEmpty) return;
+    final tasks = await getTasks();
+    tasks.removeWhere((task) => taskIds.contains(task.id));
     await saveTasks(tasks);
   }
 

@@ -30,6 +30,7 @@ class AlarmService {
       FlutterLocalNotificationsPlugin();
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isInitialized = false;
+  final Set<String> _activeAlarmTaskIds = <String>{};
 
   // 초기화
   Future<void> initialize() async {
@@ -178,9 +179,13 @@ class AlarmService {
       print('반복 재생 타이머 취소됨: $taskId');
     }
 
+    // 활성 알람 집합에서 제거 및 사운드도 안전하게 정지
+    _activeAlarmTaskIds.remove(taskId);
+    await Future.microtask(() => stopAlarmSound(taskId));
+
     // 로컬 알림도 취소
     try {
-      await _notifications.cancel(int.parse(taskId));
+      await _notifications.cancel(int.tryParse(taskId) ?? 0);
       print('로컬 알림 취소됨: $taskId');
     } catch (e) {
       print('로컬 알림 취소 실패: $e');
@@ -238,8 +243,14 @@ class AlarmService {
     print('  - 현재 시간: $now');
     print('  - 시간 차이: ${timeDifference.inSeconds}초');
 
-    // 알람 소리 재생 (진동 + TTS)
-    _playAlarmSound(task, context);
+    // 중복 방지: 이미 활성화된 알람이면 재생하지 않음
+    if (_activeAlarmTaskIds.contains(task.id)) {
+      print('ℹ️ 이미 활성화된 알람입니다. 중복 재생 방지: ${task.id}');
+    } else {
+      _activeAlarmTaskIds.add(task.id);
+      // 알람 소리 재생 (진동 + TTS)
+      _playAlarmSound(task, context);
+    }
 
     // 전역 NavigatorKey를 사용하여 알람 화면 표시
     if (navigatorKey.currentState != null) {
@@ -378,6 +389,7 @@ class AlarmService {
         _alarmSoundTimers[taskId]?.cancel();
         _alarmSoundTimers.remove(taskId);
         print('✅ 특정 알람 반복 재생 중지: $taskId');
+        _activeAlarmTaskIds.remove(taskId);
       }
 
       // 모든 반복 재생 중지
@@ -386,6 +398,7 @@ class AlarmService {
       }
       _alarmSoundTimers.clear();
       print('✅ 모든 알람 반복 재생 중지');
+      _activeAlarmTaskIds.clear();
 
       // TTS 중지
       await _ttsService.stop();

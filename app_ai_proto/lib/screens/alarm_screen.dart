@@ -252,7 +252,7 @@ class _AlarmScreenState extends State<AlarmScreen>
   void _dismissAlarm() {
     // 알람 소리 정지
     final alarmService = AlarmService();
-    alarmService.stopAlarmSound();
+    alarmService.stopAlarmSound(widget.task.id);
 
     // 알람 해제 시 일정을 완료 상태로 변경
     final taskProvider = context.read<TaskProvider>();

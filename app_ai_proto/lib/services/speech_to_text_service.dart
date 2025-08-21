@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
 
@@ -205,12 +204,13 @@ class SpeechToTextService {
     String? localeId,
     bool partialResults = true,
     bool onDevice = false,
+    bool assumePermissionGranted = false,
   }) async {
     print('=== 음성 인식 시작 요청 (audio_app2 방식) ===');
     print('🌐 Web 환경 여부: $kIsWeb');
 
     // 권한 확인 (Error 7 방지)
-    if (!kIsWeb) {
+    if (!kIsWeb && !assumePermissionGranted) {
       print('🔐 권한 확인 중...');
       final hasPermission = await _requestPermission();
       if (!hasPermission) {
@@ -232,51 +232,68 @@ class SpeechToTextService {
       print('=== audio_app2 방식으로 초기화 및 시작 ===');
 
       // audio_app2 방식: 매번 initialize 호출
-      bool available = await _speech.initialize(
-        onError: (error) {
-          print('❌ 음성 인식 오류: ${error.errorMsg}');
+      bool available = _isAvailable
+          ? true
+          : await _speech.initialize(
+              onError: (error) {
+                print('❌ 음성 인식 오류: ${error.errorMsg}');
 
-          // 실제 오류인지 확인 (타임아웃이나 일시적 오류는 무시)
-          if (error.errorMsg == 'error_speech_timeout' ||
-              error.errorMsg == 'error_no_speech' ||
-              error.errorMsg == 'error_audio' ||
-              error.errorMsg == 'error_network') {
-            print('⚠️ 일시적 오류로 판단하여 무시: ${error.errorMsg}');
-            // 오류 스트림으로 전송하지 않음
-          } else {
-            print('❌ 실제 오류로 판단하여 전송: ${error.errorMsg}');
-            if (!_errorStreamController.isClosed) {
-              _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
-            }
-          }
+                // 실제 오류인지 확인 (타임아웃이나 일시적 오류는 무시)
+                if (error.errorMsg == 'error_speech_timeout' ||
+                    error.errorMsg == 'error_no_speech' ||
+                    error.errorMsg == 'error_audio' ||
+                    error.errorMsg == 'error_network') {
+                  print('⚠️ 일시적 오류로 판단하여 무시: ${error.errorMsg}');
+                  // 오류 스트림으로 전송하지 않음
+                } else {
+                  print('❌ 실제 오류로 판단하여 전송: ${error.errorMsg}');
+                  if (!_errorStreamController.isClosed) {
+                    _errorStreamController.add('음성 인식 오류: ${error.errorMsg}');
+                  }
+                }
 
-          _isListening = false;
-          if (!_listeningStateController.isClosed) {
-            _listeningStateController.add(false);
-          }
-        },
-        onStatus: (status) {
-          print('📊 음성 인식 상태: $status');
-          if (status == 'done' ||
-              status == 'notListening' ||
-              status == 'error') {
-            _isListening = false;
-            // 스트림이 닫히지 않았을 때만 이벤트 추가
-            if (!_listeningStateController.isClosed) {
-              _listeningStateController.add(false);
-            }
-          }
-        },
-      );
+                _isListening = false;
+                if (!_listeningStateController.isClosed) {
+                  _listeningStateController.add(false);
+                }
+              },
+              onStatus: (status) {
+                print('📊 음성 인식 상태: $status');
+                if (status == 'done' ||
+                    status == 'notListening' ||
+                    status == 'error') {
+                  _isListening = false;
+                  // 스트림이 닫히지 않았을 때만 이벤트 추가
+                  if (!_listeningStateController.isClosed) {
+                    _listeningStateController.add(false);
+                  }
+                }
+              },
+            );
 
       print('🔧 SpeechToText 초기화 결과: $available');
 
       if (available) {
+        _isAvailable = true;
         // 이전 텍스트 초기화
         _currentWords = '';
         _lastWords = '';
 
         // audio_app2 방식: 매우 간단한 listen 파라미터
+        // 한국어 우선 로케일 선택
+        String? selectedLocaleId = localeId;
+        try {
+          final locales = await _speech.locales();
+          final koLocale = locales.firstWhere(
+            (l) => l.localeId.toLowerCase().startsWith('ko'),
+            orElse: () => stt.LocaleName('ko_KR', '한국어(대한민국)'),
+          );
+          selectedLocaleId ??= koLocale.localeId;
+          print('🌏 STT 로케일 선택: $selectedLocaleId');
+        } catch (e) {
+          print('로케일 조회 실패, 기본값 사용: $e');
+        }
+
         _speech.listen(
           onResult: (result) {
             print(
@@ -301,6 +318,10 @@ class SpeechToTextService {
           },
           listenFor: const Duration(seconds: 60), // 60초로 늘림
           pauseFor: const Duration(seconds: 60), // 60초로 늘림
+          partialResults: partialResults,
+          localeId: selectedLocaleId,
+          listenMode: stt.ListenMode.dictation,
+          onDevice: onDevice,
         );
 
         _isListening = true;

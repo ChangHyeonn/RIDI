@@ -214,13 +214,24 @@ class RecordService {
       // audio_app2 방식: 매번 초기화하므로 여기서는 확인만
       print('🔧 audio_app2 방식으로 STT 서비스 사용');
 
+      // STT 시작 전 TTS 재생 중이면 중지하여 오디오 경합 방지
+      if (_ttsService.isSpeaking) {
+        print('🔇 STT 시작 전 TTS 중지');
+        await _ttsService.stop();
+      }
+
       // 이전 텍스트 초기화
       _recognizedText = '';
       _aiResponseText = '';
       _recordingStartTime = DateTime.now();
 
       // 음성 인식 시작 (권한은 이미 RecordScreen에서 확인됨)
-      final success = await _sttService.startListening();
+      final success = await _sttService.startListening(
+        localeId: 'ko_KR',
+        partialResults: true,
+        onDevice: false,
+        assumePermissionGranted: true,
+      );
       if (success) {
         print('✅ 음성 인식 시작 성공');
         return true;
@@ -281,30 +292,7 @@ class RecordService {
         return;
       }
 
-      // 불완전한 일정 요청 감지 (클라이언트 측 검증) - AI 서버 호출 전에 체크
-      if (_isIncompleteScheduleRequest(text)) {
-        print('⚠️ 불완전한 일정 요청 감지: "$text"');
-        _aiResponseText =
-            '구체적인 일정 내용을 말씀해주세요. 예: "내일 오후 3시에 병원 진료", "다음 주 월요일 오전 10시에 회사 회의" 등';
-        _aiResponseStreamController.add(_aiResponseText);
-
-        try {
-          print('🔊 불완전한 일정 요청 안내 TTS 재생 시작...');
-          await _ttsService.speak(_aiResponseText);
-          print('✅ 불완전한 일정 요청 안내 TTS 재생 완료');
-
-          // TTS 재생 완료 후 자동으로 녹음 재시작
-          print('🔄 TTS 완료 후 자동 녹음 재시작...');
-          await Future.delayed(const Duration(milliseconds: 500)); // 잠시 대기
-          await _autoRestartRecording();
-        } catch (ttsError) {
-          print('❌ TTS 재생 실패: $ttsError');
-        }
-
-        // AI 처리 상태 해제
-        _aiResponseStreamController.add('');
-        return;
-      }
+      // 클라이언트 사전 차단 제거: 유효성/중복 통과 시에는 모든 텍스트를 서버로 전송
 
       // 명확화 모드에서 추가 정보가 들어온 경우
       if (_isClarificationMode) {
@@ -691,130 +679,126 @@ class RecordService {
 
       // 액션 데이터에서 일정 정보 추출
       final scheduleData = action.data;
-      if (scheduleData != null) {
-        print('📋 일정 데이터: $scheduleData');
-        print('📋 일정 데이터 타입: ${scheduleData.runtimeType}');
-        print(
-          '📋 일정 데이터 키들: ${scheduleData is Map ? scheduleData.keys.toList() : 'Map이 아님'}',
+      print('📋 일정 데이터: $scheduleData');
+      print('📋 일정 데이터 타입: ${scheduleData.runtimeType}');
+      print(
+        '📋 일정 데이터 키들: ${scheduleData is Map ? scheduleData.keys.toList() : 'Map이 아님'}',
+      );
+
+      // AI 서버 응답에서 일정 정보 파싱
+      if (scheduleData is Map<String, dynamic>) {
+        final title = scheduleData['title'] ?? '새 일정';
+        final datetime =
+            scheduleData['datetime'] ?? DateTime.now().toIso8601String();
+        final description = scheduleData['description'] ?? '';
+
+        print('📋 파싱된 일정 정보:');
+        print('  - 제목: $title');
+        print('  - 날짜: $datetime');
+        print('  - 설명: $description');
+
+        // DateTime 파싱
+        DateTime? parsedDateTime;
+        try {
+          parsedDateTime = DateTime.parse(datetime);
+        } catch (e) {
+          print('⚠️ 날짜 파싱 실패, 현재 시간 사용: $e');
+          parsedDateTime = DateTime.now();
+        }
+
+        // 지난 시간 검증 (가이드 방식에 따른 체계적 에러 처리)
+        final now = DateTime.now();
+        if (parsedDateTime.isBefore(now)) {
+          print('❌ 지난 시간의 일정은 추가할 수 없습니다');
+          print('  - 일정 시간: $parsedDateTime');
+          print('  - 현재 시간: $now');
+          print('  - 차이: ${now.difference(parsedDateTime).inMinutes}분 전');
+
+          // 가이드 방식에 따른 체계적 에러 메시지 생성
+          String errorMessage;
+          final timeDifference = now.difference(parsedDateTime);
+
+          if (timeDifference.inDays > 0) {
+            errorMessage = '지난 날짜의 일정은 추가할 수 없습니다. 미래의 날짜를 말씀해주세요.';
+          } else if (timeDifference.inHours > 0) {
+            errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
+          } else if (timeDifference.inMinutes > 0) {
+            errorMessage = '방금 지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
+          } else {
+            errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
+          }
+
+          // 가이드 방식에 따른 에러 처리
+          print('🚫 가이드 방식 에러 처리: $errorMessage');
+          _aiResponseText = errorMessage;
+          _aiResponseStreamController.add(_aiResponseText);
+
+          // TTS로 오류 메시지 재생 (가이드의 음성 피드백 방식)
+          try {
+            print('🔊 지난 시간 오류 메시지 TTS 재생 시작...');
+            await _ttsService.speak(_aiResponseText);
+            print('✅ 지난 시간 오류 메시지 TTS 재생 완료');
+          } catch (ttsError) {
+            print('❌ 지난 시간 오류 메시지 TTS 재생 실패: $ttsError');
+          }
+
+          return; // 일정 추가 중단 (가이드의 success: false 방식과 유사)
+        }
+
+        // 서버에서 받은 카테고리와 중요도 정보 확인
+        print('🔍 원본 scheduleData: $scheduleData');
+        print('🔍 scheduleData 타입: ${scheduleData.runtimeType}');
+
+        // 서버에서 받은 카테고리 그대로 사용
+        String category = scheduleData['category'] ?? '일반';
+        final isImportant =
+            scheduleData['is_important'] == true ||
+            scheduleData['priority'] == 'high' ||
+            category == '건강';
+
+        print('📋 서버에서 받은 정보:');
+        print('  - 원본 category 값: ${scheduleData['category']}');
+        print('  - category 타입: ${scheduleData['category']?.runtimeType}');
+        print('  - 최종 카테고리: $category');
+        print('  - is_important: ${scheduleData['is_important']}');
+        print('  - priority: ${scheduleData['priority']}');
+        print('  - 최종 중요도: $isImportant');
+
+        // Task 객체 생성
+        final task = Task(
+          id:
+              scheduleData['id'] ??
+              DateTime.now().millisecondsSinceEpoch.toString(),
+          title: title,
+          date: parsedDateTime,
+          isCompleted: false,
+          isImportant: isImportant,
+          category: category, // 서버에서 받은 카테고리 사용
         );
 
-        // AI 서버 응답에서 일정 정보 파싱
-        if (scheduleData is Map<String, dynamic>) {
-          final title = scheduleData['title'] ?? '새 일정';
-          final datetime =
-              scheduleData['datetime'] ?? DateTime.now().toIso8601String();
-          final description = scheduleData['description'] ?? '';
+        print('📝 생성된 Task 객체:');
+        print('  - ID: ${task.id}');
+        print('  - 제목: ${task.title}');
+        print('  - 날짜: ${task.date.toString()}');
+        print('  - 카테고리: ${task.category}');
+        print('  - 중요도: ${task.isImportant}');
 
-          print('📋 파싱된 일정 정보:');
-          print('  - 제목: $title');
-          print('  - 날짜: $datetime');
-          print('  - 설명: $description');
-
-          // DateTime 파싱
-          DateTime? parsedDateTime;
-          try {
-            parsedDateTime = DateTime.parse(datetime);
-          } catch (e) {
-            print('⚠️ 날짜 파싱 실패, 현재 시간 사용: $e');
-            parsedDateTime = DateTime.now();
+        // TaskProvider를 통해 실제 일정 추가
+        try {
+          // Provider를 통해 TaskProvider에 접근
+          final taskProvider = _getTaskProvider();
+          if (taskProvider != null) {
+            await taskProvider.addTask(task);
+            print('✅ TaskProvider를 통해 일정 추가 완료 (알람은 TaskProvider에서 자동 설정됨)');
+            print('✅ 일정 시간 검증 통과: $parsedDateTime (현재 시간: $now)');
+          } else {
+            print('❌ TaskProvider에 접근할 수 없습니다');
           }
-
-          // 지난 시간 검증 (가이드 방식에 따른 체계적 에러 처리)
-          final now = DateTime.now();
-          if (parsedDateTime.isBefore(now)) {
-            print('❌ 지난 시간의 일정은 추가할 수 없습니다');
-            print('  - 일정 시간: $parsedDateTime');
-            print('  - 현재 시간: $now');
-            print('  - 차이: ${now.difference(parsedDateTime).inMinutes}분 전');
-
-            // 가이드 방식에 따른 체계적 에러 메시지 생성
-            String errorMessage;
-            final timeDifference = now.difference(parsedDateTime);
-
-            if (timeDifference.inDays > 0) {
-              errorMessage = '지난 날짜의 일정은 추가할 수 없습니다. 미래의 날짜를 말씀해주세요.';
-            } else if (timeDifference.inHours > 0) {
-              errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
-            } else if (timeDifference.inMinutes > 0) {
-              errorMessage = '방금 지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
-            } else {
-              errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
-            }
-
-            // 가이드 방식에 따른 에러 처리
-            print('🚫 가이드 방식 에러 처리: $errorMessage');
-            _aiResponseText = errorMessage;
-            _aiResponseStreamController.add(_aiResponseText);
-
-            // TTS로 오류 메시지 재생 (가이드의 음성 피드백 방식)
-            try {
-              print('🔊 지난 시간 오류 메시지 TTS 재생 시작...');
-              await _ttsService.speak(_aiResponseText);
-              print('✅ 지난 시간 오류 메시지 TTS 재생 완료');
-            } catch (ttsError) {
-              print('❌ 지난 시간 오류 메시지 TTS 재생 실패: $ttsError');
-            }
-
-            return; // 일정 추가 중단 (가이드의 success: false 방식과 유사)
-          }
-
-          // 서버에서 받은 카테고리와 중요도 정보 확인
-          print('🔍 원본 scheduleData: $scheduleData');
-          print('🔍 scheduleData 타입: ${scheduleData.runtimeType}');
-
-          // 서버에서 받은 카테고리 그대로 사용
-          String category = scheduleData['category'] ?? '일반';
-          final isImportant =
-              scheduleData['is_important'] == true ||
-              scheduleData['priority'] == 'high' ||
-              category == '건강';
-
-          print('📋 서버에서 받은 정보:');
-          print('  - 원본 category 값: ${scheduleData['category']}');
-          print('  - category 타입: ${scheduleData['category']?.runtimeType}');
-          print('  - 최종 카테고리: $category');
-          print('  - is_important: ${scheduleData['is_important']}');
-          print('  - priority: ${scheduleData['priority']}');
-          print('  - 최종 중요도: $isImportant');
-
-          // Task 객체 생성
-          final task = Task(
-            id:
-                scheduleData['id'] ??
-                DateTime.now().millisecondsSinceEpoch.toString(),
-            title: title,
-            date: parsedDateTime,
-            isCompleted: false,
-            isImportant: isImportant,
-            category: category, // 서버에서 받은 카테고리 사용
-          );
-
-          print('📝 생성된 Task 객체:');
-          print('  - ID: ${task.id}');
-          print('  - 제목: ${task.title}');
-          print('  - 날짜: ${task.date.toString()}');
-          print('  - 카테고리: ${task.category}');
-          print('  - 중요도: ${task.isImportant}');
-
-          // TaskProvider를 통해 실제 일정 추가
-          try {
-            // Provider를 통해 TaskProvider에 접근
-            final taskProvider = _getTaskProvider();
-            if (taskProvider != null) {
-              await taskProvider.addTask(task);
-              print('✅ TaskProvider를 통해 일정 추가 완료 (알람은 TaskProvider에서 자동 설정됨)');
-              print('✅ 일정 시간 검증 통과: $parsedDateTime (현재 시간: $now)');
-            } else {
-              print('❌ TaskProvider에 접근할 수 없습니다');
-            }
-          } catch (e) {
-            print('❌ TaskProvider 일정 추가 중 오류: $e');
-          }
-        } else {
-          print('⚠️ 일정 데이터 형식이 올바르지 않습니다: $scheduleData');
+        } catch (e) {
+          print('❌ TaskProvider 일정 추가 중 오류: $e');
         }
       } else {
-        print('⚠️ 일정 데이터가 없습니다');
+        print('⚠️ 일정 데이터 형식이 올바르지 않습니다: $scheduleData');
       }
     } catch (e) {
       print('❌ 일정 추가 처리 중 오류: $e');
@@ -838,8 +822,7 @@ class RecordService {
       print('❓ === 명확화 요청 처리 시작 ===');
 
       final clarificationData = action.data;
-      if (clarificationData != null &&
-          clarificationData is Map<String, dynamic>) {
+      if (clarificationData is Map<String, dynamic>) {
         // 명확화 요청 정보 추출
         final clarificationText =
             clarificationData['clarification_text'] ?? '추가 정보가 필요합니다.';
@@ -939,7 +922,7 @@ class RecordService {
       print('📅 일정 삭제 처리 시작');
 
       final scheduleData = action.data;
-      if (scheduleData != null && scheduleData is Map<String, dynamic>) {
+      if (scheduleData is Map<String, dynamic>) {
         final taskId = scheduleData['id'];
         if (taskId != null) {
           final taskProvider = _getTaskProvider();
@@ -966,7 +949,7 @@ class RecordService {
       print('📅 일정 수정 처리 시작');
 
       final scheduleData = action.data;
-      if (scheduleData != null && scheduleData is Map<String, dynamic>) {
+      if (scheduleData is Map<String, dynamic>) {
         final taskId = scheduleData['id'];
         final title = scheduleData['title'];
         final datetime = scheduleData['datetime'];
@@ -1157,38 +1140,7 @@ class RecordService {
     }
   }
 
-  // 불완전한 일정 요청 감지 (클라이언트 측 검증)
-  bool _isIncompleteScheduleRequest(String text) {
-    final scheduleKeywords = ['일정', '추가', '만들', '등록', '예약'];
-    final incompletePatterns = [
-      '일정 추가',
-      '일정 만들어',
-      '일정 등록',
-      '일정 예약',
-      '추가해 줘',
-      '만들어 줘',
-      '등록해 줘',
-      '예약해 줘',
-    ];
-
-    // 불완전한 일정 요청 패턴 감지
-    for (final pattern in incompletePatterns) {
-      if (text.toLowerCase().contains(pattern.toLowerCase())) {
-        return true;
-      }
-    }
-
-    // 일정 키워드만 있고 구체적 내용이 없는 경우
-    bool hasScheduleKeyword = scheduleKeywords.any(
-      (keyword) => text.toLowerCase().contains(keyword.toLowerCase()),
-    );
-
-    if (hasScheduleKeyword && text.length < 10) {
-      return true;
-    }
-
-    return false;
-  }
+  // 불완전 요청 클라이언트 감지는 제거됨: 서버 응답으로 처리
 
   // 텍스트 유효성 검증 메서드 (더 관대하게 수정)
   bool _isValidTextForAI(String text) {
@@ -1205,7 +1157,7 @@ class RecordService {
     }
 
     // 3. 너무 짧은 텍스트 체크 (1글자 미만으로 완화)
-    if (text.trim().length < 1) {
+    if (text.trim().isEmpty) {
       print('🔍 텍스트 검증 실패: 너무 짧은 텍스트 (${text.trim().length}글자)');
       return false;
     }

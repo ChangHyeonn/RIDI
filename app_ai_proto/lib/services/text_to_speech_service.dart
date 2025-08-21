@@ -32,6 +32,13 @@ class TextToSpeechService {
     print('🌐 Web 환경 여부: $kIsWeb');
 
     try {
+      // TTS가 문장 재생 완료까지 await되도록 설정 (경합/타이밍 이슈 방지)
+      try {
+        await _flutterTts.awaitSpeakCompletion(true);
+      } catch (e) {
+        print('TTS awaitSpeakCompletion 설정 중 오류: $e');
+      }
+
       // iOS 크래시 방지를 위한 안전한 초기화
       if (kIsWeb) {
         print('🌐 Web 환경 TTS 설정');
@@ -58,6 +65,23 @@ class TextToSpeechService {
 
         // 모바일 환경에서 한국어 음성 설정 시도
         await _trySetKoreanVoice();
+
+        // iOS 오디오 세션 카테고리/옵션 설정 (STT/TTS 경합 감소)
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          try {
+            await _flutterTts.setIosAudioCategory(
+              IosTextToSpeechAudioCategory.playAndRecord,
+              [
+                IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
+                IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+                // IosTextToSpeechAudioCategoryOptions.allowBluetooth,
+              ],
+            );
+            print('🍎 iOS 오디오 세션 카테고리 설정 완료');
+          } catch (e) {
+            print('iOS 오디오 세션 설정 중 오류: $e');
+          }
+        }
       }
 
       // 콜백 설정
@@ -264,7 +288,7 @@ class TextToSpeechService {
     }
 
     await setVoiceSettings(speechRate: rate);
-    print('🏃 TTS 속도 변경: $speed (${rate})');
+    print('🏃 TTS 속도 변경: $speed ($rate)');
   }
 
   // 음성 톤 설정 (편의 메서드)
@@ -291,7 +315,7 @@ class TextToSpeechService {
     }
 
     await setVoiceSettings(pitch: pitch);
-    print('🎵 TTS 톤 변경: $tone (${pitch})');
+    print('🎵 TTS 톤 변경: $tone ($pitch)');
   }
 
   // 사용 가능한 언어 목록 가져오기

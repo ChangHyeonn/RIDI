@@ -307,10 +307,12 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
   }
 
   void _editRecurringTask(Task task, TaskProvider taskProvider) {
+    final signature = RecurringTaskService.buildPatternSignatureForTask(task);
     final allRecurringTasks = RecurringTaskService.findRecurringTasksByPattern(
       taskProvider.tasks,
       task.title,
       task.category,
+      signature: signature,
     );
 
     // 시간 정보 추출
@@ -345,7 +347,12 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
           initialSelectedDays: selectedDays,
           initialEndDate: endDate,
           isEditing: true,
-          editingTaskPattern: {'title': task.title, 'category': task.category},
+          editingTaskPattern: {
+            'title': task.title,
+            'category': task.category,
+            // 편집 시작 시점의 원본 패턴 시그니처 전달
+            'signature': RecurringTaskService.buildPatternSignatureForTask(task),
+          },
         ),
       ),
     );
@@ -378,20 +385,23 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
     );
   }
 
-  void _performDelete(Task task, TaskProvider taskProvider) {
+  Future<void> _performDelete(Task task, TaskProvider taskProvider) async {
     debugPrint('🗑️ 반복 일정 삭제 시작: ${task.title}');
 
+    final signature = RecurringTaskService.buildPatternSignatureForTask(task);
     final recurringTasks = RecurringTaskService.findRecurringTasksByPattern(
       taskProvider.tasks,
       task.title,
       task.category,
+      signature: signature,
     );
 
     debugPrint('  - 삭제할 일정 개수: ${recurringTasks.length}');
 
+    final idsToDelete = <String>[];
     for (final recurringTask in recurringTasks) {
-      taskProvider.deleteTask(recurringTask.id);
-      debugPrint('  - 삭제: ${recurringTask.date} (ID: ${recurringTask.id})');
+      idsToDelete.add(recurringTask.id);
+      debugPrint('  - 삭제 예정: ${recurringTask.date} (ID: ${recurringTask.id})');
     }
 
     // 추가 안전장치: 제목이 같은 모든 반복 일정 삭제
@@ -401,10 +411,12 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
 
     for (final similarTask in allSimilarTasks) {
       if (!recurringTasks.contains(similarTask)) {
-        taskProvider.deleteTask(similarTask.id);
-        debugPrint('  - 추가 삭제: ${similarTask.date} (ID: ${similarTask.id})');
+        idsToDelete.add(similarTask.id);
+        debugPrint('  - 추가 삭제 예정: ${similarTask.date} (ID: ${similarTask.id})');
       }
     }
+
+    await taskProvider.deleteTasks(idsToDelete);
 
     debugPrint('✅ 반복 일정 삭제 완료');
   }

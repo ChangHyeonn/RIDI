@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
+import '../models/task.dart';
 import '../constants/categories.dart';
 import '../constants/recurring_task_constants.dart';
 import '../services/recurring_task_service.dart';
@@ -14,6 +15,7 @@ class RecurrenceManagementScreen extends StatefulWidget {
   final DateTime? initialEndDate;
   final bool isEditing;
   final Map<String, dynamic>? editingTaskPattern;
+  final String? editingSignature;
 
   const RecurrenceManagementScreen({
     super.key,
@@ -24,6 +26,7 @@ class RecurrenceManagementScreen extends StatefulWidget {
     this.initialEndDate,
     this.isEditing = false,
     this.editingTaskPattern,
+    this.editingSignature,
   });
 
   @override
@@ -62,7 +65,8 @@ class _RecurrenceManagementScreenState
     _title = widget.initialTitle ?? '반복 일정';
     _selectedCategory = TaskCategories.general;
     _isImportant = false;
-    _endDate = widget.initialEndDate ?? RecurringTaskConstants.defaultEndDate;
+    // 기본 종료일을 오늘로 설정
+    _endDate = widget.initialEndDate ?? DateTime.now();
 
     if (widget.isEditing) {
       _selectedDays = widget.initialSelectedDays ?? List.filled(7, false);
@@ -409,13 +413,33 @@ class _RecurrenceManagementScreenState
   Widget _buildAddTimeButton() {
     return GestureDetector(
       onTap: () {
-        setState(() {
-          final newTime = TimeOfDay(
-            hour: (_selectedTime.hour + 1) % 24,
-            minute: _selectedTime.minute,
+        // 중복 방지: 기존 메인/추가 시간과 겹치지 않는 시간만 추가
+        final existing = <String>{
+          '${_selectedTime.hour}:${_selectedTime.minute}',
+          ..._additionalTimes.map((t) => '${t.hour}:${t.minute}'),
+        };
+        TimeOfDay candidate = TimeOfDay(
+          hour: (_selectedTime.hour + 1) % 24,
+          minute: _selectedTime.minute,
+        );
+        bool added = false;
+        for (int i = 0; i < 24; i++) {
+          final key = '${candidate.hour}:${candidate.minute}';
+          if (!existing.contains(key)) {
+            setState(() {
+              _additionalTimes.add(candidate);
+            });
+            added = true;
+            break;
+          }
+          candidate = TimeOfDay(
+            hour: (candidate.hour + 1) % 24,
+            minute: candidate.minute,
           );
-          _additionalTimes.add(newTime);
-        });
+        }
+        if (!added) {
+          _showErrorMessage(context, '이미 24시간이 모두 추가되어 있습니다');
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -606,20 +630,16 @@ class _RecurrenceManagementScreenState
 
     // 편집 모드일 때 기존 반복일정 삭제
     if (widget.isEditing && widget.editingTaskPattern != null) {
-      _deleteExistingTasks(taskProvider);
-      // 삭제 후 잠시 대기하여 상태 안정화
-      Future.delayed(const Duration(milliseconds: 100), () {
-        _createNewRecurringTasks(taskProvider, context);
-      });
+      _applyDiffRecurringTasks(taskProvider, context);
     } else {
       _createNewRecurringTasks(taskProvider, context);
     }
   }
 
-  void _createNewRecurringTasks(
+  Future<void> _createNewRecurringTasks(
     TaskProvider taskProvider,
     BuildContext context,
-  ) {
+  ) async {
     try {
       // 새로운 반복 일정 생성
       final allTimes = _getAllTimes();
@@ -646,18 +666,104 @@ class _RecurrenceManagementScreenState
         return;
       }
 
-      // 생성된 일정들을 추가
-      for (final task in newTasks) {
-        taskProvider.addTask(task);
-      }
+      // 생성된 일정들을 일괄 추가 (저장/알람 경쟁 상태 방지)
+      await taskProvider.addTasks(newTasks);
 
       debugPrint('✅ 반복 일정 생성 완료: ${newTasks.length}개');
 
       Navigator.pop(context);
       _showSuccessMessage(context);
+      return;
     } catch (e) {
       debugPrint('❌ 반복 일정 생성 실패: $e');
       _showErrorMessage(context, '반복 일정 생성 중 오류가 발생했습니다.');
+      return;
+    }
+  }
+
+  // 기존 패턴과 신규 설정의 차이만 적용 (삭제/추가/업데이트 최소화)
+  Future<void> _applyDiffRecurringTasks(
+    TaskProvider taskProvider,
+    BuildContext context,
+  ) async {
+    try {
+      final originalSignature =
+          widget.editingTaskPattern!['signature'] as String?;
+      final title = widget.editingTaskPattern!['title'] as String;
+      final category = widget.editingTaskPattern!['category'] as String;
+
+      // 1) 기존 패턴 일정들 수집
+      final existingTasks = RecurringTaskService.findRecurringTasksByPattern(
+        taskProvider.tasks,
+        title,
+        category,
+        signature: originalSignature,
+      );
+
+      // 2) 목표 타임라인 생성
+      final allTimes = _getAllTimes();
+      final endDate = _getSelectedEndDate()!;
+      final targetTasks = RecurringTaskService.generateRecurringTasks(
+        title: _title,
+        selectedDays: _selectedDays,
+        times: allTimes,
+        endDate: endDate,
+        category: _selectedCategory,
+        isImportant: _isImportant,
+      );
+
+      // 신(목표) recurrence 메타 고정
+      final RecurrenceInfo? newRecurrence = targetTasks.isNotEmpty
+          ? targetTasks.first.recurrence
+          : null;
+
+      String _key(DateTime d) =>
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+      final existingMap = {for (final t in existingTasks) _key(t.date): t};
+      final targetMap = {for (final t in targetTasks) _key(t.date): t};
+
+      // 3) 업데이트(공통 교집합)
+      for (final k in existingMap.keys) {
+        if (targetMap.containsKey(k)) {
+          final oldTask = existingMap[k]!;
+          final updated = oldTask.copyWith(
+            title: _title,
+            isImportant: _isImportant,
+            category: _selectedCategory,
+            recurrence: newRecurrence ?? oldTask.recurrence,
+          );
+          await taskProvider.updateTask(updated);
+        }
+      }
+
+      // 4) 삭제(기존 - 목표)
+      final idsToDelete = <String>[];
+      for (final k in existingMap.keys) {
+        if (!targetMap.containsKey(k)) {
+          idsToDelete.add(existingMap[k]!.id);
+        }
+      }
+      if (idsToDelete.isNotEmpty) {
+        await taskProvider.deleteTasks(idsToDelete);
+      }
+
+      // 5) 추가(목표 - 기존)
+      final toAdd = <Task>[];
+      for (final k in targetMap.keys) {
+        if (!existingMap.containsKey(k)) {
+          toAdd.add(targetMap[k]!);
+        }
+      }
+      if (toAdd.isNotEmpty) {
+        await taskProvider.addTasks(toAdd);
+      }
+
+      Navigator.pop(context);
+      _showSuccessMessage(context);
+    } catch (e) {
+      debugPrint('❌ 반복 일정 diff 적용 실패: $e');
+      _showErrorMessage(context, '반복 일정 수정 중 오류가 발생했습니다.');
     }
   }
 
@@ -714,6 +820,8 @@ class _RecurrenceManagementScreenState
   void _deleteExistingTasks(TaskProvider taskProvider) {
     final title = widget.editingTaskPattern!['title'];
     final category = widget.editingTaskPattern!['category'];
+    final originalSignature =
+        widget.editingTaskPattern!['signature'] as String?;
 
     debugPrint('🗑️ 기존 반복 일정 삭제 시작: $title');
 
@@ -721,6 +829,7 @@ class _RecurrenceManagementScreenState
       taskProvider.tasks,
       title,
       category,
+      signature: originalSignature,
     );
 
     debugPrint('  - 삭제할 일정 개수: ${existingTasks.length}');
@@ -1011,12 +1120,43 @@ class _RecurrenceManagementScreenState
                     currentTime.minute,
                   ),
                   onDateTimeChanged: (DateTime newDateTime) {
-                    setState(() {
-                      final newTime = TimeOfDay(
-                        hour: newDateTime.hour,
-                        minute: newDateTime.minute,
-                      );
+                    final newTime = TimeOfDay(
+                      hour: newDateTime.hour,
+                      minute: newDateTime.minute,
+                    );
 
+                    // 중복 검사
+                    bool isDuplicate = false;
+                    if (isMainTime) {
+                      for (final t in _additionalTimes) {
+                        if (t.hour == newTime.hour &&
+                            t.minute == newTime.minute) {
+                          isDuplicate = true;
+                          break;
+                        }
+                      }
+                    } else {
+                      if (_selectedTime.hour == newTime.hour &&
+                          _selectedTime.minute == newTime.minute) {
+                        isDuplicate = true;
+                      }
+                      for (int i = 0; i < _additionalTimes.length; i++) {
+                        if (i == index) continue;
+                        final t = _additionalTimes[i];
+                        if (t.hour == newTime.hour &&
+                            t.minute == newTime.minute) {
+                          isDuplicate = true;
+                          break;
+                        }
+                      }
+                    }
+
+                    if (isDuplicate) {
+                      _showErrorMessage(context, '이미 설정된 시간입니다');
+                      return;
+                    }
+
+                    setState(() {
                       if (isMainTime) {
                         _selectedTime = newTime;
                       } else {

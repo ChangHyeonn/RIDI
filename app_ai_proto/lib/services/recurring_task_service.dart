@@ -5,13 +5,46 @@ import '../constants/categories.dart';
 
 /// 반복 일정 관련 비즈니스 로직을 처리하는 서비스 클래스
 class RecurringTaskService {
+  /// 패턴 시그니처 생성: daysOfWeek(오름차순) + times(HH:MM 오름차순)
+  static String buildPatternSignatureFromRecurrence(
+    RecurrenceInfo? r,
+    DateTime fallbackDate,
+  ) {
+    List<int> days = [];
+    List<String> times = [];
+    if (r != null) {
+      if (r.daysOfWeek != null) {
+        days = List<int>.from(r.daysOfWeek!)..sort();
+      }
+      if (r.times.isNotEmpty) {
+        times = r.times.map((t) => t.time).toList()..sort();
+      }
+    }
+    if (days.isEmpty) {
+      days = [fallbackDate.weekday - 1];
+    }
+    if (times.isEmpty) {
+      final hh = fallbackDate.hour.toString().padLeft(2, '0');
+      final mm = fallbackDate.minute.toString().padLeft(2, '0');
+      times = ['${hh}:${mm}'];
+    }
+    final dayStr = days.join(',');
+    final timeStr = times.join(',');
+    return 'd:${dayStr}|t:${timeStr}';
+  }
+
+  static String buildPatternSignatureForTask(Task task) {
+    return buildPatternSignatureFromRecurrence(task.recurrence, task.date);
+  }
+
   /// 반복 일정들을 그룹화하여 반환
   static Map<String, List<Task>> groupRecurringTasks(List<Task> allTasks) {
     final recurringTasks = allTasks.where((task) => task.isRecurring).toList();
     final Map<String, List<Task>> groupedTasks = {};
 
     for (final task in recurringTasks) {
-      final key = '${task.title}_${task.category}';
+      final signature = buildPatternSignatureForTask(task);
+      final key = '${task.title}_${task.category}_$signature';
       if (!groupedTasks.containsKey(key)) {
         groupedTasks[key] = [];
       }
@@ -25,35 +58,36 @@ class RecurringTaskService {
   static List<Task> findRecurringTasksByPattern(
     List<Task> allTasks,
     String title,
-    String category,
-  ) {
-    return allTasks
-        .where(
-          (t) => t.isRecurring && t.title == title && t.category == category,
-        )
-        .toList();
+    String category, {
+    String? signature,
+  }) {
+    return allTasks.where((t) {
+      if (!(t.isRecurring && t.title == title && t.category == category)) {
+        return false;
+      }
+      if (signature == null) return true;
+      final sig = buildPatternSignatureForTask(t);
+      return sig == signature;
+    }).toList();
   }
 
   /// 반복 일정에서 요일 정보를 추출
   static List<bool> extractWeekdaysFromTasks(List<Task> tasks) {
     final List<bool> weekdayStatus = List.filled(7, false);
 
-    if (tasks.isNotEmpty) {
-      final firstTask = tasks.first;
-      if (firstTask.recurrence?.daysOfWeek != null) {
-        // 저장된 반복 정보의 요일들 사용
-        for (final weekday in firstTask.recurrence!.daysOfWeek!) {
+    if (tasks.isEmpty) return weekdayStatus;
+
+    for (final task in tasks) {
+      if (task.recurrence?.daysOfWeek != null) {
+        for (final weekday in task.recurrence!.daysOfWeek!) {
           if (weekday >= 0 && weekday < 7) {
             weekdayStatus[weekday] = true;
           }
         }
       } else {
-        // 저장된 반복 정보가 없으면 실제 일정들에서 추출
-        for (final task in tasks) {
-          final weekday = task.date.weekday - 1; // 0=월요일, 6=일요일
-          if (weekday >= 0 && weekday < 7) {
-            weekdayStatus[weekday] = true;
-          }
+        final weekday = task.date.weekday - 1; // 0=월요일, 6=일요일
+        if (weekday >= 0 && weekday < 7) {
+          weekdayStatus[weekday] = true;
         }
       }
     }
@@ -65,21 +99,15 @@ class RecurringTaskService {
   static Set<String> extractTimesFromTasks(List<Task> tasks) {
     final Set<String> uniqueTimes = {};
 
-    if (tasks.isNotEmpty) {
-      final firstTask = tasks.first;
-      if (firstTask.recurrence?.times != null) {
-        // 저장된 반복 정보의 시간들 사용
-        for (final recurrenceTime in firstTask.recurrence!.times) {
+    if (tasks.isEmpty) return uniqueTimes;
+
+    for (final task in tasks) {
+      if (task.recurrence?.times != null && task.recurrence!.times.isNotEmpty) {
+        for (final recurrenceTime in task.recurrence!.times) {
           uniqueTimes.add(recurrenceTime.label);
         }
       } else {
-        // 저장된 반복 정보가 없으면 실제 일정들에서 추출
-        for (final task in tasks) {
-          final timeStr = RecurringTaskConstants.formatDateTime12Hour(
-            task.date,
-          );
-          uniqueTimes.add(timeStr);
-        }
+        uniqueTimes.add(RecurringTaskConstants.formatDateTime12Hour(task.date));
       }
     }
 
@@ -90,33 +118,27 @@ class RecurringTaskService {
   static List<TimeOfDay> extractTimeOfDayFromTasks(List<Task> tasks) {
     final Set<TimeOfDay> uniqueTimes = {};
 
-    if (tasks.isNotEmpty) {
-      final firstTask = tasks.first;
-      if (firstTask.recurrence?.times != null) {
-        // 저장된 반복 정보의 시간들 사용
-        for (final recurrenceTime in firstTask.recurrence!.times) {
+    if (tasks.isEmpty) return [];
+
+    for (final task in tasks) {
+      if (task.recurrence?.times != null && task.recurrence!.times.isNotEmpty) {
+        for (final recurrenceTime in task.recurrence!.times) {
           final timeParts = recurrenceTime.time.split(':');
           if (timeParts.length == 2) {
-            try {
-              final hour = int.parse(timeParts[0]);
-              final minute = int.parse(timeParts[1]);
+            final hour = int.tryParse(timeParts[0]);
+            final minute = int.tryParse(timeParts[1]);
+            if (hour != null && minute != null) {
               uniqueTimes.add(TimeOfDay(hour: hour, minute: minute));
-            } catch (e) {
-              debugPrint('시간 파싱 오류: ${recurrenceTime.time}');
             }
           }
         }
       } else {
-        // 저장된 반복 정보가 없으면 실제 일정들에서 추출
-        for (final task in tasks) {
-          uniqueTimes.add(
-            TimeOfDay(hour: task.date.hour, minute: task.date.minute),
-          );
-        }
+        uniqueTimes.add(
+          TimeOfDay(hour: task.date.hour, minute: task.date.minute),
+        );
       }
     }
 
-    // 시간순으로 정렬
     final sortedTimes = uniqueTimes.toList()
       ..sort((a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute));
 
@@ -232,12 +254,17 @@ class RecurringTaskService {
 
   /// 종료일 추출
   static DateTime? extractEndDateFromTasks(List<Task> tasks) {
-    if (tasks.isNotEmpty) {
-      final firstTask = tasks.first;
-      return firstTask.recurrence?.endDate ??
-          RecurringTaskConstants.defaultEndDate;
+    if (tasks.isEmpty) return null;
+    DateTime? maxEnd;
+    for (final task in tasks) {
+      final end = task.recurrence?.endDate;
+      if (end != null) {
+        if (maxEnd == null || end.isAfter(maxEnd)) {
+          maxEnd = end;
+        }
+      }
     }
-    return null;
+    return maxEnd ?? RecurringTaskConstants.defaultEndDate;
   }
 
   /// 날짜 유효성 검사

@@ -74,6 +74,19 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
+  // 일정 여러 개 추가 (일괄 저장)
+  Future<void> addTasks(List<Task> tasks) async {
+    await _taskService.addTasks(tasks);
+    await loadTasks();
+
+    final now = DateTime.now();
+    for (final task in tasks) {
+      if (!task.isCompleted && task.date.isAfter(now)) {
+        _alarmService.scheduleAlarm(task);
+      }
+    }
+  }
+
   // 일정 업데이트
   Future<void> updateTask(Task task) async {
     await _taskService.updateTask(task);
@@ -94,6 +107,16 @@ class TaskProvider with ChangeNotifier {
 
     // 알람 취소
     _alarmService.cancelAlarm(taskId);
+  }
+
+  // 일정 여러 개 삭제 (일괄)
+  Future<void> deleteTasks(List<String> taskIds) async {
+    await _taskService.deleteTasks(taskIds);
+    await loadTasks();
+
+    for (final id in taskIds) {
+      _alarmService.cancelAlarm(id);
+    }
   }
 
   // 일정 완료 상태 토글
