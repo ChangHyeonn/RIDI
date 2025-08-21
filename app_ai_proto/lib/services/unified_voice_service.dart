@@ -213,7 +213,27 @@ class UnifiedVoiceService {
       _aiResponseStreamController.add(aiResponse);
       print('AI 응답: ${aiResponse.responseText}');
 
-      // TTS로 응답 재생 (응답 텍스트가 있을 때)
+      // 실패 응답이면 서버 메시지를 음성으로 안내
+      if (aiResponse.success == false) {
+        String errorMessage = '요청을 처리할 수 없습니다.';
+        if (aiResponse.action != null &&
+            aiResponse.action!.data.containsKey('message')) {
+          errorMessage = aiResponse.action!.data['message'] ?? errorMessage;
+        } else if (aiResponse.textResponse != null &&
+            aiResponse.textResponse!.text.isNotEmpty) {
+          errorMessage = aiResponse.textResponse!.text;
+        } else if (aiResponse.responseText != null &&
+            aiResponse.responseText!.isNotEmpty) {
+          errorMessage = aiResponse.responseText!;
+        }
+
+        _statusStreamController.add(errorMessage);
+        await _ttsService.speak(errorMessage);
+        _isProcessing = false;
+        return;
+      }
+
+      // 성공 응답: TTS로 응답 재생 (응답 텍스트가 있을 때)
       if (aiResponse.responseText != null &&
           aiResponse.responseText!.trim().isNotEmpty) {
         await _ttsService.speak(aiResponse.responseText!);

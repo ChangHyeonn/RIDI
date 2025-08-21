@@ -367,6 +367,16 @@ class RecordService {
         // APP_INTEGRATION_GUIDE에 따른 에러 처리
         await _handleErrorResponse(aiResponse);
       }
+
+      // 신규 가이드: action 기반 UI 지시사항 처리 (구형/신형 공통)
+      try {
+        final action = aiResponse.action;
+        if (action != null) {
+          await _applyUiInstructions(action.uiInstructions);
+        }
+      } catch (e) {
+        print('UI 지시사항 적용 중 오류: $e');
+      }
     } catch (e) {
       print('❌ AI 처리 중 오류: $e');
       print('🔍 오류 상세: ${e.toString()}');
@@ -429,12 +439,16 @@ class RecordService {
       print('🎯 === AI 액션 처리 시작 ===');
       print('액션 타입: ${action.type}');
       print('액션 데이터: ${action.data}');
+      print('중요도(is_important): ${action.isImportant}');
 
       switch (action.type) {
         case 'schedule_add':
           await _handleScheduleAdd(action);
           break;
         case 'schedule_read':
+          await _handleScheduleRead(action);
+          break;
+        case 'schedule_list':
           await _handleScheduleRead(action);
           break;
         case 'schedule_delete':
@@ -453,6 +467,31 @@ class RecordService {
       print('✅ AI 액션 처리 완료');
     } catch (e) {
       print('❌ AI 액션 처리 중 오류: $e');
+    }
+  }
+
+  // UI 지시사항 적용 (가이드 v3.1.0)
+  Future<void> _applyUiInstructions(UIInstructions ui) async {
+    try {
+      print('🧭 UI 지시사항 적용 시작');
+      final taskProvider = _getTaskProvider();
+
+      if (ui.refreshData == true && taskProvider != null) {
+        await taskProvider.loadTasks();
+        print('🔄 데이터 새로고침 완료');
+      }
+
+      if (ui.notification != null) {
+        final n = ui.notification!;
+        print('🔔 알림: ${n.type} - ${n.title}: ${n.message}');
+      }
+
+      // 화면 이동(screen) 등은 현재 라우팅 구조 상 생략/로그만
+      if (ui.screen != null) {
+        print('🧭 화면 이동 요청: ${ui.screen}');
+      }
+    } catch (e) {
+      print('UI 지시사항 적용 중 오류: $e');
     }
   }
 
@@ -900,11 +939,20 @@ class RecordService {
 
       final taskProvider = _getTaskProvider();
       if (taskProvider != null) {
-        final tasks = taskProvider.tasks;
-        print('📋 조회된 일정 수: ${tasks.length}');
-
-        for (final task in tasks) {
-          print('  - ${task.title} (${task.date.toString()})');
+        // 신규 가이드에선 서버에서 리스트를 내려줄 수 있음
+        final data = action.data;
+        if (data.containsKey('schedules')) {
+          final schedules = data['schedules'] as List<dynamic>;
+          print('📋 서버 제공 일정 수: ${schedules.length}');
+          for (final s in schedules) {
+            print('  - ${s['title']} (${s['datetime']})');
+          }
+        } else {
+          final tasks = taskProvider.tasks;
+          print('📋 로컬 저장 일정 수: ${tasks.length}');
+          for (final task in tasks) {
+            print('  - ${task.title} (${task.date.toString()})');
+          }
         }
 
         print('✅ 일정 조회 완료');
@@ -1436,6 +1484,7 @@ class RecordService {
       if (aiResponse.action != null) {
         print('🎯 구형 action 처리: ${aiResponse.action!.type}');
         await _handleAIAction(aiResponse.action!);
+        await _applyUiInstructions(aiResponse.action!.uiInstructions);
       } else {
         print('⚠️ 구형 action이 없습니다');
       }

@@ -36,10 +36,24 @@ class AIResponse {
         : null;
     print('🔍 processingResult 파싱 완료: ${processingResult?.action}');
 
-    final responseText = json['response_text'];
+    // response_text는 문자열 또는 객체로 올 수 있음
+    String? responseText;
+    final rt = json['response_text'];
+    if (rt is String) {
+      responseText = rt;
+    } else if (rt is Map<String, dynamic>) {
+      responseText = rt['text']?.toString();
+    }
     print('🔍 responseText: $responseText');
 
-    final processingTime = json['processing_time']?.toDouble();
+    // processing_time은 number 또는 string으로 올 수 있음
+    double? processingTime;
+    final pt = json['processing_time'];
+    if (pt is num) {
+      processingTime = pt.toDouble();
+    } else if (pt is String) {
+      processingTime = double.tryParse(pt);
+    }
     print('🔍 processingTime: $processingTime');
 
     final timestamp = json['timestamp'] ?? '';
@@ -73,6 +87,19 @@ class AIResponse {
     print('🔍 AIResponse 생성 완료 - success: ${response.success}');
     return response;
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'success': success,
+      'user_text': userText,
+      'processing_result': processingResult?.toJson(),
+      'response_text': responseText,
+      'processing_time': processingTime,
+      'timestamp': timestamp,
+      'action': action?.toJson(),
+      'text_response': textResponse?.toJson(),
+    }..removeWhere((k, v) => v == null);
+  }
 }
 
 class ProcessingResult {
@@ -86,7 +113,10 @@ class ProcessingResult {
     print('🔍 JSON 데이터: $json');
 
     final action = json['action'] ?? '';
-    final result = json['result'] ?? {};
+    final dynamic rawResult = json['result'];
+    final Map<String, dynamic> result = rawResult is Map
+        ? Map<String, dynamic>.from(rawResult)
+        : <String, dynamic>{};
 
     print('🔍 action: $action');
     print('🔍 result: $result');
@@ -104,28 +134,49 @@ class ProcessingResult {
     print('🔍 ProcessingResult 생성 완료 - action: ${processingResult.action}');
     return processingResult;
   }
+
+  Map<String, dynamic> toJson() {
+    return {'action': action, 'result': result};
+  }
 }
 
 class AIAction {
   final String type;
   final String priority;
+  final bool isImportant;
   final Map<String, dynamic> data;
   final UIInstructions uiInstructions;
 
   AIAction({
     required this.type,
     required this.priority,
+    required this.isImportant,
     required this.data,
     required this.uiInstructions,
   });
 
   factory AIAction.fromJson(Map<String, dynamic> json) {
+    final dynamic rawData = json['data'];
+    final Map<String, dynamic> data = rawData is Map
+        ? Map<String, dynamic>.from(rawData)
+        : <String, dynamic>{};
     return AIAction(
       type: json['type'] ?? '',
       priority: json['priority'] ?? 'medium',
-      data: json['data'] ?? {},
+      isImportant: json['is_important'] == true,
+      data: data,
       uiInstructions: UIInstructions.fromJson(json['ui_instructions'] ?? {}),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'priority': priority,
+      'is_important': isImportant,
+      'data': data,
+      'ui_instructions': uiInstructions.toJson(),
+    };
   }
 }
 
@@ -141,6 +192,10 @@ class TextResponse {
       text: json['text'] ?? '',
       displayAutomatically: json['display_automatically'] ?? false,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'text': text, 'display_automatically': displayAutomatically};
   }
 }
 
@@ -167,6 +222,15 @@ class UIInstructions {
           : null,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'screen': screen,
+      'refresh_data': refreshData,
+      'show_confirmation': showConfirmation,
+      'notification': notification?.toJson(),
+    }..removeWhere((k, v) => v == null);
+  }
 }
 
 class NotificationInfo {
@@ -189,5 +253,14 @@ class NotificationInfo {
       message: json['message'] ?? '',
       duration: json['duration'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'title': title,
+      'message': message,
+      'duration': duration,
+    }..removeWhere((k, v) => v == null);
   }
 }

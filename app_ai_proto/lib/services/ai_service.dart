@@ -138,15 +138,41 @@ class AIService {
       print('📡 요청 헤더: {"Content-Type": "application/json"}');
       print('📡 요청 본문: ${json.encode(requestBody)}');
 
-      final startTime = DateTime.now();
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/api/v1/process_text'),
-            headers: {'Content-Type': 'application/json'},
-            body: json.encode(requestBody),
-          )
-          .timeout(const Duration(seconds: 30));
-      final endTime = DateTime.now();
+      // 타임아웃 30초 유지, 1회 재시도 (백오프)
+      const timeoutDuration = Duration(seconds: 30);
+      const maxAttempts = 1;
+      Object? lastError;
+      late http.Response response;
+      late DateTime startTime;
+      late DateTime endTime;
+
+      for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          print(
+            '📡 요청 시도 $attempt/$maxAttempts (타임아웃: ${timeoutDuration.inSeconds}s)',
+          );
+          startTime = DateTime.now();
+          response = await http
+              .post(
+                Uri.parse('$baseUrl/api/v1/process_text'),
+                headers: {'Content-Type': 'application/json'},
+                body: json.encode(requestBody),
+              )
+              .timeout(timeoutDuration);
+          endTime = DateTime.now();
+          break; // 성공 시 루프 탈출
+        } catch (e) {
+          lastError = e;
+          print('⚠️ 요청 시도 $attempt 실패: $e');
+          if (attempt < maxAttempts) {
+            print('⏳ 재시도 전 대기 800ms');
+            await Future.delayed(const Duration(milliseconds: 800));
+            continue;
+          } else {
+            rethrow; // 최종 실패는 상위에서 처리
+          }
+        }
+      }
       final duration = endTime.difference(startTime);
 
       print('📥 서버 응답 수신 완료');
@@ -155,6 +181,11 @@ class AIService {
       print('📋 응답 헤더: ${response.headers}');
 
       var responseData = response.body;
+      // 선행 BOM 제거 (일부 서버/프록시 환경에서 발생)
+      if (responseData.isNotEmpty && responseData.codeUnitAt(0) == 0xFEFF) {
+        print('⚠️ 응답 앞의 BOM(\uFEFF) 제거');
+        responseData = responseData.substring(1);
+      }
       print('📄 응답 데이터 크기: ${responseData.length} bytes');
       print('📄 원본 응답 데이터:');
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -177,8 +208,9 @@ class AIService {
         throw Exception('서버 응답이 JSON 형식이 아닙니다.');
       }
 
-      // 200(성공)과 400(오류) 모두 정상적인 응답으로 처리
-      if (response.statusCode == 200 || response.statusCode == 400) {
+      // 2xx(성공)과 4xx(클라이언트 오류)는 본문 JSON을 정상적으로 처리
+      if ((response.statusCode >= 200 && response.statusCode < 300) ||
+          (response.statusCode >= 400 && response.statusCode < 500)) {
         print('✅ 서버 응답 성공');
         print('📊 응답 상태 코드: ${response.statusCode}');
 
@@ -254,6 +286,15 @@ class AIService {
 
           print('🔍 AIResponse.fromJson 호출 시작...');
           final aiResponse = AIResponse.fromJson(jsonData);
+          // 수신한 JSON 구조를 통째로 로깅 (디버깅용)
+          try {
+            final pretty = const JsonEncoder.withIndent(
+              '  ',
+            ).convert(aiResponse.toJson());
+            print('🧾 수신 JSON 정규화 결과:\n$pretty');
+          } catch (e) {
+            print('수신 JSON pretty-print 중 오류: $e');
+          }
           print('🤖 === AI 응답 분석 ===');
           print('✅ 응답 성공 여부: ${aiResponse.success}');
           print('⏰ 응답 타임스탬프: ${aiResponse.timestamp}');
@@ -278,11 +319,19 @@ class AIService {
           throw Exception('AI 응답 파싱 오류: $e');
         }
       } else {
-        print('❌ 서버 오류 발생');
-        print('📊 오류 상태 코드: ${response.statusCode}');
-        print('📄 오류 응답: $responseData');
-        print('⏰ 오류 발생 시간: ${DateTime.now().toIso8601String()}');
-        throw Exception('서버 오류: ${response.statusCode} - $responseData');
+        // 5xx 등 서버 오류일 때도 응답 본문이 JSON이면 파싱 시도하여 메시지 표시
+        print('⚠️ 서버 오류 상태 코드: ${response.statusCode}');
+        try {
+          final jsonData = json.decode(responseData);
+          final aiResponse = AIResponse.fromJson(jsonData);
+          print('⚠️ 서버 오류 코드이지만 JSON 파싱 성공 — 에러 메시지 전달');
+          return aiResponse;
+        } catch (_) {
+          print('❌ 서버 오류 및 JSON 아님 — 예외로 처리');
+          print('📄 오류 응답: $responseData');
+          print('⏰ 오류 발생 시간: ${DateTime.now().toIso8601String()}');
+          throw Exception('서버 오류: ${response.statusCode} - $responseData');
+        }
       }
     } catch (e) {
       print('❌ AI 텍스트 처리 실패');
