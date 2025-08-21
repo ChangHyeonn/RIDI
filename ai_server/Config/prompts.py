@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""
+Prompt Manager - 목적별 분리된 프롬프트 관리 시스템
+"""
+
+from datetime import datetime
+from typing import Dict, Any
+
+
+class PromptManager:
+    """목적별 분리된 프롬프트 관리 클래스"""
+    
+    # 기본 한국어 시스템 프롬프트 (하위 호환 및 단순 안내용)
+    KOREAN_ASSISTANT_SYSTEM_PROMPT = (
+        "당신은 한국어 텍스트 요청을 이해하고 도와주는 일정 관리 어시스턴트입니다. "
+        "사용자의 요청을 분석하여 일정 추가/조회/삭제 등 필요한 작업을 돕거나, 명확한 안내를 제공합니다."
+    )
+    
+    # ===== 1단계: 의도 분류 프롬프트 =====
+    INTENT_CLASSIFICATION_PROMPT = """
+당신은 사용자 요청의 의도를 분류하는 AI입니다.
+
+현재 날짜: {current_date}
+사용자 요청: {user_request}
+
+다음 카테고리 중 하나로 분류해주세요:
+- schedule_add: 일정 추가 요청
+- schedule_read: 일정 조회 요청  
+- schedule_delete: 일정 삭제 요청
+- schedule_update: 일정 수정 요청
+- general_conversation: 일반 대화
+- error_handling: 오류 상황
+
+JSON 형식으로만 응답:
+{{
+    "intent": "카테고리명",
+    "confidence": 0.0-1.0,
+    "requires_extraction": true/false
+}}
+"""
+
+    # ===== 2단계: 일정 정보 추출 프롬프트 (반복 일정 지원) =====
+    SCHEDULE_EXTRACTION_PROMPT = """
+일정 관련 정보를 추출해주세요.
+
+현재 날짜: {current_date}
+사용자 요청: {user_request}
+
+중요: 일정 제목은 구체적인 내용만 추출하세요.
+- "내일 오후 3시에 병원 진료 일정을 추가해 줘" → title: "병원 진료"
+- "다음주 월요일 오전 9시에 회사 회의 일정을 넣어줘" → title: "회사 회의"
+- "매일 아침 7시에 약 복용 일정을 등록해 줘" → title: "약 복용"
+- "일정", "예약", "할 일" 등의 일반적 단어는 제목에 포함하지 마세요.
+
+시간 변환 규칙:
+- "내일" = 현재 날짜 + 1일
+- "모레" = 현재 날짜 + 2일  
+- "다음 주" = 현재 날짜 + 7일
+- "오전/오후" = 24시간 형식으로 변환
+
+중요도 설정 규칙:
+- 건강 관련 일정(병원, 치과, 검진, 약 복용, 운동, 다이어트, 건강관리, 예방접종, 물리치료, 심리상담, 건강검진 등): is_important = true
+- 그 외 모든 일정: is_important = false
+
+반복 일정 감지 규칙:
+1. 반복 키워드:
+   - "매일", "매일마다" → daily
+   - "평일", "평일마다", "월요일부터 금요일" → weekdays  
+   - "주말", "주말마다", "토요일 일요일" → weekends
+   - "월, 수, 금", "화목토", 특정 요일들 → custom_days
+
+2. 요일 매핑 (custom_days용):
+   - 월요일=0, 화요일=1, 수요일=2, 목요일=3, 금요일=4, 토요일=5, 일요일=6
+
+3. 다중 시간 감지:
+   - "아침 7시, 저녁 6시"
+   - "오전 8시, 오후 1시, 저녁 8시"
+   - "하루 2번", "하루 3번"
+
+4. 종료 조건:
+   - "~까지", "~년 ~월까지" → 특정 날짜
+   - 명시 없음 → 무기한 (end_date: null)
+
+JSON 형식으로만 응답:
+{{
+    "title": "일정 제목 (구체적인 내용만, '일정', '예약' 등의 일반적 단어 제외)",
+    "date": "YYYY-MM-DD",
+    "time": "HH:MM",
+    "category": "경조사/일반/건강",
+    "is_important": "건강 카테고리인 경우에만 true, 나머지는 false",
+    "location": "장소 (있는 경우)",
+    "description": "추가 설명 (있는 경우)",
+    "is_recurring": "반복 일정 여부 (true/false)",
+    "recurrence": {{
+        "type": "daily/weekdays/weekends/custom_days (is_recurring이 true인 경우만)",
+        "times": [
+            {{"time": "07:00", "label": "아침"}},
+            {{"time": "18:00", "label": "저녁"}}
+        ],
+        "end_date": "YYYY-MM-DD 또는 null (무기한)",
+        "days_of_week": "[0,2,4] (custom_days인 경우만, 월=0, 화=1, ...)"
+    }}
+}}
+
+예시:
+- "내일 오후 3시에 병원 진료" → is_recurring: false
+- "매일 아침 7시, 저녁 6시에 약 복용" → is_recurring: true, type: "daily", times: [07:00, 18:00]
+- "평일마다 오전 9시에 회의" → is_recurring: true, type: "weekdays", times: [09:00]
+- "월, 수, 금요일 오전 6시, 오후 5시에 기상 알람" → is_recurring: true, type: "custom_days", days_of_week: [0,2,4], times: [06:00, 17:00]
+"""
+
+    # ===== 3단계: 응답 생성 프롬프트 =====
+    RESPONSE_GENERATION_PROMPT = """
+사용자 요청에 대한 친화적인 응답을 생성해주세요.
+
+요청: {user_request}
+의도: {intent}
+추출된 정보: {extracted_info}
+처리 결과: {processing_result}
+
+응답 스타일:
+- 친화적이고 명확한 한국어
+- 존댓말 사용
+- 필요한 경우 확인 질문 포함
+- 오류 시 해결 방법 제시
+
+JSON 형식으로만 응답:
+{{
+    "response_text": "사용자에게 보여줄 응답",
+    "action_type": "schedule_added/schedule_read/schedule_deleted/error/confirmation",
+    "requires_confirmation": true/false,
+    "next_action": "추가 작업이 필요한 경우"
+}}
+"""
+
+    # ===== 일반 대화 프롬프트 =====
+    GENERAL_CONVERSATION_PROMPT = """
+친화적인 AI 어시스턴트입니다.
+
+사용자: {user_request}
+
+응답 스타일:
+- 자연스러운 한국어 대화
+- 친근하고 도움이 되는 톤
+- 필요시 일정 관리 기능 안내
+
+JSON 형식으로만 응답:
+{{
+    "response_text": "자연스러운 대화 응답",
+    "action_type": "conversation",
+    "suggestions": ["추천 기능 목록"]
+}}
+"""
+
+    # ===== 오류 처리 프롬프트 =====
+    ERROR_HANDLING_PROMPT = """
+오류 상황에 대한 친화적인 응답을 생성해주세요.
+
+오류 유형: {error_type}
+오류 내용: {error_message}
+사용자 요청: {user_request}
+
+응답 스타일:
+- 겁주지 않고 안심시키는 톤
+- 해결 방법 제시
+- 다시 시도하도록 격려
+
+JSON 형식으로만 응답:
+{{
+    "response_text": "친화적인 오류 메시지",
+    "action_type": "error",
+    "suggestions": ["해결 방법 목록"],
+    "retry_available": true/false
+}}
+"""
+
+
+
+    # ===== 프롬프트 접근 메서드들 =====
+    
+    @classmethod
+    def get_intent_classification_prompt(cls, user_request: str, current_date: str = None) -> str:
+        """의도 분류 프롬프트 반환"""
+        if current_date is None:
+            current_date = datetime.now().strftime("%Y-%m-%d")
+        return cls.INTENT_CLASSIFICATION_PROMPT.format(
+            user_request=user_request,
+            current_date=current_date
+        )
+    
+    @classmethod
+    def get_schedule_extraction_prompt(cls, user_request: str, current_date: str = None) -> str:
+        """일정 정보 추출 프롬프트 반환"""
+        if current_date is None:
+            current_date = datetime.now().strftime("%Y-%m-%d")
+        return cls.SCHEDULE_EXTRACTION_PROMPT.format(
+            user_request=user_request,
+            current_date=current_date
+        )
+    
+    @classmethod
+    def get_response_generation_prompt(cls, user_request: str, intent: str, 
+                                     extracted_info: dict, processing_result: str) -> str:
+        """응답 생성 프롬프트 반환"""
+        return cls.RESPONSE_GENERATION_PROMPT.format(
+            user_request=user_request,
+            intent=intent,
+            extracted_info=str(extracted_info),
+            processing_result=processing_result
+        )
+    
+    @classmethod
+    def get_general_conversation_prompt(cls, user_request: str) -> str:
+        """일반 대화 프롬프트 반환"""
+        return cls.GENERAL_CONVERSATION_PROMPT.format(user_request=user_request)
+    
+    @classmethod
+    def get_error_handling_prompt(cls, error_type: str, error_message: str, user_request: str) -> str:
+        """오류 처리 프롬프트 반환"""
+        return cls.ERROR_HANDLING_PROMPT.format(
+            error_type=error_type,
+            error_message=error_message,
+            user_request=user_request
+        )
+
+
