@@ -344,10 +344,10 @@ class ProcessTextUseCase:
     def _validate_schedule_info(self, schedule_info: Dict[str, Any]) -> Dict[str, Any]:
         """일정 정보 엄격 검증"""
         
-        # 1. 기본 정보 존재 확인
-        title = schedule_info.get('title', '').strip()
-        date = schedule_info.get('date', '').strip()
-        time = schedule_info.get('time', '').strip()
+        # 1. 기본 정보 존재 확인 (None 값 안전 처리)
+        title = (schedule_info.get('title') or '').strip()
+        date = (schedule_info.get('date') or '').strip()
+        time = (schedule_info.get('time') or '').strip()
         
         # 2. 제목 개선 로직: "일정을 추가해 줘" 같은 문구에서 실제 일정 내용 추출
         improved_title = self._extract_actual_schedule_title(title)
