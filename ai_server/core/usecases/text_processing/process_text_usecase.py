@@ -356,58 +356,57 @@ class ProcessTextUseCase:
             schedule_info['title'] = improved_title
             title = improved_title
         
-        # 3. 비구체적 제목 차단
-        generic_titles = ['일정', '예약', '할 일', '미팅', '약속', '행사']
+        # 3. 누락된 정보에 따른 구체적인 안내 메시지 생성
+        missing_info = []
         
-        if not title:
-            return {
-                'valid': False,
-                'error_message': '구체적인 일정 내용을 말씀해주세요. 예: "병원 진료", "친구 만남", "회사 회의" 등',
-                'error_type': ErrorTypes.MISSING_SCHEDULE_TITLE
-            }
+        # 일정 내용 검증
+        if not title or title.lower() in ['일정', '예약', '할 일', '미팅', '약속', '행사']:
+            missing_info.append('일정 내용')
         
-        if title.lower() in [t.lower() for t in generic_titles]:
-            return {
-                'valid': False,
-                'error_message': f'"일정" 대신 구체적인 내용을 말씀해주세요. 예: "병원 진료", "친구 만남" 등',
-                'error_type': ErrorTypes.GENERIC_SCHEDULE_TITLE
-            }
-        
-        # 4. 제목 길이 및 의미 검증
-        if len(title) < 2:
-            return {
-                'valid': False,
-                'error_message': '일정 제목이 너무 짧습니다. 좀 더 구체적으로 설명해주세요.',
-                'error_type': ErrorTypes.SHORT_SCHEDULE_TITLE
-            }
-        
-        # 4. 날짜 및 시간 검증
+        # 날짜 검증
         if not date:
-            return {
-                'valid': False,
-                'error_message': '일정 날짜를 명확히 말씀해주세요. 예: "내일", "모레", "월요일" 등',
-                'error_type': ErrorTypes.MISSING_SCHEDULE_DATE
-            }
+            missing_info.append('일자')
         
+        # 시간 검증
         if not time:
+            missing_info.append('시간')
+        
+        # 누락된 정보가 있으면 구체적인 안내 메시지 반환
+        if missing_info:
+            if len(missing_info) == 1:
+                if missing_info[0] == '일정 내용':
+                    error_message = '상세한 일정을 말씀해 주시겠어요?'
+                    error_type = ErrorTypes.MISSING_SCHEDULE_TITLE
+                elif missing_info[0] == '일자':
+                    error_message = '상세한 일자를 말씀해 주시겠어요?'
+                    error_type = ErrorTypes.MISSING_SCHEDULE_DATE
+                elif missing_info[0] == '시간':
+                    error_message = '상세한 시간을 말씀해 주시겠어요?'
+                    error_type = ErrorTypes.MISSING_SCHEDULE_TIME
+            else:
+                # 여러 정보가 누락된 경우
+                missing_str = ', '.join(missing_info[:-1]) + f'와 {missing_info[-1]}'
+                error_message = f'상세한 {missing_str}을 말씀해 주시겠어요?'
+                error_type = ErrorTypes.MISSING_SCHEDULE_TITLE
+            
             return {
                 'valid': False,
-                'error_message': '일정 시간을 명확히 말씀해주세요. 예: "오전 9시", "오후 3시 30분" 등',
-                'error_type': ErrorTypes.MISSING_SCHEDULE_TIME
+                'error_message': error_message,
+                'error_type': error_type
             }
         
-        # 5. 날짜 형식 검증
+        # 4. 날짜 형식 검증
         try:
             from datetime import datetime
             datetime.strptime(date, '%Y-%m-%d')
         except ValueError:
             return {
                 'valid': False,
-                'error_message': '잘못된 날짜 형식입니다. 날짜를 다시 명확히 말씀해주세요.',
+                'error_message': '상세한 일자를 말씀해 주시겠어요?',
                 'error_type': ErrorTypes.INVALID_DATE_FORMAT
             }
         
-        # 6. 시간 형식 검증
+        # 5. 시간 형식 검증
         try:
             hour, minute = time.split(':')
             hour_int = int(hour)
@@ -417,7 +416,7 @@ class ProcessTextUseCase:
         except (ValueError, AttributeError):
             return {
                 'valid': False,
-                'error_message': '잘못된 시간 형식입니다. 시간을 다시 명확히 말씀해주세요.',
+                'error_message': '상세한 시간을 말씀해 주시겠어요?',
                 'error_type': ErrorTypes.INVALID_TIME_FORMAT
             }
         
