@@ -1464,10 +1464,11 @@ class RecordService {
       await _ttsService.speak(userFriendlyMessage);
       print('✅ 에러 메시지 TTS 재생 완료');
 
-      // 특정 에러 타입에 대해서만 자동 재시작
+      // 특정 에러 타입에 대해서만 자동 재시작 (충분한 대기 시간 추가)
       if (_shouldAutoRestartForError(errorType)) {
         print('🔄 에러 타입 "$errorType"에 대해 자동 녹음 재시작...');
-        await Future.delayed(const Duration(milliseconds: 500)); // 잠시 대기
+        print('⏰ TTS 재생 완료 후 3초 대기...');
+        await Future.delayed(const Duration(seconds: 3)); // 3초 대기로 증가
         await _autoRestartRecording();
       }
     } catch (ttsError) {
