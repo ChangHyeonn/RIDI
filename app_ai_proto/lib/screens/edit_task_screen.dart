@@ -45,8 +45,8 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
       minute: widget.task.date.minute,
     );
     _titleController.text = widget.task.title;
-    _isImportant = widget.task.isImportant;
     _selectedCategory = widget.task.category; // 기존 카테고리 설정
+    _isImportant = widget.task.isImportant;
     _isAM = widget.task.date.hour < 12;
     _updateTimeControllers();
   }
@@ -237,7 +237,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Color(0xFF6366f1)),
+            colorScheme: const ColorScheme.light(primary: Color(0xFF9C27B0)),
           ),
           child: child!,
         );
@@ -930,7 +930,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                 // 중요도 선택
                 const Text(
                   '중요도',
-                  style: TextStyle(fontSize: 14, color: Color(0xFF6b7280)),
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -982,7 +982,13 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => setState(() => _isImportant = false),
+                        onTap: () {
+                          // 건강 카테고리일 때는 일반 일정 선택 불가
+                          if (_selectedCategory == TaskCategories.health) {
+                            return;
+                          }
+                          setState(() => _isImportant = false);
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -1004,18 +1010,24 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                             children: [
                               Icon(
                                 Icons.star_border,
-                                color: !_isImportant
-                                    ? Colors.white
-                                    : Colors.grey,
+                                color:
+                                    _selectedCategory == TaskCategories.health
+                                    ? Colors.grey[400] // 건강 카테고리일 때 더 어둡게
+                                    : (!_isImportant
+                                          ? Colors.white
+                                          : Colors.grey),
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 '일반 일정',
                                 style: TextStyle(
-                                  color: !_isImportant
-                                      ? Colors.white
-                                      : Colors.grey,
+                                  color:
+                                      _selectedCategory == TaskCategories.health
+                                      ? Colors.grey[400] // 건강 카테고리일 때 더 어둡게
+                                      : (!_isImportant
+                                            ? Colors.white
+                                            : Colors.grey),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

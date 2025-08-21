@@ -196,6 +196,14 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
+                                        // 반복 일정 아이콘 (반복 일정인 경우)
+                                        if (task.isRecurring)
+                                          Text(
+                                            '🔄',
+                                            style: TextStyle(
+                                              fontSize: 14 * scaleFactor,
+                                            ),
+                                          ),
                                         Text(
                                           TaskCategories.getCategoryIcon(
                                             task.category,
