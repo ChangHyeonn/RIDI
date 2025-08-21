@@ -349,7 +349,14 @@ class ProcessTextUseCase:
         date = schedule_info.get('date', '').strip()
         time = schedule_info.get('time', '').strip()
         
-        # 2. 비구체적 제목 차단
+        # 2. 제목 개선 로직: "일정을 추가해 줘" 같은 문구에서 실제 일정 내용 추출
+        improved_title = self._extract_actual_schedule_title(title)
+        if improved_title and improved_title != title:
+            # 개선된 제목이 있으면 schedule_info 업데이트
+            schedule_info['title'] = improved_title
+            title = improved_title
+        
+        # 3. 비구체적 제목 차단
         generic_titles = ['일정', '예약', '할 일', '미팅', '약속', '행사']
         
         if not title:
@@ -366,7 +373,7 @@ class ProcessTextUseCase:
                 'error_type': ErrorTypes.GENERIC_SCHEDULE_TITLE
             }
         
-        # 3. 제목 길이 및 의미 검증
+        # 4. 제목 길이 및 의미 검증
         if len(title) < 2:
             return {
                 'valid': False,
@@ -415,6 +422,40 @@ class ProcessTextUseCase:
             }
         
         return {'valid': True}
+    
+    def _extract_actual_schedule_title(self, title: str) -> str:
+        """실제 일정 제목 추출 (generic 제목 개선)"""
+        if not title:
+            return title
+        
+        # "일정을 추가해 줘" 같은 문구에서 실제 일정 내용 추출
+        title_lower = title.lower()
+        
+        # 제거할 문구들
+        remove_phrases = [
+            '일정을 추가해 줘', '일정 추가해 줘', '일정 추가해주세요', '일정을 추가해주세요',
+            '일정을 넣어 줘', '일정 넣어 줘', '일정 넣어주세요', '일정을 넣어주세요',
+            '일정을 등록해 줘', '일정 등록해 줘', '일정 등록해주세요', '일정을 등록해주세요',
+            '일정을 만들어 줘', '일정 만들어 줘', '일정 만들어주세요', '일정을 만들어주세요',
+            '일정을 잡아 줘', '일정 잡아 줘', '일정 잡아주세요', '일정을 잡아주세요',
+            '일정을 예약해 줘', '일정 예약해 줘', '일정 예약해주세요', '일정을 예약해주세요'
+        ]
+        
+        # 제거할 문구들을 제거
+        cleaned_title = title
+        for phrase in remove_phrases:
+            if phrase in title_lower:
+                cleaned_title = title.replace(phrase, '').replace(phrase.replace('줘', '주세요'), '')
+                break
+        
+        # 앞뒤 공백 제거
+        cleaned_title = cleaned_title.strip()
+        
+        # 만약 제거 후 빈 문자열이 되면 원본 반환
+        if not cleaned_title:
+            return title
+        
+        return cleaned_title
     
     def _create_error_result(self, error_message: str, processing_time: float, error_type: str = ErrorTypes.SYSTEM_ERROR) -> TextProcessingResult:
         """에러 결과 생성"""

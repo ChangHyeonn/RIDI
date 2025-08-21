@@ -4,7 +4,7 @@ Prompt Manager - 목적별 분리된 프롬프트 관리 시스템
 """
 
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 
 class PromptManager:
@@ -46,6 +46,12 @@ JSON 형식으로만 응답:
 현재 날짜: {current_date}
 사용자 요청: {user_request}
 
+중요: 일정 제목은 구체적인 내용만 추출하세요.
+- "내일 오후 3시에 병원 진료 일정을 추가해 줘" → title: "병원 진료"
+- "다음주 월요일 오전 9시에 회사 회의 일정을 넣어줘" → title: "회사 회의"
+- "매일 아침 7시에 약 복용 일정을 등록해 줘" → title: "약 복용"
+- "일정", "예약", "할 일" 등의 일반적 단어는 제목에 포함하지 마세요.
+
 시간 변환 규칙:
 - "내일" = 현재 날짜 + 1일
 - "모레" = 현재 날짜 + 2일  
@@ -77,7 +83,7 @@ JSON 형식으로만 응답:
 
 JSON 형식으로만 응답:
 {{
-    "title": "일정 제목",
+    "title": "일정 제목 (구체적인 내용만, '일정', '예약' 등의 일반적 단어 제외)",
     "date": "YYYY-MM-DD",
     "time": "HH:MM",
     "category": "경조사/일반/건강",
@@ -127,33 +133,6 @@ JSON 형식으로만 응답:
 }}
 """
 
-    # ===== 일정 관리 전용 프롬프트 =====
-    SCHEDULE_MANAGEMENT_PROMPT = """
-일정 관리 전문 AI입니다.
-
-현재 날짜: {current_date}
-사용자 요청: {user_request}
-
-지원 기능:
-1. 일정 추가: 새로운 일정 등록
-2. 일정 조회: 기존 일정 확인
-3. 일정 삭제: 기존 일정 제거
-4. 일정 수정: 기존 일정 변경
-
-JSON 형식으로만 응답:
-{{
-    "action": "add/read/delete/update",
-    "schedule_info": {{
-        "title": "일정 제목",
-        "datetime": "YYYY-MM-DD HH:MM",
-        "category": "경조사/일반/건강",
-        "is_important": "건강 카테고리인 경우에만 true, 나머지는 false"
-    }},
-    "response": "사용자 응답",
-    "success": true/false
-}}
-"""
-
     # ===== 일반 대화 프롬프트 =====
     GENERAL_CONVERSATION_PROMPT = """
 친화적인 AI 어시스턴트입니다.
@@ -195,49 +174,7 @@ JSON 형식으로만 응답:
 }}
 """
 
-    # ===== 확인 요청 프롬프트 =====
-    CONFIRMATION_PROMPT = """
-사용자의 확인이 필요한 작업에 대한 메시지를 생성해주세요.
 
-작업 유형: {action_type}
-작업 내용: {action_details}
-사용자 요청: {user_request}
-
-확인 메시지 스타일:
-- 명확하고 간단한 설명
-- "네" 또는 "아니오"로 답변 가능
-- 작업의 중요성 강조
-
-JSON 형식으로만 응답:
-{{
-    "response_text": "확인 요청 메시지",
-    "action_type": "confirmation",
-    "confirmation_data": {{
-        "action": "실행할 작업",
-        "details": "작업 세부사항"
-    }}
-}}
-"""
-
-    # ===== 기존 통합 프롬프트 (하위 호환성) =====
-    UNIFIED_REQUEST_ANALYSIS_PROMPT = """
-당신은 일정 관리 AI 어시스턴트입니다. 사용자의 요청을 분석해주세요.
-
-현재 날짜: {current_date}
-사용자 요청: {user_request}
-
-다음 JSON 형식으로만 응답하세요:
-
-{{
-    "category": "schedule_add|schedule_read|schedule_delete|other",
-    "confidence": 0.8,
-    "extracted_info": {{
-        "title": "일정 제목",
-        "date": "YYYY-MM-DD",
-        "time": "HH:MM"
-    }}
-}}
-"""
 
     # ===== 프롬프트 접근 메서드들 =====
     
@@ -273,16 +210,6 @@ JSON 형식으로만 응답:
         )
     
     @classmethod
-    def get_schedule_management_prompt(cls, user_request: str, current_date: str = None) -> str:
-        """일정 관리 프롬프트 반환"""
-        if current_date is None:
-            current_date = datetime.now().strftime("%Y-%m-%d")
-        return cls.SCHEDULE_MANAGEMENT_PROMPT.format(
-            user_request=user_request,
-            current_date=current_date
-        )
-    
-    @classmethod
     def get_general_conversation_prompt(cls, user_request: str) -> str:
         """일반 대화 프롬프트 반환"""
         return cls.GENERAL_CONVERSATION_PROMPT.format(user_request=user_request)
@@ -295,98 +222,5 @@ JSON 형식으로만 응답:
             error_message=error_message,
             user_request=user_request
         )
-    
-    @classmethod
-    def get_confirmation_prompt(cls, action_type: str, action_details: str, user_request: str) -> str:
-        """확인 요청 프롬프트 반환"""
-        return cls.CONFIRMATION_PROMPT.format(
-            action_type=action_type,
-            action_details=action_details,
-            user_request=user_request
-        )
-    
-    @classmethod
-    def get_unified_request_analysis_prompt(cls, user_request: str, current_date: str = None) -> str:
-        """통합 요청 분석 프롬프트 반환 (하위 호환성)"""
-        if current_date is None:
-            current_date = datetime.now().strftime("%Y-%m-%d")
-        return cls.UNIFIED_REQUEST_ANALYSIS_PROMPT.format(
-            user_request=user_request,
-            current_date=current_date
-        )
-    
-    @classmethod
-    def get_korean_assistant_prompt(cls) -> str:
-        """기본 한국어 어시스턴트 시스템 프롬프트 반환 (하위 호환)"""
-        return cls.KOREAN_ASSISTANT_SYSTEM_PROMPT
-    
-    @classmethod
-    def get_prompt_by_intent(cls, intent: str, **kwargs) -> str:
-        """의도에 따른 적절한 프롬프트 반환"""
-        prompt_map = {
-            "schedule_add": cls.get_schedule_management_prompt,
-            "schedule_read": cls.get_schedule_management_prompt,
-            "schedule_delete": cls.get_schedule_management_prompt,
-            "schedule_update": cls.get_schedule_management_prompt,
-            "general_conversation": cls.get_general_conversation_prompt,
-            "error_handling": cls.get_error_handling_prompt
-        }
-        
-        if intent in prompt_map:
-            return prompt_map[intent](**kwargs)
-        else:
-            return cls.get_general_conversation_prompt(**kwargs)
-    
-    @classmethod
-    def get_available_prompts(cls) -> Dict[str, str]:
-        """사용 가능한 모든 프롬프트 목록 반환"""
-        return {
-            "intent_classification": "의도 분류 프롬프트",
-            "schedule_extraction": "일정 정보 추출 프롬프트",
-            "response_generation": "응답 생성 프롬프트",
-            "schedule_management": "일정 관리 프롬프트",
-            "general_conversation": "일반 대화 프롬프트",
-            "error_handling": "오류 처리 프롬프트",
-            "confirmation": "확인 요청 프롬프트",
-            "unified_analysis": "통합 요청 분석 프롬프트 (하위 호환성)"
-        }
 
 
-# ===== 프롬프트 파이프라인 클래스 =====
-
-class PromptPipeline:
-    """단계별 프롬프트 처리 파이프라인"""
-    
-    def __init__(self):
-        self.current_date = datetime.now().strftime("%Y-%m-%d")
-    
-    def process_request(self, user_request: str) -> Dict[str, Any]:
-        """단계별 프롬프트 처리"""
-        # 1단계: 의도 분류
-        intent_prompt = PromptManager.get_intent_classification_prompt(
-            user_request, self.current_date
-        )
-        
-        # 2단계: 정보 추출 (필요한 경우)
-        extraction_prompt = None
-        if self._requires_extraction(user_request):
-            extraction_prompt = PromptManager.get_schedule_extraction_prompt(
-                user_request, self.current_date
-            )
-        
-        # 3단계: 응답 생성
-        response_prompt = PromptManager.get_response_generation_prompt(
-            user_request, "intent", {}, "processing_result"
-        )
-        
-        return {
-            "intent_prompt": intent_prompt,
-            "extraction_prompt": extraction_prompt,
-            "response_prompt": response_prompt,
-            "current_date": self.current_date
-        }
-    
-    def _requires_extraction(self, user_request: str) -> bool:
-        """정보 추출이 필요한지 판단"""
-        schedule_keywords = ['일정', '약속', '회의', '병원', '약', '추가', '삭제', '확인']
-        return any(keyword in user_request for keyword in schedule_keywords)
