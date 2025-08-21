@@ -30,6 +30,8 @@ class ErrorTypes:
     # 4. 일정 조회/삭제 에러
     SCHEDULE_NOT_FOUND = "schedule_not_found"
     SCHEDULE_DELETE_ERROR = "schedule_delete_error"
+    SCHEDULE_SELECTION_REQUIRED = "schedule_selection_required"
+    INVALID_SELECTION_RESPONSE = "invalid_selection_response"
     
     # 5. LLM/AI 처리 에러
     AI_PROCESSING_ERROR = "ai_processing_error"

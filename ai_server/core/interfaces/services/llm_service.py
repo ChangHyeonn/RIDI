@@ -29,6 +29,11 @@ class ILLMService(ABC):
         pass
     
     @abstractmethod
+    def parse_selection_response(self, user_response: str, schedule_list: str) -> Dict[str, Any]:
+        """사용자의 일정 선택 응답 파싱"""
+        pass
+    
+    @abstractmethod
     def get_model_info(self) -> Dict[str, Any]:
         """모델 정보 반환"""
         pass

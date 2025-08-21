@@ -105,6 +105,43 @@ class OpenAILLMService(ILLMService):
             self.logger.error(f"Response generation failed: {e}")
             return "죄송합니다. 응답을 생성하는 중에 오류가 발생했습니다."
     
+    def parse_selection_response(self, user_response: str, schedule_list: str) -> Dict[str, Any]:
+        """사용자의 일정 선택 응답 파싱"""
+        try:
+            prompt = self._get_selection_response_prompt(user_response, schedule_list)
+            response = self._chat_completion(prompt, max_tokens=200)
+            
+            # AI_02 스타일 로그: LLM 응답 로깅
+            self.logger.debug(f"LLM selection response: {response}")
+            
+            # JSON 파싱
+            try:
+                selection_data = json.loads(response)
+                
+                # AI_02 스타일 로그: 파싱 결과
+                self.logger.info(f"LLM selection parsing: {user_response} -> {selection_data}")
+                
+                return selection_data
+            except json.JSONDecodeError:
+                self.logger.warning(f"Failed to parse selection response: {response}")
+                return {
+                    "selected_indices": [],
+                    "selected_schedule_ids": [],
+                    "action": "cancel",
+                    "is_valid_selection": False,
+                    "error_message": "응답을 파싱할 수 없습니다."
+                }
+                
+        except Exception as e:
+            self.logger.error(f"Selection response parsing failed: {e}")
+            return {
+                "selected_indices": [],
+                "selected_schedule_ids": [],
+                "action": "cancel",
+                "is_valid_selection": False,
+                "error_message": f"응답 파싱 실패: {str(e)}"
+            }
+    
     def get_model_info(self) -> Dict[str, Any]:
         """모델 정보 반환"""
         return {
@@ -171,3 +208,8 @@ class OpenAILLMService(ILLMService):
         """정보 추출 프롬프트 생성 (Config/prompts.py 사용)"""
         from Config.prompts import PromptManager
         return PromptManager.get_schedule_extraction_prompt(text)
+    
+    def _get_selection_response_prompt(self, user_response: str, schedule_list: str) -> str:
+        """선택 응답 파싱 프롬프트 생성 (Config/prompts.py 사용)"""
+        from Config.prompts import PromptManager
+        return PromptManager.get_schedule_selection_response_prompt(user_response, schedule_list)

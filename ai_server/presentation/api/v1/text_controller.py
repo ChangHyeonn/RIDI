@@ -62,6 +62,15 @@ def _create_ai02_response(result):
                 "highlight_important": True  # AI_02 스타일 추가
             }
         )
+    elif result.action_type == "schedule_selection":
+        # 일정 선택 UI 제공
+        return _create_schedule_selection_response(result)
+    elif result.action_type == "schedule_delete_multiple":
+        # 다중 일정 삭제 완료
+        return _create_schedule_delete_multiple_response(result)
+    elif result.action_type == "schedule_delete_cancelled":
+        # 일정 삭제 취소
+        return _create_text_response(result.response_text)
     else:
         # 일반 텍스트 응답
         return _create_text_response(result.response_text)
@@ -230,6 +239,76 @@ def _get_custom_days_description(days_of_week: list) -> str:
         return "특정 요일마다"
 
 
+def _create_schedule_selection_response(result):
+    """일정 선택 응답 생성 (guide.md v3.2.0 호환)"""
+    from datetime import datetime
+    
+    response = {
+        "success": False,  # guide.md에 따라 False로 설정
+        "action": {
+            "type": "schedule_selection",
+            "is_important": True,
+            "data": {
+                "search_title": result.action_data.get("search_title", ""),
+                "similar_schedules": result.action_data.get("similar_schedules", []),
+                "total_found": result.action_data.get("total_found", 0)
+            },
+            "ui_instructions": {
+                "screen": "schedule_selection",
+                "show_selection_ui": True,
+                "allow_multiple_selection": True,
+                "selection_type": "delete",
+                "notification": {
+                    "type": "info",
+                    "title": "일정 선택",
+                    "message": "삭제할 일정을 선택해주세요"
+                }
+            }
+        },
+        "text_response": {
+            "text": result.response_text,
+            "display_automatically": True
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    return jsonify(response), 200
+
+
+def _create_schedule_delete_multiple_response(result):
+    """다중 일정 삭제 완료 응답 생성 (guide.md v3.2.0 호환)"""
+    from datetime import datetime
+    
+    response = {
+        "success": True,
+        "action": {
+            "type": "schedule_delete_multiple",
+            "is_important": True,
+            "data": {
+                "deleted_schedules": result.action_data.get("deleted_schedules", []),
+                "deleted_count": result.action_data.get("deleted_count", 0)
+            },
+            "ui_instructions": {
+                "screen": "calendar",
+                "refresh_data": True,
+                "remove_items": result.action_data.get("deleted_schedules", []),
+                "notification": {
+                    "type": "success",
+                    "title": "일정 삭제 완료",
+                    "message": f"{result.action_data.get('deleted_count', 0)}개 일정이 삭제되었습니다"
+                }
+            }
+        },
+        "text_response": {
+            "text": result.response_text,
+            "display_automatically": True
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    return jsonify(response), 200
+
+
 def _create_text_response(text: str, response_text: str = None, simple_text: str = None):
     """AI_02 완전 동일 텍스트 전용 응답 생성"""
     from datetime import datetime
@@ -302,7 +381,7 @@ def process_text():
             logger.error(f"Text processing failed: {result.error_message}")
         
         # 3. AI_02 호환 응답 생성
-        if result.success:
+        if result.success or result.action_type == "schedule_selection":
             response = _create_ai02_response(result)
             logger.info(f"Response sent: {result.action_type} action with text: '{result.response_text[:30]}...'")
             return response

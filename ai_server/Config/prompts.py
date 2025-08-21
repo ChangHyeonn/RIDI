@@ -47,10 +47,27 @@ JSON 형식으로만 응답:
 사용자 요청: {user_request}
 
 중요: 일정 제목은 구체적인 내용만 추출하세요.
+
+추가 요청 예시:
 - "내일 오후 3시에 병원 진료 일정을 추가해 줘" → title: "병원 진료"
 - "다음주 월요일 오전 9시에 회사 회의 일정을 넣어줘" → title: "회사 회의"
 - "매일 아침 7시에 약 복용 일정을 등록해 줘" → title: "약 복용"
+
+삭제 요청 예시:
+- "병원 진료 일정 삭제해 줘" → title: "병원 진료"
+- "친구 만남 일정 삭제해 줘" → title: "친구 만남"
+- "내일 친구 만남 일정 삭제해 줘" → title: "친구 만남", date: "내일 날짜"
+- "회의 일정 삭제해 줘" → title: "회의"
+- "약 복용 일정 삭제해 줘" → title: "약 복용"
+- "병원 일정 삭제해 줘" → title: "병원"
+- "치과 일정 삭제해 줘" → title: "치과"
+
+삭제 요청 처리 규칙:
+- "~일정 삭제해 줘" → title: "~" (일정 앞의 구체적인 내용만 추출)
+- "~일정 지워줘" → title: "~"
+- "~일정 취소해 줘" → title: "~"
 - "일정", "예약", "할 일" 등의 일반적 단어는 제목에 포함하지 마세요.
+- 단일 단어도 유효한 제목입니다 (예: "병원", "치과", "회의" 등)
 
 시간 변환 규칙:
 - "내일" = 현재 날짜 + 1일
@@ -103,10 +120,14 @@ JSON 형식으로만 응답:
 }}
 
 예시:
-- "내일 오후 3시에 병원 진료" → is_recurring: false
-- "매일 아침 7시, 저녁 6시에 약 복용" → is_recurring: true, type: "daily", times: [07:00, 18:00]
-- "평일마다 오전 9시에 회의" → is_recurring: true, type: "weekdays", times: [09:00]
-- "월, 수, 금요일 오전 6시, 오후 5시에 기상 알람" → is_recurring: true, type: "custom_days", days_of_week: [0,2,4], times: [06:00, 17:00]
+**일정 추가:**
+- "내일 오후 3시에 병원 진료" → title: "병원 진료", date: "2025-08-22", time: "15:00", is_recurring: false
+- "매일 아침 7시, 저녁 6시에 약 복용" → title: "약 복용", date: "2025-08-22", time: "07:00", is_recurring: true, type: "daily"
+
+**일정 삭제:**
+- "병원 일정 삭제해 줘" → title: "병원"
+- "병원 진료 일정 삭제해 줘" → title: "병원 진료"
+- "내일 병원 진료 일정 삭제해 줘" → title: "병원 진료", date: "2025-08-22"
 """
 
     # ===== 3단계: 응답 생성 프롬프트 =====
@@ -174,6 +195,54 @@ JSON 형식으로만 응답:
 }}
 """
 
+    # ===== 일정 선택 프롬프트 =====
+    SCHEDULE_SELECTION_PROMPT = """
+사용자가 삭제하고 싶은 일정을 선택하도록 안내해주세요.
+
+검색된 일정 목록:
+{schedule_list}
+
+사용자 요청: {user_request}
+
+응답 스타일:
+- 친화적이고 명확한 안내
+- 번호로 선택할 수 있도록 안내
+- 다중 선택 가능함을 안내
+- "모두" 또는 "전부"로 전체 삭제 가능함을 안내
+
+JSON 형식으로만 응답:
+{{
+    "response_text": "사용자에게 보여줄 선택 안내 메시지",
+    "action_type": "schedule_selection",
+    "requires_user_selection": true,
+    "selection_options": ["번호 선택", "모두 삭제", "취소"]
+}}
+"""
+
+    # ===== 일정 선택 응답 처리 프롬프트 =====
+    SCHEDULE_SELECTION_RESPONSE_PROMPT = """
+사용자의 일정 선택 응답을 처리해주세요.
+
+사용자 응답: {user_response}
+선택 가능한 일정 목록:
+{schedule_list}
+
+응답 형식 분석:
+- 단일 선택: "1번", "병원 진료" → 해당 일정만 선택
+- 다중 선택: "1번, 3번", "병원 진료, 치과 진료" → 여러 일정 선택
+- 모두 삭제: "모두", "전부", "다" → 모든 일정 선택
+- 취소: "취소", "안할래요", "그만" → 선택 취소
+
+JSON 형식으로만 응답:
+{{
+    "selected_indices": [0, 2],  // 선택된 일정의 인덱스 (0부터 시작)
+    "selected_schedule_ids": ["id1", "id2"],  // 선택된 일정의 ID 목록
+    "action": "delete_multiple/delete_all/cancel",
+    "is_valid_selection": true/false,
+    "error_message": "잘못된 선택인 경우 오류 메시지"
+}}
+"""
+
 
 
     # ===== 프롬프트 접근 메서드들 =====
@@ -221,6 +290,22 @@ JSON 형식으로만 응답:
             error_type=error_type,
             error_message=error_message,
             user_request=user_request
+        )
+    
+    @classmethod
+    def get_schedule_selection_prompt(cls, schedule_list: str, user_request: str) -> str:
+        """일정 선택 프롬프트 반환"""
+        return cls.SCHEDULE_SELECTION_PROMPT.format(
+            schedule_list=schedule_list,
+            user_request=user_request
+        )
+    
+    @classmethod
+    def get_schedule_selection_response_prompt(cls, user_response: str, schedule_list: str) -> str:
+        """일정 선택 응답 처리 프롬프트 반환"""
+        return cls.SCHEDULE_SELECTION_RESPONSE_PROMPT.format(
+            user_response=user_response,
+            schedule_list=schedule_list
         )
 
 

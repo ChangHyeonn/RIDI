@@ -29,6 +29,9 @@ class ProcessTextUseCase:
         self.get_schedule_usecase = get_schedule_usecase
         self.delete_schedule_usecase = delete_schedule_usecase
         self.logger = LoggerFactory.get_logger(__name__)
+        
+        # 간단한 메모리 기반 세션 저장소 (실제로는 Redis나 DB 사용 권장)
+        self._user_sessions = {}
     
     def execute(self, request: TextRequest) -> TextProcessingResult:
         """텍스트 요청 처리 (AI_02 호환 방식)"""
@@ -49,6 +52,10 @@ class ProcessTextUseCase:
             # AI_02 스타일 로그: Intent Classification
             self.logger.info(f"Intent classified: {request.text} -> {intent.category}")
             self.logger.info(f"Intent analyzed: {intent.category} (confidence: {intent.confidence})")
+            
+            # 2.5. 일정 선택 응답 감지 (스펙트럼 삭제 후 사용자 선택)
+            if self._is_schedule_selection_response(request.text):
+                return self._handle_schedule_selection_response(request, start_time)
             
             # 3. 일정 관련 요청의 경우 정보 추출
             if intent.category == "schedule_add":
@@ -74,9 +81,15 @@ class ProcessTextUseCase:
                 self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
                 return self._handle_schedule_read(request, intent, start_time)
             elif intent.category == "schedule_delete":
+                # 일정 정보 추출
+                schedule_info = self.llm_service.extract_schedule_info(request.text)
+                
+                # AI_02 스타일 로그: Information Extraction
+                self.logger.info(f"Information extracted: {schedule_info}")
+                
                 # AI_02 스타일 로그: Request Analysis
                 self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
-                return self._handle_schedule_delete(request, intent, start_time)
+                return self._handle_schedule_delete(request, schedule_info, start_time)
             else:
                 # AI_02 스타일 로그: Request Analysis
                 self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
@@ -165,12 +178,13 @@ class ProcessTextUseCase:
                 ErrorTypes.AI_PROCESSING_ERROR
             )
     
-    def _handle_schedule_delete(self, request: TextRequest, intent: IntentAnalysis, start_time: float) -> TextProcessingResult:
-        """일정 삭제 처리"""
+    def _handle_schedule_delete(self, request: TextRequest, schedule_info: dict, start_time: float) -> TextProcessingResult:
+        """일정 삭제 처리 (스펙트럼 검색 지원)"""
         try:
-            result = self.delete_schedule_usecase.execute(request.user_id, intent.extracted_info)
+            result = self.delete_schedule_usecase.execute(request.user_id, schedule_info)
             
             if result.success:
+                # 삭제 성공 응답
                 response_text = f"{result.deleted_title} 일정을 삭제했습니다."
                 return TextProcessingResult(
                     success=True,
@@ -179,13 +193,151 @@ class ProcessTextUseCase:
                     response_text=response_text,
                     processing_time=time.time() - start_time
                 )
+            elif result.requires_selection:
+                # 일정 선택 UI 제공
+                return self._handle_schedule_selection(request, result, start_time)
             else:
+                # 삭제 실패 응답
                 return self._create_error_result(result.error_message, time.time() - start_time)
                 
         except Exception as e:
             self.logger.error(f"Schedule delete failed: {e}")
             return self._create_error_result(
                 "일정 삭제 중 오류가 발생했습니다.", 
+                time.time() - start_time,
+                ErrorTypes.AI_PROCESSING_ERROR
+            )
+    
+    def _handle_schedule_selection(self, request: TextRequest, result, start_time: float) -> TextProcessingResult:
+        """일정 선택 UI 처리"""
+        try:
+            similar_schedules = result.similar_schedules
+            
+            # 일정 목록 생성
+            schedule_list = []
+            for i, schedule in enumerate(similar_schedules, 1):
+                schedule_info = f"{i}. {schedule['title']}"
+                if schedule['datetime']:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(schedule['datetime'])
+                    schedule_info += f" ({dt.strftime('%m월 %d일 %H시 %M분')})"
+                if schedule['is_recurring']:
+                    schedule_info += " (반복 일정)"
+                schedule_list.append(schedule_info)
+            
+            schedule_list_text = "\n".join(schedule_list)
+            
+            # 선택 안내 메시지 생성 (원본 요청에서 제목 추출)
+            search_title = request.text.split('삭제')[0].strip() if '삭제' in request.text else '일정'
+            response_text = f"'{search_title}'과 관련된 일정이 {len(similar_schedules)}개 있습니다. 삭제하고 싶은 일정을 선택해주세요:\n\n{schedule_list_text}\n\n번호로 선택하거나 '모두'를 말씀하시면 됩니다."
+            
+            # 세션에 일정 목록 저장
+            self._user_sessions[request.user_id] = {
+                "similar_schedules": similar_schedules,
+                "search_title": search_title,
+                "timestamp": time.time()
+            }
+            
+            return TextProcessingResult(
+                success=False,
+                action_type="schedule_selection",
+                action_data={
+                    "search_title": search_title,
+                    "similar_schedules": similar_schedules,
+                    "total_found": len(similar_schedules),
+                    "requires_user_selection": True
+                },
+                response_text=response_text,
+                processing_time=time.time() - start_time
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Schedule selection failed: {e}")
+            return self._create_error_result(
+                "일정 선택 처리 중 오류가 발생했습니다.", 
+                time.time() - start_time,
+                ErrorTypes.AI_PROCESSING_ERROR
+            )
+    
+    def _handle_schedule_selection_response(self, request: TextRequest, start_time: float) -> TextProcessingResult:
+        """일정 선택 응답 처리"""
+        try:
+            # 세션에서 일정 목록 가져오기
+            user_session = self._user_sessions.get(request.user_id)
+            if not user_session:
+                return self._create_error_result(
+                    "선택할 일정이 없습니다. 다시 삭제 요청을 해주세요.", 
+                    time.time() - start_time,
+                    ErrorTypes.SCHEDULE_SELECTION_REQUIRED
+                )
+            
+            # 세션 만료 확인 (5분)
+            if time.time() - user_session["timestamp"] > 300:
+                del self._user_sessions[request.user_id]
+                return self._create_error_result(
+                    "선택 시간이 만료되었습니다. 다시 삭제 요청을 해주세요.", 
+                    time.time() - start_time,
+                    ErrorTypes.SCHEDULE_SELECTION_REQUIRED
+                )
+            
+            similar_schedules = user_session["similar_schedules"]
+            search_title = user_session["search_title"]
+            
+            # 사용자 응답 파싱
+            selection_result = self._parse_selection_response(request.text, similar_schedules)
+            
+            if not selection_result["is_valid"]:
+                return self._create_error_result(
+                    selection_result["error_message"], 
+                    time.time() - start_time,
+                    ErrorTypes.INVALID_SELECTION_RESPONSE
+                )
+            
+            # 선택된 일정 삭제
+            if selection_result["action"] == "cancel":
+                # 세션 정리
+                del self._user_sessions[request.user_id]
+                return TextProcessingResult(
+                    success=True,
+                    action_type="schedule_delete_cancelled",
+                    action_data={"message": "삭제가 취소되었습니다."},
+                    response_text="삭제를 취소했습니다.",
+                    processing_time=time.time() - start_time
+                )
+            
+            # 실제 삭제 실행
+            selected_schedule_ids = selection_result["selected_schedule_ids"]
+            delete_result = self.delete_schedule_usecase.execute_selection(request.user_id, selected_schedule_ids)
+            
+            if delete_result.success:
+                # 세션 정리
+                del self._user_sessions[request.user_id]
+                
+                # 삭제 성공 응답 생성
+                deleted_titles = [schedule["title"] for schedule in similar_schedules if schedule["id"] in selected_schedule_ids]
+                response_text = self._generate_delete_multiple_response(deleted_titles, len(selected_schedule_ids))
+                
+                return TextProcessingResult(
+                    success=True,
+                    action_type="schedule_delete_multiple",
+                    action_data={
+                        "deleted_schedules": deleted_titles,
+                        "deleted_count": len(selected_schedule_ids)
+                    },
+                    response_text=response_text,
+                    processing_time=time.time() - start_time
+                )
+            else:
+                return self._create_error_result(
+                    delete_result.error_message, 
+                    time.time() - start_time,
+                    ErrorTypes.SCHEDULE_DELETE_ERROR
+                )
+            
+        except Exception as e:
+            self.logger.error(f"Schedule selection response failed: {e}")
+            return self._create_error_result(
+                "일정 선택 응답 처리 중 오류가 발생했습니다.", 
                 time.time() - start_time,
                 ErrorTypes.AI_PROCESSING_ERROR
             )
@@ -334,12 +486,67 @@ class ProcessTextUseCase:
             return "특정 요일마다"
     
     def _generate_read_response(self, schedules: list) -> str:
-        """일정 조회 응답 메시지 생성"""
+        """일정 조회 응답 메시지 생성 (상세 정보 포함)"""
         if not schedules:
             return "등록된 일정이 없습니다."
         
         count = len(schedules)
-        return f"{count}개의 일정을 찾았습니다."
+        
+        # 일정이 1개인 경우
+        if count == 1:
+            schedule = schedules[0]
+            title = schedule.title
+            start_time = schedule.start_datetime
+            
+            # 시간 정보 포함
+            if start_time:
+                month = start_time.month
+                day = start_time.day
+                hour = start_time.hour
+                minute = start_time.minute
+                
+                if minute == 0:
+                    return f"{month}월 {day}일 {hour}시에 {title} 일정이 있습니다."
+                else:
+                    return f"{month}월 {day}일 {hour}시 {minute}분에 {title} 일정이 있습니다."
+            else:
+                return f"{title} 일정이 있습니다."
+        
+        # 일정이 여러 개인 경우
+        elif count <= 3:
+            # 상위 3개 일정의 제목만 나열
+            titles = []
+            for i, schedule in enumerate(schedules[:3]):
+                title = schedule.title
+                start_time = schedule.start_datetime
+                
+                if start_time:
+                    month = start_time.month
+                    day = start_time.day
+                    titles.append(f"{month}월 {day}일 {title}")
+                else:
+                    titles.append(title)
+            
+            if len(titles) == 1:
+                return f"{count}개의 일정이 있습니다. {titles[0]}입니다."
+            elif len(titles) == 2:
+                return f"{count}개의 일정이 있습니다. {titles[0]}와 {titles[1]}입니다."
+            else:
+                return f"{count}개의 일정이 있습니다. {titles[0]}, {titles[1]}, {titles[2]}입니다."
+        
+        # 일정이 4개 이상인 경우
+        else:
+            # 첫 번째 일정만 상세히, 나머지는 개수로
+            first_schedule = schedules[0]
+            title = first_schedule.title
+            start_time = first_schedule.start_datetime
+            
+            if start_time:
+                month = start_time.month
+                day = start_time.day
+                return f"{count}개의 일정이 있습니다. {month}월 {day}일 {title} 외 {count-1}개 일정이 있습니다."
+            else:
+                return f"{count}개의 일정이 있습니다. {title} 외 {count-1}개 일정이 있습니다."
     
     def _validate_schedule_info(self, schedule_info: Dict[str, Any]) -> Dict[str, Any]:
         """일정 정보 엄격 검증"""
@@ -422,6 +629,20 @@ class ProcessTextUseCase:
         
         return {'valid': True}
     
+    def _generate_delete_multiple_response(self, deleted_titles: list, deleted_count: int) -> str:
+        """다중 삭제 응답 메시지 생성"""
+        if not deleted_titles:
+            return "일정이 삭제되었습니다."
+        
+        if deleted_count == 1:
+            return f"{deleted_titles[0]} 일정을 삭제했습니다."
+        elif deleted_count == 2:
+            return f"{deleted_titles[0]}와 {deleted_titles[1]} 일정을 삭제했습니다."
+        else:
+            # 3개 이상인 경우
+            titles_str = ", ".join(deleted_titles[:-1]) + f"와 {deleted_titles[-1]}"
+            return f"{titles_str} 일정을 삭제했습니다."
+    
     def _extract_actual_schedule_title(self, title: str) -> str:
         """실제 일정 제목 추출 (generic 제목 개선)"""
         if not title:
@@ -456,6 +677,108 @@ class ProcessTextUseCase:
         
         return cleaned_title
     
+    def _is_schedule_selection_response(self, text: str) -> bool:
+        """일정 선택 응답인지 감지"""
+        if not text:
+            return False
+        
+        # 선택 응답 패턴들
+        selection_patterns = [
+            r'^\d+번$',  # "1번", "2번" 등
+            r'^\d+번,\s*\d+번$',  # "1번, 2번" 등
+            r'^\d+번\s*,\s*\d+번$',  # "1번 , 2번" 등
+            r'^모두$',  # "모두"
+            r'^전부$',  # "전부"
+            r'^다$',  # "다"
+            r'^취소$',  # "취소"
+            r'^안할래요$',  # "안할래요"
+            r'^그만$',  # "그만"
+        ]
+        
+        import re
+        for pattern in selection_patterns:
+            if re.match(pattern, text.strip()):
+                return True
+        
+        return False
+    
+    def _parse_selection_response(self, text: str, similar_schedules: list) -> dict:
+        """선택 응답 파싱"""
+        if not text or not similar_schedules:
+            return {
+                "is_valid": False,
+                "error_message": "잘못된 선택입니다."
+            }
+        
+        text = text.strip()
+        
+        # 취소 응답
+        if text in ["취소", "안할래요", "그만"]:
+            return {
+                "is_valid": True,
+                "action": "cancel",
+                "selected_indices": [],
+                "selected_schedule_ids": []
+            }
+        
+        # 모두 삭제
+        if text in ["모두", "전부", "다"]:
+            return {
+                "is_valid": True,
+                "action": "delete_all",
+                "selected_indices": list(range(len(similar_schedules))),
+                "selected_schedule_ids": [schedule["id"] for schedule in similar_schedules]
+            }
+        
+        # 번호 선택 파싱
+        import re
+        
+        # 단일 선택: "1번"
+        single_match = re.match(r'^(\d+)번$', text)
+        if single_match:
+            index = int(single_match.group(1)) - 1  # 0-based index
+            if 0 <= index < len(similar_schedules):
+                return {
+                    "is_valid": True,
+                    "action": "delete_multiple",
+                    "selected_indices": [index],
+                    "selected_schedule_ids": [similar_schedules[index]["id"]]
+                }
+            else:
+                return {
+                    "is_valid": False,
+                    "error_message": f"1부터 {len(similar_schedules)}까지의 번호를 선택해주세요."
+                }
+        
+        # 다중 선택: "1번, 2번"
+        multiple_match = re.match(r'^(\d+)번\s*,\s*(\d+)번$', text)
+        if multiple_match:
+            index1 = int(multiple_match.group(1)) - 1
+            index2 = int(multiple_match.group(2)) - 1
+            
+            if (0 <= index1 < len(similar_schedules) and 
+                0 <= index2 < len(similar_schedules) and 
+                index1 != index2):
+                return {
+                    "is_valid": True,
+                    "action": "delete_multiple",
+                    "selected_indices": [index1, index2],
+                    "selected_schedule_ids": [
+                        similar_schedules[index1]["id"],
+                        similar_schedules[index2]["id"]
+                    ]
+                }
+            else:
+                return {
+                    "is_valid": False,
+                    "error_message": f"1부터 {len(similar_schedules)}까지의 서로 다른 번호를 선택해주세요."
+                }
+        
+        return {
+            "is_valid": False,
+            "error_message": "번호로 선택하거나 '모두', '취소'를 말씀해주세요."
+        }
+
     def _create_error_result(self, error_message: str, processing_time: float, error_type: str = ErrorTypes.SYSTEM_ERROR) -> TextProcessingResult:
         """에러 결과 생성"""
         return TextProcessingResult(

@@ -338,6 +338,8 @@ custom_days :	특정 요일들	"월, 수, 금요일 오전 6시, 오후 5시에 
 
 ### 3. 🗑️ 일정 삭제 성공
 
+#### 3.1 단일 일정 삭제
+
 **요청 예시**: "병원 예약 취소해줘"
 
 ```json
@@ -371,6 +373,155 @@ custom_days :	특정 요일들	"월, 수, 금요일 오전 6시, 오후 5시에 
   },
   "text_response": {
     "text": "1월 15일 오후 3시 병원 진료 일정을 삭제하였습니다.",
+    "display_automatically": true
+  },
+  "timestamp": "2024-01-14T10:30:00.123456"
+}
+```
+
+#### 3.2 🆕 스펙트럼 일정 선택 삭제 (v3.2.0)
+
+**요청 예시**: "병원 일정 삭제해줘" (유사한 일정이 여러 개 있는 경우)
+
+```json
+{
+  "success": false,
+  "action": {
+    "type": "schedule_selection",
+    "is_important": true,
+    "data": {
+      "search_title": "병원 일정",
+      "similar_schedules": [
+        {
+          "id": "507f1f77bcf86cd799439011",
+          "title": "병원 진료",
+          "datetime": "2024-01-15T15:00:00",
+          "category": "건강",
+          "similarity": 1.0,
+          "is_recurring": false
+        },
+        {
+          "id": "507f1f77bcf86cd799439012",
+          "title": "치과 진료",
+          "datetime": "2024-01-20T10:00:00",
+          "category": "건강",
+          "similarity": 0.25,
+          "is_recurring": false
+        }
+      ],
+      "total_found": 2
+    },
+    "ui_instructions": {
+      "screen": "schedule_selection",
+      "show_selection_ui": true,
+      "allow_multiple_selection": true,
+      "selection_type": "delete",
+      "notification": {
+        "type": "info",
+        "title": "일정 선택",
+        "message": "삭제할 일정을 선택해주세요"
+      }
+    }
+  },
+  "text_response": {
+    "text": "'병원 일정'과 관련된 일정이 2개 있습니다. 삭제하고 싶은 일정을 선택해주세요:\n\n1. 병원 진료 (01월 15일 15시 00분)\n2. 치과 진료 (01월 20일 10시 00분)\n\n번호로 선택하거나 '모두'를 말씀하시면 됩니다.",
+    "display_automatically": true
+  },
+  "timestamp": "2024-01-14T10:30:00.123456"
+}
+```
+
+**스펙트럼 검색 특징**:
+- **유사도 기반 검색**: Jaccard similarity + 의료 키워드 매칭으로 정확한 검색
+- **의료 관련 키워드**: "병원", "치과", "검진", "진료" 등이 서로 연관되어 검색됨
+- **유사도 점수**: 0.0~1.0 범위, 높을수록 더 유사함
+- **검색 범위**: 단어 포함, 키워드 매칭, 의미적 연관성까지 고려
+
+#### 3.3 🆕 선택된 일정 삭제 완료
+
+**사용자 응답 예시들**:
+- `"1번"` → 단일 일정 삭제
+- `"1번, 2번"` → 다중 일정 삭제
+- `"모두"` → 모든 관련 일정 삭제
+- `"취소"` → 삭제 취소
+
+**단일 일정 삭제 응답** (사용자: "1번"):
+
+```json
+{
+  "success": true,
+  "action": {
+    "type": "schedule_delete_multiple",
+    "is_important": true,
+    "data": {
+      "deleted_schedules": ["병원 진료"],
+      "deleted_count": 1
+    },
+    "ui_instructions": {
+      "screen": "calendar",
+      "refresh_data": true,
+      "remove_items": ["병원 진료"],
+      "notification": {
+        "type": "success",
+        "title": "일정 삭제 완료",
+        "message": "1개 일정이 삭제되었습니다"
+      }
+    }
+  },
+  "text_response": {
+    "text": "병원 진료 일정을 삭제했습니다.",
+    "display_automatically": true
+  },
+  "timestamp": "2024-01-14T10:30:00.123456"
+}
+```
+
+**다중 일정 삭제 응답** (사용자: "1번, 2번"):
+
+```json
+{
+  "success": true,
+  "action": {
+    "type": "schedule_delete_multiple",
+    "is_important": true,
+    "data": {
+      "deleted_schedules": ["병원 진료", "치과 진료"],
+      "deleted_count": 2
+    },
+    "ui_instructions": {
+      "screen": "calendar",
+      "refresh_data": true,
+      "remove_items": ["병원 진료", "치과 진료"],
+      "notification": {
+        "type": "success",
+        "title": "일정 삭제 완료",
+        "message": "2개 일정이 삭제되었습니다"
+      }
+    }
+  },
+  "text_response": {
+    "text": "병원 진료와 치과 진료 일정을 삭제했습니다.",
+    "display_automatically": true
+  },
+  "timestamp": "2024-01-14T10:30:00.123456"
+}
+```
+
+**삭제 취소 응답** (사용자: "취소"):
+
+```json
+{
+  "success": true,
+  "action": {
+    "type": "schedule_delete_cancelled",
+    "is_important": false,
+    "data": {
+      "message": "삭제가 취소되었습니다."
+    },
+    "ui_instructions": {}
+  },
+  "text_response": {
+    "text": "삭제를 취소했습니다.",
     "display_automatically": true
   },
   "timestamp": "2024-01-14T10:30:00.123456"
@@ -813,6 +964,83 @@ custom_days :	특정 요일들	"월, 수, 금요일 오전 6시, 오후 5시에 
 }
 ```
 
+#### 4.3 🆕 스펙트럼 삭제 관련 에러 (v3.2.0)
+
+**4.3.1 일정 선택 필요** (선택할 일정이 없는 경우)
+
+```json
+{
+  "success": false,
+  "action": {
+    "type": "error",
+    "is_important": true,
+    "data": {
+      "error_type": "schedule_selection_required",
+      "message": "선택할 일정이 없습니다. 다시 삭제 요청을 해주세요."
+    },
+    "ui_instructions": {
+      "notification": {
+        "type": "error",
+        "title": "오류 발생",
+        "message": "선택할 일정이 없습니다. 다시 삭제 요청을 해주세요.",
+        "duration": 5000
+      }
+    }
+  },
+  "timestamp": "2024-01-14T10:30:00.123456"
+}
+```
+
+**4.3.2 잘못된 선택 응답** (사용자가 잘못된 형식으로 응답한 경우)
+
+```json
+{
+  "success": false,
+  "action": {
+    "type": "error",
+    "is_important": true,
+    "data": {
+      "error_type": "invalid_selection_response",
+      "message": "번호로 선택하거나 '모두', '취소'를 말씀해주세요."
+    },
+    "ui_instructions": {
+      "notification": {
+        "type": "error",
+        "title": "오류 발생",
+        "message": "번호로 선택하거나 '모두', '취소'를 말씀해주세요.",
+        "duration": 5000
+      }
+    }
+  },
+  "timestamp": "2024-01-14T10:30:00.123456"
+}
+```
+
+**4.3.3 세션 만료** (선택 시간이 만료된 경우)
+
+```json
+{
+  "success": false,
+  "action": {
+    "type": "error",
+    "is_important": true,
+    "data": {
+      "error_type": "schedule_selection_required",
+      "message": "선택 시간이 만료되었습니다. 다시 삭제 요청을 해주세요."
+    },
+    "ui_instructions": {
+      "notification": {
+        "type": "error",
+        "title": "오류 발생",
+        "message": "선택 시간이 만료되었습니다. 다시 삭제 요청을 해주세요.",
+        "duration": 5000
+      }
+    }
+  },
+  "timestamp": "2024-01-14T10:30:00.123456"
+}
+```
+
 ### 5. 🤖 AI 처리 에러
 
 #### 5.1 LLM 처리 오류
@@ -1070,6 +1298,8 @@ custom_days :	특정 요일들	"월, 수, 금요일 오전 6시, 오후 5시에 
 | **일정 조작** | `schedule_not_found` | 일정을 찾을 수 없음 |
 | | `schedule_delete_error` | 일정 삭제 실패 |
 | | `insufficient_delete_info` | 삭제 정보 부족 |
+| | `schedule_selection_required` | 일정 선택 필요 (스펙트럼 삭제) |
+| | `invalid_selection_response` | 잘못된 선택 응답 (스펙트럼 삭제) |
 | **AI 처리** | `ai_processing_error` | AI 처리 오류 |
 | | `llm_error` | 언어모델 오류 |
 | | `intent_analysis_error` | 의도 분석 실패 |
@@ -1101,6 +1331,12 @@ custom_days :	특정 요일들	"월, 수, 금요일 오전 6시, 오후 5시에 
 - **`show_end_date`**: 종료 날짜 표시 (`true`/`false`)
 - **`show_indefinite`**: 무기한 표시 (`true`/`false`)
 - **`show_custom_days`**: 특정 요일 표시 (`true`/`false`)
+
+#### 🆕 일정 선택 UI 지시사항 (v3.2.0)
+- **`show_selection_ui`**: 일정 선택 UI 표시 (`true`/`false`)
+- **`allow_multiple_selection`**: 다중 선택 허용 (`true`/`false`)
+- **`selection_type`**: 선택 타입 (`"delete"`, `"edit"`, `"view"`)
+- **`remove_items`**: 삭제할 아이템 ID 목록 (배열)
 
 ### `notification` 필드
 
@@ -1209,6 +1445,104 @@ String _generateRecurrenceDescription(Map<String, dynamic> recurrence) {
 }
 ```
 
+### 🆕 스펙트럼 삭제 처리 (v3.2.0)
+
+```dart
+if (success && actionType == 'schedule_selection') {
+  // 스펙트럼 삭제 선택 UI 표시
+  String searchTitle = actionData['search_title'];
+  List<dynamic> similarSchedules = actionData['similar_schedules'];
+  int totalFound = actionData['total_found'];
+  
+  // 선택 UI 표시
+  if (uiInstructions['show_selection_ui'] == true) {
+    _showScheduleSelectionDialog(
+      searchTitle: searchTitle,
+      schedules: similarSchedules,
+      allowMultiple: uiInstructions['allow_multiple_selection'] ?? false,
+      selectionType: uiInstructions['selection_type'] ?? 'delete',
+    );
+  }
+}
+
+if (success && actionType == 'schedule_delete_multiple') {
+  // 다중 일정 삭제 완료 처리
+  List<String> deletedSchedules = List<String>.from(actionData['deleted_schedules']);
+  int deletedCount = actionData['deleted_count'];
+  
+  // UI에서 삭제된 일정들 제거
+  if (uiInstructions['remove_items'] != null) {
+    List<String> removeItems = List<String>.from(uiInstructions['remove_items']);
+    _removeSchedulesFromUI(removeItems);
+  }
+  
+  // 성공 알림 표시
+  if (uiInstructions['notification'] != null) {
+    _showNotification(uiInstructions['notification']);
+  }
+}
+
+if (success && actionType == 'schedule_delete_cancelled') {
+  // 삭제 취소 처리
+  String message = actionData['message'];
+  _showCancellationMessage(message);
+}
+
+// 스펙트럼 삭제 선택 UI 위젯
+Widget _showScheduleSelectionDialog({
+  required String searchTitle,
+  required List<dynamic> schedules,
+  required bool allowMultiple,
+  required String selectionType,
+}) {
+  return AlertDialog(
+    title: Text('$searchTitle 관련 일정 선택'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('삭제할 일정을 선택해주세요:'),
+        SizedBox(height: 16),
+        ...schedules.asMap().entries.map((entry) {
+          int index = entry.key;
+          Map<String, dynamic> schedule = entry.value;
+          return CheckboxListTile(
+            title: Text('${index + 1}. ${schedule['title']}'),
+            subtitle: Text(_formatDateTime(schedule['datetime'])),
+            value: _selectedSchedules.contains(index),
+            onChanged: allowMultiple 
+              ? (bool? value) => _toggleScheduleSelection(index, value)
+              : null,
+          );
+        }).toList(),
+        if (allowMultiple) ...[
+          SizedBox(height: 8),
+          TextButton(
+            onPressed: () => _selectAllSchedules(schedules.length),
+            child: Text('모두 선택'),
+          ),
+        ],
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => _cancelSelection(),
+        child: Text('취소'),
+      ),
+      ElevatedButton(
+        onPressed: () => _confirmSelection(),
+        child: Text('삭제'),
+      ),
+    ],
+  );
+}
+
+String _formatDateTime(String datetime) {
+  // "2024-01-15T15:00:00" → "1월 15일 15시 00분"
+  DateTime dt = DateTime.parse(datetime);
+  return '${dt.month}월 ${dt.day}일 ${dt.hour}시 ${dt.minute.toString().padLeft(2, '0')}분';
+}
+```
+
 ## 🔧 개발 팁
 
 1. **에러 타입 기반 처리**: `error_type` 필드를 사용해 에러별 맞춤 UI 제공
@@ -1223,12 +1557,29 @@ String _generateRecurrenceDescription(Map<String, dynamic> recurrence) {
 10. **🆕 친화적 에러 메시지**: v3.1.0부터 더 친화적이고 구체적인 안내 메시지 제공
 11. **🆕 "일정" 어휘 처리**: "일정" 단어가 포함되어도 실제 내용이 있으면 정상 처리
 12. **🆕 복합 누락 처리**: 여러 정보가 누락된 경우에도 적절한 메시지 제공
+13. **🆕 스펙트럼 일정 삭제**: v3.2.0부터 유사한 일정들을 넓게 찾아서 사용자가 선택할 수 있도록 함
+14. **🆕 다중 일정 삭제**: 사용자가 여러 일정을 한 번에 선택하여 삭제 가능
+15. **🆕 유사도 기반 검색**: 제목 유사도를 계산하여 관련 일정들을 스마트하게 찾음
+16. **🆕 선택 응답 처리**: "1번", "1번, 2번", "모두", "취소" 등 다양한 사용자 응답 처리
+17. **🆕 세션 관리**: 선택 상태를 메모리에 저장하여 다음 요청에서 처리
+18. **🆕 의료 키워드 매칭**: "병원", "치과", "검진", "진료" 등 의료 관련 키워드 자동 연관
 
 ---
 
-**버전**: 3.1.0 (Clean Architecture)  
+**버전**: 3.2.0 (Clean Architecture)  
 **최종 업데이트**: 2025년 8월  
 **아키텍처**: Clean Architecture with Dependency Injection
+
+### 📝 v3.2.0 주요 변경사항
+
+1. **스펙트럼 일정 삭제**: 유사한 일정들을 넓게 찾아서 사용자가 선택할 수 있도록 함
+2. **다중 일정 삭제**: 사용자가 여러 일정을 한 번에 선택하여 삭제 가능
+3. **유사도 기반 검색**: Jaccard similarity + 의료 키워드 매칭으로 정확한 검색
+4. **선택 UI 지원**: 일정 선택을 위한 전용 UI 지시사항 추가
+5. **선택 응답 처리**: "1번", "1번, 2번", "모두", "취소" 등 다양한 사용자 응답 처리
+6. **세션 관리**: 선택 상태를 메모리에 저장하여 다음 요청에서 처리 (5분 만료)
+7. **의료 키워드 매칭**: "병원", "치과", "검진", "진료" 등 의료 관련 키워드 자동 연관
+8. **에러 처리 강화**: 선택 관련 다양한 에러 상황 처리 (세션 만료, 잘못된 선택 등)
 
 ### 📝 v3.1.0 주요 변경사항
 
