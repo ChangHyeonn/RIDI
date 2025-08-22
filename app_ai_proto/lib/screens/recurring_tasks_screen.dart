@@ -22,7 +22,7 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
       body: Consumer<TaskProvider>(
         builder: (context, taskProvider, child) {
           final fontSize = taskProvider.fontSize;
-          final scaleFactor = 0.75 + (fontSize * 0.5);
+          final scaleFactor = 0.85 + (fontSize * 0.5);
 
           return Column(
             children: [
@@ -112,32 +112,73 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
     TaskProvider taskProvider,
     double scaleFactor,
   ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: RecurringTaskConstants.cardColor,
-        borderRadius: BorderRadius.circular(
-          RecurringTaskConstants.cardBorderRadius,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+    return GestureDetector(
+      onTap: () {
+        final signature = RecurringTaskService.buildPatternSignatureForTask(
+          representativeTask,
+        );
+        final sortedTimes = RecurringTaskService.extractTimeOfDayFromTasks(
+          taskGroup,
+        );
+        final baseTime = sortedTimes.isNotEmpty
+            ? sortedTimes.first
+            : RecurringTaskConstants.defaultTime;
+        final additionalTimes = sortedTimes.length > 1
+            ? sortedTimes.sublist(1)
+            : <TimeOfDay>[];
+        final selectedDays = RecurringTaskService.extractWeekdaysFromTasks(
+          taskGroup,
+        );
+        final endDate =
+            RecurringTaskService.extractEndDateFromTasks(taskGroup) ??
+            RecurringTaskConstants.defaultEndDate;
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RecurrenceManagementScreen(
+              initialTitle: representativeTask.title,
+              initialTime: baseTime,
+              initialAdditionalTimes: additionalTimes,
+              initialSelectedDays: selectedDays,
+              initialEndDate: endDate,
+              isEditing: true,
+              editingTaskPattern: {
+                'title': representativeTask.title,
+                'category': representativeTask.category,
+                'signature': signature,
+              },
+            ),
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildTaskHeader(representativeTask, taskGroup, scaleFactor),
-            const SizedBox(height: 8),
-            _buildTimeDisplay(taskGroup, scaleFactor),
-            const SizedBox(height: 12),
-            _buildActionButtons(representativeTask, taskProvider),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: RecurringTaskConstants.cardColor,
+          borderRadius: BorderRadius.circular(
+            RecurringTaskConstants.cardBorderRadius,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
           ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildTaskHeader(representativeTask, taskGroup, scaleFactor),
+              const SizedBox(height: 8),
+              _buildTimeDisplay(taskGroup, scaleFactor),
+              const SizedBox(height: 12),
+              _buildActionButtons(representativeTask, taskProvider),
+            ],
+          ),
         ),
       ),
     );
@@ -150,7 +191,7 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
   ) {
     return Row(
       children: [
-        Icon(Icons.repeat, color: Colors.blue[600]),
+        const Icon(Icons.repeat, color: RecurringTaskConstants.primaryColor),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -170,20 +211,8 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
     Task representativeTask,
     TaskProvider taskProvider,
   ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.edit, color: Colors.blue),
-          onPressed: () => _editRecurringTask(representativeTask, taskProvider),
-        ),
-        IconButton(
-          icon: const Icon(Icons.delete, color: Colors.red),
-          onPressed: () =>
-              _deleteRecurringTask(representativeTask, taskProvider),
-        ),
-      ],
-    );
+    // 목록에서는 수정/삭제 버튼을 노출하지 않음. 항목 탭 → 설정 화면에서 처리
+    return const SizedBox.shrink();
   }
 
   Widget _buildBottomButton(double scaleFactor) {
@@ -205,7 +234,7 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
           onPressed: () => _navigateToManagementScreen(),
           icon: const Icon(Icons.settings, color: Colors.white),
           label: Text(
-            '반복일정관리',
+            '반복일정 추가',
             style: TextStyle(
               color: Colors.white,
               fontSize: 16 * scaleFactor,
@@ -213,7 +242,7 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
             ),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
+            backgroundColor: RecurringTaskConstants.primaryColor,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(
@@ -253,7 +282,9 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
           width: RecurringTaskConstants.weekdayIconSize,
           height: RecurringTaskConstants.weekdayIconSize,
           decoration: BoxDecoration(
-            color: isActive ? Colors.blue : Colors.grey[300],
+            color: isActive
+                ? RecurringTaskConstants.primaryColor
+                : Colors.grey[300],
             borderRadius: BorderRadius.circular(
               RecurringTaskConstants.weekdayIconSize / 2,
             ),
@@ -289,14 +320,14 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.blue[50],
+            color: Color(0xFFEFF2FF),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.blue[200]!),
+            border: Border.all(color: Color(0xFFCBD5FF)),
           ),
           child: Text(
             time,
             style: TextStyle(
-              color: Colors.blue[700],
+              color: RecurringTaskConstants.primaryColor,
               fontSize: 12 * scaleFactor,
               fontWeight: FontWeight.w500,
             ),
@@ -306,126 +337,7 @@ class _RecurringTasksScreenState extends State<RecurringTasksScreen> {
     );
   }
 
-  void _editRecurringTask(Task task, TaskProvider taskProvider) {
-    final signature = RecurringTaskService.buildPatternSignatureForTask(task);
-    final allRecurringTasks = RecurringTaskService.findRecurringTasksByPattern(
-      taskProvider.tasks,
-      task.title,
-      task.category,
-      signature: signature,
-    );
+  // 목록 화면에서는 편집/삭제를 제공하지 않으므로 관련 메서드는 제거되었습니다.
 
-    // 시간 정보 추출
-    final sortedTimes = RecurringTaskService.extractTimeOfDayFromTasks(
-      allRecurringTasks,
-    );
-    final baseTime = sortedTimes.isNotEmpty
-        ? sortedTimes.first
-        : RecurringTaskConstants.defaultTime;
-    final additionalTimes = sortedTimes.length > 1
-        ? sortedTimes.sublist(1)
-        : <TimeOfDay>[];
-
-    // 요일 정보 추출
-    final selectedDays = RecurringTaskService.extractWeekdaysFromTasks(
-      allRecurringTasks,
-    );
-
-    // 종료일 추출
-    final endDate =
-        RecurringTaskService.extractEndDateFromTasks(allRecurringTasks) ??
-        RecurringTaskConstants.defaultEndDate;
-
-    // 편집 화면으로 이동
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RecurrenceManagementScreen(
-          initialTitle: task.title,
-          initialTime: baseTime,
-          initialAdditionalTimes: additionalTimes,
-          initialSelectedDays: selectedDays,
-          initialEndDate: endDate,
-          isEditing: true,
-          editingTaskPattern: {
-            'title': task.title,
-            'category': task.category,
-            // 편집 시작 시점의 원본 패턴 시그니처 전달
-            'signature': RecurringTaskService.buildPatternSignatureForTask(task),
-          },
-        ),
-      ),
-    );
-  }
-
-  void _deleteRecurringTask(Task task, TaskProvider taskProvider) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('반복 일정 삭제'),
-          content: Text('정말로 "${task.title}" 반복 일정을 삭제하시겠습니까?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('취소'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                _performDelete(task, taskProvider);
-                Navigator.of(context).pop();
-                _showDeleteSuccessMessage();
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('삭제'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _performDelete(Task task, TaskProvider taskProvider) async {
-    debugPrint('🗑️ 반복 일정 삭제 시작: ${task.title}');
-
-    final signature = RecurringTaskService.buildPatternSignatureForTask(task);
-    final recurringTasks = RecurringTaskService.findRecurringTasksByPattern(
-      taskProvider.tasks,
-      task.title,
-      task.category,
-      signature: signature,
-    );
-
-    debugPrint('  - 삭제할 일정 개수: ${recurringTasks.length}');
-
-    final idsToDelete = <String>[];
-    for (final recurringTask in recurringTasks) {
-      idsToDelete.add(recurringTask.id);
-      debugPrint('  - 삭제 예정: ${recurringTask.date} (ID: ${recurringTask.id})');
-    }
-
-    // 추가 안전장치: 제목이 같은 모든 반복 일정 삭제
-    final allSimilarTasks = taskProvider.tasks
-        .where((t) => t.isRecurring && t.title == task.title)
-        .toList();
-
-    for (final similarTask in allSimilarTasks) {
-      if (!recurringTasks.contains(similarTask)) {
-        idsToDelete.add(similarTask.id);
-        debugPrint('  - 추가 삭제 예정: ${similarTask.date} (ID: ${similarTask.id})');
-      }
-    }
-
-    await taskProvider.deleteTasks(idsToDelete);
-
-    debugPrint('✅ 반복 일정 삭제 완료');
-  }
-
-  void _showDeleteSuccessMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(RecurringTaskConstants.successRecurrenceDeleted),
-      ),
-    );
-  }
+  // 목록 화면에서는 삭제 기능을 제공하지 않습니다.
 }

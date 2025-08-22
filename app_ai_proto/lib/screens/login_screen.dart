@@ -84,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen>
     return Consumer<TaskProvider>(
       builder: (context, taskProvider, child) {
         final fontSize = taskProvider.fontSize;
-        final scaleFactor = 0.5 + fontSize;
+        final scaleFactor = 0.6 + fontSize;
 
         return Scaffold(
           backgroundColor: const Color(0xFFfafafa),
@@ -102,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen>
                 child: FadeTransition(
                   opacity: _fadeAnimation,
                   child: Padding(
-                    padding: const EdgeInsets.all(24.0),
+                    padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
                     child: Form(
                       key: _formKey,
                       child: SingleChildScrollView(

@@ -630,29 +630,58 @@ class RecordService {
           scheduleData['priority'] == 'high' ||
           category == '건강';
 
-      // 반복 일정 정보 처리
-      bool isRecurring = scheduleData['is_recurring'] ?? false;
+      // 반복 일정 정보 처리 (서버 포맷 다양성 허용)
+      bool isRecurring =
+          scheduleData['is_recurring'] == true ||
+          scheduleData['recurrence'] != null;
       RecurrenceInfo? recurrence;
 
-      if (isRecurring && scheduleData['recurrence'] != null) {
+      if (scheduleData['recurrence'] != null) {
         try {
-          final recurrenceData =
-              scheduleData['recurrence'] as Map<String, dynamic>;
-          final times =
-              (recurrenceData['times'] as List?)
-                  ?.map((time) => RecurrenceTime.fromJson(time))
-                  .toList() ??
-              [];
+          final recurrenceData = Map<String, dynamic>.from(
+            scheduleData['recurrence'],
+          );
+
+          // times: ["07:00", ...] 또는 [{"time":"07:00","label":"아침"}, ...]
+          final rawTimes = recurrenceData['times'] as List? ?? [];
+          final times = rawTimes.map((t) {
+            if (t is String) {
+              return RecurrenceTime(time: t, label: t);
+            } else if (t is Map<String, dynamic>) {
+              final timeStr = (t['time'] ?? '').toString();
+              final labelStr = (t['label'] ?? timeStr).toString();
+              return RecurrenceTime(time: timeStr, label: labelStr);
+            } else {
+              return RecurrenceTime(time: '00:00', label: '00:00');
+            }
+          }).toList();
+
+          // end_date: ISO 문자열 또는 null
+          DateTime? endDate;
+          if (recurrenceData['end_date'] != null) {
+            final ed = recurrenceData['end_date'];
+            if (ed is String && ed.isNotEmpty) {
+              try {
+                endDate = DateTime.parse(ed);
+              } catch (_) {}
+            }
+          }
+
+          // days_of_week: 정수/문자열 혼합 가능 → int 리스트로 정규화(0=월..6=일)
+          List<int>? daysOfWeek;
+          if (recurrenceData['days_of_week'] != null) {
+            final raw = recurrenceData['days_of_week'] as List;
+            daysOfWeek = raw.map((e) {
+              if (e is int) return e;
+              return int.tryParse(e.toString()) ?? 0;
+            }).toList();
+          }
 
           recurrence = RecurrenceInfo(
-            type: recurrenceData['type'] ?? 'daily',
+            type: (recurrenceData['type'] ?? 'daily').toString(),
             times: times,
-            endDate: recurrenceData['end_date'] != null
-                ? DateTime.parse(recurrenceData['end_date'])
-                : null,
-            daysOfWeek: recurrenceData['days_of_week'] != null
-                ? List<int>.from(recurrenceData['days_of_week'])
-                : null,
+            endDate: endDate,
+            daysOfWeek: daysOfWeek,
           );
 
           print('📋 반복 일정 정보:');
@@ -663,9 +692,8 @@ class RecordService {
           print('  - 종료 날짜: ${recurrence.endDate}');
           print('  - 요일: ${recurrence.daysOfWeek}');
         } catch (e) {
-          print('⚠️ 반복 일정 정보 파싱 실패: $e');
-          isRecurring = false;
-          recurrence = null;
+          print('⚠️ 반복 일정 정보 파싱 실패(관대한 처리 실패): $e');
+          // recurrence 파싱 실패해도 is_recurring은 false로 강등하지 않음
         }
       }
 
@@ -803,6 +831,64 @@ class RecordService {
         print('  - priority: ${scheduleData['priority']}');
         print('  - 최종 중요도: $isImportant');
 
+        // 반복 일정 정보 파싱 (action 경로)
+        bool isRecurring =
+            scheduleData['is_recurring'] == true ||
+            scheduleData['recurrence'] != null;
+        RecurrenceInfo? recurrence;
+        if (scheduleData['recurrence'] != null) {
+          try {
+            final recurrenceData = Map<String, dynamic>.from(
+              scheduleData['recurrence'],
+            );
+
+            final rawTimes = recurrenceData['times'] as List? ?? [];
+            final times = rawTimes.map((t) {
+              if (t is String) {
+                return RecurrenceTime(time: t, label: t);
+              } else if (t is Map<String, dynamic>) {
+                final timeStr = (t['time'] ?? '').toString();
+                final labelStr = (t['label'] ?? timeStr).toString();
+                return RecurrenceTime(time: timeStr, label: labelStr);
+              } else {
+                return RecurrenceTime(time: '00:00', label: '00:00');
+              }
+            }).toList();
+
+            DateTime? endDate;
+            if (recurrenceData['end_date'] != null) {
+              final ed = recurrenceData['end_date'];
+              if (ed is String && ed.isNotEmpty) {
+                try {
+                  endDate = DateTime.parse(ed);
+                } catch (_) {}
+              }
+            }
+
+            List<int>? daysOfWeek;
+            if (recurrenceData['days_of_week'] != null) {
+              final raw = recurrenceData['days_of_week'] as List? ?? [];
+              daysOfWeek = raw.map((e) {
+                if (e is int) return e;
+                return int.tryParse(e.toString()) ?? 0;
+              }).toList();
+            }
+
+            recurrence = RecurrenceInfo(
+              type: (recurrenceData['type'] ?? 'daily').toString(),
+              times: times,
+              endDate: endDate,
+              daysOfWeek: daysOfWeek,
+            );
+
+            print(
+              '📋(action) 반복 일정 정보: type=${recurrence.type}, times=${times.map((t) => t.time).join(',')}, end=${recurrence.endDate}, days=${recurrence.daysOfWeek}',
+            );
+          } catch (e) {
+            print('⚠️(action) 반복 일정 파싱 실패: $e');
+          }
+        }
+
         // Task 객체 생성
         final task = Task(
           id:
@@ -813,6 +899,8 @@ class RecordService {
           isCompleted: false,
           isImportant: isImportant,
           category: category, // 서버에서 받은 카테고리 사용
+          isRecurring: isRecurring,
+          recurrence: recurrence,
         );
 
         print('📝 생성된 Task 객체:');

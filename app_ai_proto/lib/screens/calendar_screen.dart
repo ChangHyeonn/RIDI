@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
-import '../constants/categories.dart';
 import 'add_task_screen.dart';
 import 'date_detail_screen.dart';
-import 'recurring_tasks_screen.dart';
-import 'package:intl/intl.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -305,40 +302,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
             const SizedBox(height: 12),
 
-            // 반복일정 관리 버튼
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const RecurringTasksScreen(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.repeat, color: Colors.white),
-                  label: Text(
-                    '반복일정관리',
-                    style: TextStyle(
-                      fontSize: 26 * (0.6 + fontSize * 0.4),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ),
+            // 반복일정 관리 버튼 제거
           ],
         ),
       ),
