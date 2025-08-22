@@ -196,24 +196,16 @@ class _RecurrenceManagementScreenState
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFf8f9fa),
+        color: RecurringTaskConstants.cardColor,
         borderRadius: BorderRadius.circular(
           RecurringTaskConstants.inputBorderRadius,
         ),
-        border: Border.all(color: Colors.blue.withValues(alpha: 0.3), width: 1),
+        // 테두리 제거
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '반복일정',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: RecurringTaskConstants.textPrimaryColor,
-            ),
-          ),
-          const SizedBox(height: 20),
+          // 상단 제목 제거
           _buildDateSection(),
           const SizedBox(height: 16),
           _buildWeekdaySelector(),
@@ -290,7 +282,7 @@ class _RecurrenceManagementScreenState
               decoration: BoxDecoration(
                 color: RecurringTaskConstants.cardColor,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
+                border: Border.all(color: RecurringTaskConstants.borderColor),
               ),
               child: Row(
                 children: [
@@ -335,7 +327,9 @@ class _RecurrenceManagementScreenState
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: isSelected ? Colors.blue : Colors.grey[200],
+              color: isSelected
+                  ? RecurringTaskConstants.primaryColor
+                  : Colors.grey[200],
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -446,7 +440,7 @@ class _RecurrenceManagementScreenState
         decoration: BoxDecoration(
           color: RecurringTaskConstants.cardColor,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[300]!),
+          border: Border.all(color: RecurringTaskConstants.borderColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -455,7 +449,7 @@ class _RecurrenceManagementScreenState
               width: 20,
               height: 20,
               decoration: BoxDecoration(
-                color: Colors.blue,
+                color: RecurringTaskConstants.primaryColor,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: const Icon(Icons.add, color: Colors.white, size: 16),
@@ -503,8 +497,11 @@ class _RecurrenceManagementScreenState
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: RecurringTaskConstants.cardColor,
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: RecurringTaskConstants.borderColor,
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -547,7 +544,7 @@ class _RecurrenceManagementScreenState
               ],
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }
@@ -567,33 +564,61 @@ class _RecurrenceManagementScreenState
       ),
       child: Row(
         children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: RecurringTaskConstants.cardColor,
-                foregroundColor: RecurringTaskConstants.primaryColor,
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    RecurringTaskConstants.inputBorderRadius,
+          if (widget.isEditing) ...[
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _confirmDelete(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD35445),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      RecurringTaskConstants.inputBorderRadius,
+                    ),
                   ),
+                  elevation: 0,
                 ),
-                elevation: 0,
-                side: const BorderSide(
-                  color: RecurringTaskConstants.primaryColor,
-                ),
-              ),
-              child: Text(
-                '취소',
-                style: TextStyle(
-                  fontSize: 18 * scaleFactor,
-                  fontWeight: FontWeight.bold,
+                child: Text(
+                  '삭제',
+                  style: TextStyle(
+                    fontSize: 18 * scaleFactor,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 16),
+            const SizedBox(width: 16),
+          ],
+          if (!widget.isEditing) ...[
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: RecurringTaskConstants.cardColor,
+                  foregroundColor: RecurringTaskConstants.primaryColor,
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      RecurringTaskConstants.inputBorderRadius,
+                    ),
+                  ),
+                  elevation: 0,
+                  side: const BorderSide(
+                    color: RecurringTaskConstants.primaryColor,
+                  ),
+                ),
+                child: Text(
+                  '취소',
+                  style: TextStyle(
+                    fontSize: 18 * scaleFactor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+          ],
           Expanded(
             child: ElevatedButton(
               onPressed: () => _saveRecurrenceSchedule(context),
@@ -620,6 +645,59 @@ class _RecurrenceManagementScreenState
         ],
       ),
     );
+  }
+
+  void _confirmDelete(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: const Text('반복 일정 삭제'),
+          content: const Text('정말로 이 반복 일정을 삭제하시겠습니까?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final taskProvider = context.read<TaskProvider>();
+                await _performDeleteByPattern(taskProvider);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (context.mounted) Navigator.of(context).pop();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD35445),
+              ),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _performDeleteByPattern(TaskProvider taskProvider) async {
+    final signature = widget.editingTaskPattern != null
+        ? widget.editingTaskPattern!['signature'] as String?
+        : null;
+    final title = widget.editingTaskPattern != null
+        ? widget.editingTaskPattern!['title'] as String
+        : _title;
+    final category = widget.editingTaskPattern != null
+        ? widget.editingTaskPattern!['category'] as String
+        : _selectedCategory;
+
+    final tasks = RecurringTaskService.findRecurringTasksByPattern(
+      taskProvider.tasks,
+      title,
+      category,
+      signature: signature,
+    );
+    final ids = tasks.map((t) => t.id).toList();
+    if (ids.isNotEmpty) {
+      await taskProvider.deleteTasks(ids);
+    }
   }
 
   void _saveRecurrenceSchedule(BuildContext context) {
@@ -717,11 +795,11 @@ class _RecurrenceManagementScreenState
           ? targetTasks.first.recurrence
           : null;
 
-      String _key(DateTime d) =>
+      String key(DateTime d) =>
           '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
-      final existingMap = {for (final t in existingTasks) _key(t.date): t};
-      final targetMap = {for (final t in targetTasks) _key(t.date): t};
+      final existingMap = {for (final t in existingTasks) key(t.date): t};
+      final targetMap = {for (final t in targetTasks) key(t.date): t};
 
       // 3) 업데이트(공통 교집합)
       for (final k in existingMap.keys) {
@@ -817,44 +895,7 @@ class _RecurrenceManagementScreenState
     return allTimes;
   }
 
-  void _deleteExistingTasks(TaskProvider taskProvider) {
-    final title = widget.editingTaskPattern!['title'];
-    final category = widget.editingTaskPattern!['category'];
-    final originalSignature =
-        widget.editingTaskPattern!['signature'] as String?;
-
-    debugPrint('🗑️ 기존 반복 일정 삭제 시작: $title');
-
-    final existingTasks = RecurringTaskService.findRecurringTasksByPattern(
-      taskProvider.tasks,
-      title,
-      category,
-      signature: originalSignature,
-    );
-
-    debugPrint('  - 삭제할 일정 개수: ${existingTasks.length}');
-
-    for (final existingTask in existingTasks) {
-      taskProvider.deleteTask(existingTask.id);
-      debugPrint('  - 삭제: ${existingTask.date} (ID: ${existingTask.id})');
-    }
-
-    // 혹시 모르는 중복 제거 (제목만으로도 한번 더 확인)
-    final allTasksWithSameTitle = taskProvider.tasks
-        .where((task) => task.isRecurring && task.title == title)
-        .toList();
-
-    for (final duplicateTask in allTasksWithSameTitle) {
-      if (!existingTasks.contains(duplicateTask)) {
-        taskProvider.deleteTask(duplicateTask.id);
-        debugPrint(
-          '  - 중복 삭제: ${duplicateTask.date} (ID: ${duplicateTask.id})',
-        );
-      }
-    }
-
-    debugPrint('✅ 기존 일정 삭제 완료');
-  }
+  // 사용되지 않던 삭제 유틸은 제거되었습니다. 편집 모드 삭제는 _performDeleteByPattern 사용.
 
   void _showErrorMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(

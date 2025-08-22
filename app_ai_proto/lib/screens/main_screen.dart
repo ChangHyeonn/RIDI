@@ -118,6 +118,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                     padding: const EdgeInsets.all(20.0),
                     child: Column(
                       children: [
+                        // 하단 기존 버튼 영역을 재사용하므로 상단 액션 제거
                         // 메인 콘텐츠 영역 (헤더 없이 바로 시작)
                         Expanded(
                           child: Column(
@@ -693,43 +694,60 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                                       mainAxisSize: MainAxisSize.min,
                                                                                       children: [
                                                                                         // 반복 일정 아이콘 (반복 일정인 경우)
-                                                                                        if (task.isRecurring)
+                                                                                        if (task.isRecurring) ...[
                                                                                           Text(
                                                                                             '🔄',
                                                                                             style: TextStyle(
                                                                                               fontSize:
-                                                                                                  12 *
+                                                                                                  16 *
                                                                                                   scaleFactor,
                                                                                             ),
                                                                                           ),
-                                                                                        Text(
-                                                                                          TaskCategories.getCategoryIcon(
-                                                                                            task.category,
-                                                                                          ),
-                                                                                          style: TextStyle(
-                                                                                            fontSize:
-                                                                                                16 *
+                                                                                          SizedBox(
+                                                                                            width:
+                                                                                                4 *
                                                                                                 scaleFactor,
                                                                                           ),
-                                                                                        ),
-                                                                                        SizedBox(
-                                                                                          width:
-                                                                                              4 *
-                                                                                              scaleFactor,
-                                                                                        ),
-                                                                                        Text(
-                                                                                          TaskCategories.getCategoryInfo(
-                                                                                                task.category,
-                                                                                              )?['name'] ??
+                                                                                          Text(
+                                                                                            '반복',
+                                                                                            style: TextStyle(
+                                                                                              fontSize:
+                                                                                                  12 *
+                                                                                                  scaleFactor,
+                                                                                              color: Colors.white,
+                                                                                              fontWeight: FontWeight.bold,
+                                                                                            ),
+                                                                                          ),
+                                                                                        ] else ...[
+                                                                                          Text(
+                                                                                            TaskCategories.getCategoryIcon(
                                                                                               task.category,
-                                                                                          style: TextStyle(
-                                                                                            fontSize:
-                                                                                                12 *
-                                                                                                scaleFactor,
-                                                                                            color: Colors.white,
-                                                                                            fontWeight: FontWeight.bold,
+                                                                                            ),
+                                                                                            style: TextStyle(
+                                                                                              fontSize:
+                                                                                                  16 *
+                                                                                                  scaleFactor,
+                                                                                            ),
                                                                                           ),
-                                                                                        ),
+                                                                                          SizedBox(
+                                                                                            width:
+                                                                                                4 *
+                                                                                                scaleFactor,
+                                                                                          ),
+                                                                                          Text(
+                                                                                            TaskCategories.getCategoryInfo(
+                                                                                                  task.category,
+                                                                                                )?['name'] ??
+                                                                                                task.category,
+                                                                                            style: TextStyle(
+                                                                                              fontSize:
+                                                                                                  12 *
+                                                                                                  scaleFactor,
+                                                                                              color: Colors.white,
+                                                                                              fontWeight: FontWeight.bold,
+                                                                                            ),
+                                                                                          ),
+                                                                                        ],
                                                                                       ],
                                                                                     ),
                                                                                   ),
@@ -1379,43 +1397,60 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                                       mainAxisSize: MainAxisSize.min,
                                                                                       children: [
                                                                                         // 반복 일정 아이콘 (반복 일정인 경우)
-                                                                                        if (task.isRecurring)
+                                                                                        if (task.isRecurring) ...[
                                                                                           Text(
                                                                                             '🔄',
                                                                                             style: TextStyle(
                                                                                               fontSize:
-                                                                                                  12 *
+                                                                                                  16 *
                                                                                                   scaleFactor,
                                                                                             ),
                                                                                           ),
-                                                                                        Text(
-                                                                                          TaskCategories.getCategoryIcon(
-                                                                                            task.category,
-                                                                                          ),
-                                                                                          style: TextStyle(
-                                                                                            fontSize:
-                                                                                                16 *
+                                                                                          SizedBox(
+                                                                                            width:
+                                                                                                4 *
                                                                                                 scaleFactor,
                                                                                           ),
-                                                                                        ),
-                                                                                        SizedBox(
-                                                                                          width:
-                                                                                              4 *
-                                                                                              scaleFactor,
-                                                                                        ),
-                                                                                        Text(
-                                                                                          TaskCategories.getCategoryInfo(
-                                                                                                task.category,
-                                                                                              )?['name'] ??
+                                                                                          Text(
+                                                                                            '반복',
+                                                                                            style: TextStyle(
+                                                                                              fontSize:
+                                                                                                  12 *
+                                                                                                  scaleFactor,
+                                                                                              color: Colors.white,
+                                                                                              fontWeight: FontWeight.bold,
+                                                                                            ),
+                                                                                          ),
+                                                                                        ] else ...[
+                                                                                          Text(
+                                                                                            TaskCategories.getCategoryIcon(
                                                                                               task.category,
-                                                                                          style: TextStyle(
-                                                                                            fontSize:
-                                                                                                12 *
-                                                                                                scaleFactor,
-                                                                                            color: Colors.white,
-                                                                                            fontWeight: FontWeight.bold,
+                                                                                            ),
+                                                                                            style: TextStyle(
+                                                                                              fontSize:
+                                                                                                  16 *
+                                                                                                  scaleFactor,
+                                                                                            ),
                                                                                           ),
-                                                                                        ),
+                                                                                          SizedBox(
+                                                                                            width:
+                                                                                                4 *
+                                                                                                scaleFactor,
+                                                                                          ),
+                                                                                          Text(
+                                                                                            TaskCategories.getCategoryInfo(
+                                                                                                  task.category,
+                                                                                                )?['name'] ??
+                                                                                                task.category,
+                                                                                            style: TextStyle(
+                                                                                              fontSize:
+                                                                                                  12 *
+                                                                                                  scaleFactor,
+                                                                                              color: Colors.white,
+                                                                                              fontWeight: FontWeight.bold,
+                                                                                            ),
+                                                                                          ),
+                                                                                        ],
                                                                                       ],
                                                                                     ),
                                                                                   ),
@@ -1497,7 +1532,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                               ),
                               const SizedBox(height: 20),
                               // 일정 더보기 섹션
-                              Container(
+                              SizedBox(
                                 height: 80,
                                 child: GestureDetector(
                                   onTap: () {
@@ -1576,7 +1611,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                           height: 70,
                           child: Row(
                             children: [
-                              // 음성 인식 버튼
+                              // 좌측: 반복일정 버튼 (원래 카드 스타일)
                               Expanded(
                                 child: GestureDetector(
                                   onTap: () {
@@ -1584,7 +1619,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) =>
-                                            const RecordScreen(),
+                                            const RecurringTasksScreen(),
                                       ),
                                     );
                                   },
@@ -1608,18 +1643,20 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
-                                          Icon(
-                                            Icons.mic,
+                                          const Icon(
+                                            Icons.repeat,
                                             color: Color(0xFF6366f1),
-                                            size: 40,
+                                            size: 24,
                                           ),
-                                          SizedBox(width: 12),
+                                          const SizedBox(width: 8),
                                           Text(
-                                            '음성 인식',
+                                            '반복일정',
                                             style: TextStyle(
-                                              color: Color(0xFF1f2937),
-                                              fontSize: 28 * (0.5 + fontSize),
-                                              fontWeight: FontWeight.bold,
+                                              color: const Color(0xFF1f2937),
+                                              fontSize:
+                                                  22 *
+                                                  (0.75 + (fontSize * 0.5)),
+                                              fontWeight: FontWeight.w700,
                                             ),
                                           ),
                                         ],
@@ -1628,9 +1665,42 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                   ),
                                 ),
                               ),
-
                               const SizedBox(width: 16),
-                              // 설정 버튼
+                              // 중앙: 녹음 버튼 (원형 빨간 버튼)
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const RecordScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  width: 72,
+                                  height: 72,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFD35445),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: const Color(0xFF263238),
+                                      width: 6,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.12,
+                                        ),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              // 우측: 설정 버튼 (원래 카드 스타일)
                               Expanded(
                                 child: GestureDetector(
                                   onTap: () {
@@ -1662,18 +1732,20 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.settings,
-                                            size: 40,
                                             color: Color(0xFF6366f1),
+                                            size: 24,
                                           ),
-                                          SizedBox(width: 12),
+                                          const SizedBox(width: 8),
                                           Text(
                                             '설정',
                                             style: TextStyle(
-                                              color: Color(0xFF1f2937),
-                                              fontSize: 30 * (0.5 + fontSize),
-                                              fontWeight: FontWeight.bold,
+                                              color: const Color(0xFF1f2937),
+                                              fontSize:
+                                                  22 *
+                                                  (0.75 + (fontSize * 0.5)),
+                                              fontWeight: FontWeight.w700,
                                             ),
                                           ),
                                         ],
@@ -1682,7 +1754,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 16),
                             ],
                           ),
                         ),
@@ -1697,4 +1768,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       ),
     );
   }
+
+  // (제거됨) 빠른 액션: 기존 하단 버튼 레이아웃을 사용하도록 복귀
 }

@@ -70,6 +70,22 @@ class AlarmService {
   // 알람 설정
   void scheduleAlarm(Task task, [BuildContext? context]) async {
     final now = DateTime.now();
+
+    // 반복 일정 처리: 다음 1회 발생 시점을 계산해 단일 알람을 예약
+    if (task.isRecurring && task.recurrence != null) {
+      final next = _computeNextOccurrence(task.recurrence!, now);
+      if (next == null) {
+        print('⚠️ 반복 일정의 다음 발생 시점을 찾을 수 없어 알람을 설정하지 않습니다.');
+        return;
+      }
+      final nextTask = task.copyWith(date: next);
+      print('🔁 반복 일정 — 다음 발생 시점으로 알람 예약: ${next.toString()}');
+      // 기존 예약 취소 후 다음 1회 알람으로 예약
+      cancelAlarm(task.id);
+      return _scheduleSingleAlarm(nextTask, context);
+    }
+
+    // 일반 단건 일정
     final alarmTime = DateTime(
       task.date.year,
       task.date.month,
@@ -95,18 +111,28 @@ class AlarmService {
       return;
     }
 
-    // 기존 알람이 있으면 취소
     cancelAlarm(task.id);
+    _scheduleSingleAlarm(task, context);
+  }
 
-    // 초기화 확인
+  // 단일 알람 예약 (내부 공통 함수)
+  void _scheduleSingleAlarm(Task task, [BuildContext? context]) async {
+    final now = DateTime.now();
+    final alarmTime = DateTime(
+      task.date.year,
+      task.date.month,
+      task.date.day,
+      task.date.hour,
+      task.date.minute,
+    );
+
     if (!_isInitialized) {
       await initialize();
     }
 
     try {
-      // 로컬 알림 스케줄링
       await _notifications.zonedSchedule(
-        int.parse(task.id), // 알림 ID로 task ID 사용
+        int.parse(task.id),
         '일정 알람',
         '${task.title} 일정이 시작되었습니다.',
         tz.TZDateTime.from(alarmTime, tz.local),
@@ -130,10 +156,9 @@ class AlarmService {
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        payload: task.id, // Task ID를 payload로 전달
+        payload: task.id,
       );
 
-      // 기존 Timer 방식도 백업으로 유지
       final duration = alarmTime.difference(now);
       final timer = Timer(duration, () {
         _showAlarmScreen(task, context);
@@ -150,16 +175,84 @@ class AlarmService {
       print('  - 로컬 알림 스케줄링 완료');
     } catch (e) {
       print('❌ 로컬 알림 스케줄링 실패: $e');
-      // 로컬 알림 실패 시 Timer 방식으로 폴백
       final duration = alarmTime.difference(now);
       final timer = Timer(duration, () {
         _showAlarmScreen(task, context);
       });
-
       _alarmTimers[task.id] = timer;
       _scheduledAlarms[task.id] = alarmTime;
       print('✅ Timer 방식으로 알람 설정됨 (폴백)');
     }
+  }
+
+  // 반복 일정의 다음 1회 발생 시점 계산
+  DateTime? _computeNextOccurrence(RecurrenceInfo recurrence, DateTime from) {
+    // 허용 요일 집합 만들기 (DateTime.weekday: 1=월..7=일)
+    Set<int> allowedWeekdays;
+    switch (recurrence.type) {
+      case 'daily':
+        allowedWeekdays = {1, 2, 3, 4, 5, 6, 7};
+        break;
+      case 'weekdays':
+        allowedWeekdays = {1, 2, 3, 4, 5};
+        break;
+      case 'weekends':
+        allowedWeekdays = {6, 7};
+        break;
+      case 'custom_days':
+        // RecurrenceInfo.daysOfWeek: 0=월..6=일
+        final days = recurrence.daysOfWeek ?? [];
+        allowedWeekdays = days.map((d) => ((d % 7) + 1)).toSet();
+        break;
+      default:
+        allowedWeekdays = {1, 2, 3, 4, 5, 6, 7};
+    }
+
+    DateTime cursorDate = from;
+    // 탐색 한도: 365일
+    for (int dayOffset = 0; dayOffset <= 365; dayOffset++) {
+      final date = DateTime(
+        cursorDate.year,
+        cursorDate.month,
+        cursorDate.day,
+      ).add(Duration(days: dayOffset));
+
+      if (!allowedWeekdays.contains(date.weekday)) {
+        continue;
+      }
+
+      // 해당 날짜의 각 시간 후보 계산
+      DateTime? best;
+      for (final rt in recurrence.times) {
+        final parts = rt.time.split(':');
+        if (parts.length < 2) continue;
+        final hour = int.tryParse(parts[0]) ?? 0;
+        final minute = int.tryParse(parts[1]) ?? 0;
+        final candidate = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          hour,
+          minute,
+        );
+
+        // from 이후만 허용
+        if (candidate.isAfter(from) || candidate.isAtSameMomentAs(from)) {
+          if (recurrence.endDate != null &&
+              candidate.isAfter(recurrence.endDate!)) {
+            continue;
+          }
+          if (best == null || candidate.isBefore(best)) {
+            best = candidate;
+          }
+        }
+      }
+
+      if (best != null) {
+        return best;
+      }
+    }
+    return null;
   }
 
   // 알람 취소
@@ -261,6 +354,23 @@ class AlarmService {
       print('✅ 알람 화면 표시됨: ${task.title}');
     } else {
       print('❌ NavigatorKey가 null이어서 알람 화면을 표시할 수 없음');
+    }
+
+    // 반복 일정이면 다음 1회 발생 시점으로 재예약
+    if (task.isRecurring && task.recurrence != null) {
+      final next = _computeNextOccurrence(
+        task.recurrence!,
+        DateTime.now().add(const Duration(seconds: 1)),
+      );
+      if (next != null) {
+        final nextTask = task.copyWith(date: next);
+        print('🔁 반복 일정 — 다음 발생 시점 재예약: ${next.toString()}');
+        // 기존 예약 정리 후 재예약
+        cancelAlarm(task.id);
+        _scheduleSingleAlarm(nextTask, context);
+      } else {
+        print('⚠️ 반복 일정 재예약 불가(다음 시점 없음)');
+      }
     }
   }
 
