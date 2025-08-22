@@ -81,16 +81,41 @@ class OpenAILLMService(ILLMService):
             # AI_02 스타일 로그: LLM 응답 로깅
             self.logger.debug(f"LLM extraction response: {response}")
             
-            # JSON 파싱
+            # 강화된 JSON 파싱 (다양한 응답 형식 처리)
             try:
-                schedule_info = json.loads(response)
+                # 1단계: 마크다운 코드 블록 제거
+                cleaned_response = response.strip()
+                if cleaned_response.startswith('```json'):
+                    cleaned_response = cleaned_response[7:]  # '```json' 제거
+                if cleaned_response.startswith('```'):
+                    cleaned_response = cleaned_response[3:]   # '```' 제거
+                if cleaned_response.endswith('```'):
+                    cleaned_response = cleaned_response[:-3]  # 끝의 '```' 제거
+                
+                cleaned_response = cleaned_response.strip()
+                
+                # 2단계: JSON 파싱 시도
+                try:
+                    schedule_info = json.loads(cleaned_response)
+                except json.JSONDecodeError:
+                    # 3단계: Python 딕셔너리 형태인지 확인
+                    if cleaned_response.startswith('{') and cleaned_response.endswith('}'):
+                        # ast.literal_eval로 안전하게 파싱 시도
+                        import ast
+                        try:
+                            schedule_info = ast.literal_eval(cleaned_response)
+                        except (ValueError, SyntaxError):
+                            raise json.JSONDecodeError("Failed to parse as Python dict", cleaned_response, 0)
+                    else:
+                        raise json.JSONDecodeError("Invalid JSON format", cleaned_response, 0)
                 
                 # AI_02 스타일 로그: 추출 결과
                 self.logger.info(f"LLM schedule extraction: {text} -> {schedule_info}")
                 
                 return schedule_info
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, ValueError, SyntaxError) as e:
                 self.logger.warning(f"Failed to parse schedule info: {response}")
+                self.logger.warning(f"Parse error: {e}")
                 return {}
                 
         except Exception as e:
@@ -114,16 +139,41 @@ class OpenAILLMService(ILLMService):
             # AI_02 스타일 로그: LLM 응답 로깅
             self.logger.debug(f"LLM selection response: {response}")
             
-            # JSON 파싱
+            # 강화된 JSON 파싱 (다양한 응답 형식 처리)
             try:
-                selection_data = json.loads(response)
+                # 1단계: 마크다운 코드 블록 제거
+                cleaned_response = response.strip()
+                if cleaned_response.startswith('```json'):
+                    cleaned_response = cleaned_response[7:]  # '```json' 제거
+                if cleaned_response.startswith('```'):
+                    cleaned_response = cleaned_response[3:]   # '```' 제거
+                if cleaned_response.endswith('```'):
+                    cleaned_response = cleaned_response[:-3]  # 끝의 '```' 제거
+                
+                cleaned_response = cleaned_response.strip()
+                
+                # 2단계: JSON 파싱 시도
+                try:
+                    selection_data = json.loads(cleaned_response)
+                except json.JSONDecodeError:
+                    # 3단계: Python 딕셔너리 형태인지 확인
+                    if cleaned_response.startswith('{') and cleaned_response.endswith('}'):
+                        # ast.literal_eval로 안전하게 파싱 시도
+                        import ast
+                        try:
+                            selection_data = ast.literal_eval(cleaned_response)
+                        except (ValueError, SyntaxError):
+                            raise json.JSONDecodeError("Failed to parse as Python dict", cleaned_response, 0)
+                    else:
+                        raise json.JSONDecodeError("Invalid JSON format", cleaned_response, 0)
                 
                 # AI_02 스타일 로그: 파싱 결과
                 self.logger.info(f"LLM selection parsing: {user_response} -> {selection_data}")
                 
                 return selection_data
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, ValueError, SyntaxError) as e:
                 self.logger.warning(f"Failed to parse selection response: {response}")
+                self.logger.warning(f"Parse error: {e}")
                 return {
                     "selected_indices": [],
                     "selected_schedule_ids": [],

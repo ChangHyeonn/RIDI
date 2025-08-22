@@ -1589,6 +1589,81 @@ String _formatDateTime(String datetime) {
 18. **🆕 의료 키워드 매칭**: "병원", "치과", "검진", "진료" 등 의료 관련 키워드 자동 연관
 19. **🆕 반복 일정 시작일 관리**: 반복 일정의 시작일이 `data.datetime` 필드에 정확히 기록됨
 20. **🆕 시작일 표현 처리**: "다음주 월요일부터", "내일부터", "오늘부터" 등의 자연어 표현을 시작일로 변환
+21. **🆕 강화된 JSON 파싱**: 마크다운 코드 블록과 Python 딕셔너리 형태의 LLM 응답을 모두 처리
+22. **🆕 파싱 안정성 향상**: LLM의 일관성 없는 응답 형식에 대한 강건한 처리
+
+---
+
+## 🔧 파싱 파이프라인 강화 (v3.2.1)
+
+### 🎯 문제 상황
+- LLM이 때로는 Python 딕셔너리 형태로 응답 (성공)
+- 때로는 마크다운 JSON 코드 블록으로 응답 (실패)
+- 일관성 없는 응답 형식으로 인한 파싱 실패
+
+### ✅ 해결 방안
+
+#### 1. **프롬프트 개선**
+```python
+# 기존
+"JSON 형식으로만 응답:"
+
+# 개선
+"중요: JSON 형식으로만 응답하세요. 마크다운 코드 블록(```json)을 사용하지 마세요."
+```
+
+#### 2. **강화된 파싱 로직**
+```python
+# 1단계: 마크다운 코드 블록 제거
+cleaned_response = response.strip()
+if cleaned_response.startswith('```json'):
+    cleaned_response = cleaned_response[7:]  # '```json' 제거
+if cleaned_response.startswith('```'):
+    cleaned_response = cleaned_response[3:]   # '```' 제거
+if cleaned_response.endswith('```'):
+    cleaned_response = cleaned_response[:-3]  # 끝의 '```' 제거
+
+# 2단계: JSON 파싱 시도
+try:
+    schedule_info = json.loads(cleaned_response)
+except json.JSONDecodeError:
+    # 3단계: Python 딕셔너리 형태인지 확인
+    if cleaned_response.startswith('{') and cleaned_response.endswith('}'):
+        import ast
+        schedule_info = ast.literal_eval(cleaned_response)
+```
+
+#### 3. **처리 가능한 응답 형식**
+- ✅ 순수 JSON: `{"title": "치과", "date": "2025-08-23"}`
+- ✅ Python 딕셔너리: `{'title': '친구 결혼식', 'date': '2025-08-30'}`
+- ✅ 마크다운 JSON: ```json {"title": "치과", ...} ```
+- ✅ 마크다운 코드: ``` {"title": "치과", ...} ```
+
+### 📊 개선 효과
+
+#### **이전 (실패)**
+```
+2025-08-22 14:08:54,124 - WARNING - Failed to parse schedule info: ```json
+{
+    "title": "치과",
+    "date": "2025-08-23",
+    ...
+}
+```
+2025-08-22 14:08:54,125 - INFO - Information extracted: {}
+```
+
+#### **현재 (성공)**
+```
+2025-08-22 14:11:54,738 - INFO - LLM schedule extraction: 내일 오후 3시에 치과 예약이 있거든 일정 추가해 줄래 -> {'title': '치과', 'date': '2025-08-23', 'time': '15:00', ...}
+```
+
+### 💡 개발 시 주의사항
+
+- **파싱 우선순위**: JSON → Python 딕셔너리 → 마크다운 코드 블록
+- **안전한 파싱**: `ast.literal_eval()` 사용으로 보안 강화
+- **에러 로깅**: 파싱 실패 시 상세한 에러 정보 기록
+- **프롬프트 명확화**: LLM에게 일관된 응답 형식 요구
 
 ---
 
@@ -1636,9 +1711,17 @@ String _formatDateTime(String datetime) {
 
 ---
 
-**버전**: 3.2.0 (Clean Architecture)  
+**버전**: 3.2.1 (Clean Architecture)  
 **최종 업데이트**: 2025년 8월  
 **아키텍처**: Clean Architecture with Dependency Injection
+
+### 📝 v3.2.1 주요 변경사항
+
+1. **파싱 파이프라인 강화**: LLM의 일관성 없는 응답 형식에 대한 강건한 처리
+2. **마크다운 코드 블록 처리**: ```json 형태의 응답을 자동으로 정리하여 파싱
+3. **Python 딕셔너리 지원**: `{'title': '...'}` 형태의 응답도 안전하게 처리
+4. **프롬프트 개선**: 마크다운 코드 블록 사용 금지 명시
+5. **에러 로깅 강화**: 파싱 실패 시 상세한 에러 정보 기록
 
 ### 📝 v3.2.0 주요 변경사항
 
