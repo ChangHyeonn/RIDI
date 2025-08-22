@@ -309,6 +309,38 @@ def _create_schedule_delete_multiple_response(result):
     return jsonify(response), 200
 
 
+def _create_schedule_delete_cancelled_response(result):
+    """일정 삭제 취소 응답 생성 (guide.md v3.2.0 호환)"""
+    from datetime import datetime
+    
+    response = {
+        "success": True,
+        "action": {
+            "type": "schedule_delete_cancelled",
+            "is_important": False,
+            "data": {
+                "cancelled": True,
+                "message": "일정 삭제가 취소되었습니다"
+            },
+            "ui_instructions": {
+                "screen": "calendar",
+                "notification": {
+                    "type": "info",
+                    "title": "삭제 취소",
+                    "message": "일정 삭제가 취소되었습니다"
+                }
+            }
+        },
+        "text_response": {
+            "text": result.response_text,
+            "display_automatically": True
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    return jsonify(response), 200
+
+
 def _create_text_response(text: str, response_text: str = None, simple_text: str = None):
     """AI_02 완전 동일 텍스트 전용 응답 생성"""
     from datetime import datetime
