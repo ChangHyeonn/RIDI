@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
-import '../models/task.dart';
 import '../constants/categories.dart';
 import 'edit_task_screen.dart';
 
@@ -196,34 +195,44 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        // 반복 일정 아이콘 (반복 일정인 경우)
-                                        if (task.isRecurring)
+                                        if (task.isRecurring) ...[
                                           Text(
                                             '🔄',
                                             style: TextStyle(
                                               fontSize: 14 * scaleFactor,
                                             ),
                                           ),
-                                        Text(
-                                          TaskCategories.getCategoryIcon(
-                                            task.category,
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '반복',
+                                            style: TextStyle(
+                                              fontSize: 12 * scaleFactor,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
-                                          style: TextStyle(
-                                            fontSize: 14 * scaleFactor,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          TaskCategories.getCategoryInfo(
-                                                task.category,
-                                              )?['name'] ??
+                                        ] else ...[
+                                          Text(
+                                            TaskCategories.getCategoryIcon(
                                               task.category,
-                                          style: TextStyle(
-                                            fontSize: 12 * scaleFactor,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
+                                            ),
+                                            style: TextStyle(
+                                              fontSize: 14 * scaleFactor,
+                                            ),
                                           ),
-                                        ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            TaskCategories.getCategoryInfo(
+                                                  task.category,
+                                                )?['name'] ??
+                                                task.category,
+                                            style: TextStyle(
+                                              fontSize: 12 * scaleFactor,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),

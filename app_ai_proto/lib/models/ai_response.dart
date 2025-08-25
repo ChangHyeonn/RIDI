@@ -122,11 +122,9 @@ class ProcessingResult {
     print('🔍 result: $result');
     print('🔍 result 타입: ${result.runtimeType}');
 
-    if (result is Map<String, dynamic>) {
-      print('🔍 result 키들: ${result.keys.toList()}');
-      if (result.containsKey('schedule_data')) {
-        print('🔍 schedule_data 발견: ${result['schedule_data']}');
-      }
+    print('🔍 result 키들: ${result.keys.toList()}');
+    if (result.containsKey('schedule_data')) {
+      print('🔍 schedule_data 발견: ${result['schedule_data']}');
     }
 
     final processingResult = ProcessingResult(action: action, result: result);
@@ -204,12 +202,25 @@ class UIInstructions {
   final bool? refreshData;
   final bool? showConfirmation;
   final NotificationInfo? notification;
+  // 신규/확장 필드들
+  final String? highlightDate;
+  final bool? showSelectionUi;
+  final bool? allowMultipleSelection;
+  final String? selectionType;
+  final String? removeItem; // 단일 삭제용 (id)
+  final List<String>? removeItems; // 다중 삭제용 (id 또는 제목)
 
   UIInstructions({
     this.screen,
     this.refreshData,
     this.showConfirmation,
     this.notification,
+    this.highlightDate,
+    this.showSelectionUi,
+    this.allowMultipleSelection,
+    this.selectionType,
+    this.removeItem,
+    this.removeItems,
   });
 
   factory UIInstructions.fromJson(Map<String, dynamic> json) {
@@ -220,6 +231,16 @@ class UIInstructions {
       notification: json['notification'] != null
           ? NotificationInfo.fromJson(json['notification'])
           : null,
+      highlightDate: json['highlight_date'],
+      showSelectionUi: json['show_selection_ui'],
+      allowMultipleSelection: json['allow_multiple_selection'],
+      selectionType: json['selection_type'],
+      removeItem: json['remove_item']?.toString(),
+      removeItems: (json['remove_items'] is List)
+          ? List<String>.from(
+              (json['remove_items'] as List).map((e) => e.toString()),
+            )
+          : null,
     );
   }
 
@@ -229,6 +250,12 @@ class UIInstructions {
       'refresh_data': refreshData,
       'show_confirmation': showConfirmation,
       'notification': notification?.toJson(),
+      'highlight_date': highlightDate,
+      'show_selection_ui': showSelectionUi,
+      'allow_multiple_selection': allowMultipleSelection,
+      'selection_type': selectionType,
+      'remove_item': removeItem,
+      'remove_items': removeItems,
     }..removeWhere((k, v) => v == null);
   }
 }
