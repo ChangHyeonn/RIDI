@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
+import '../widgets/global_voice_button.dart';
 import 'add_task_screen.dart';
 import 'date_detail_screen.dart';
 
@@ -49,13 +50,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
 
-            // 커스텀 헤더 (한자 년/월 표시 + 화살표)
+            // 커스텀 헤더 (년/월 + 화살표)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // 왼쪽 화살표
                   IconButton(
                     onPressed: () {
                       setState(() {
@@ -68,10 +68,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     icon: const Icon(Icons.chevron_left),
                     color: Colors.black,
                   ),
-                  // 년/월 표시
                   Column(
                     children: [
-                      // 년도 (작은 폰트)
                       Text(
                         '${_focusedDay.year}年',
                         style: TextStyle(
@@ -81,7 +79,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      // 월 (큰 폰트)
                       Text(
                         '${_focusedDay.month}月',
                         style: TextStyle(
@@ -92,7 +89,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       ),
                     ],
                   ),
-                  // 오른쪽 화살표
                   IconButton(
                     onPressed: () {
                       setState(() {
@@ -116,16 +112,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   firstDay: DateTime.utc(2020, 1, 1),
                   lastDay: DateTime.utc(2030, 12, 31),
                   focusedDay: _focusedDay,
-                  selectedDayPredicate: (day) {
-                    return isSameDay(_selectedDay, day);
-                  },
+                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
                   onDaySelected: (selectedDay, focusedDay) {
                     setState(() {
                       _selectedDay = selectedDay;
                       _focusedDay = focusedDay;
                     });
-
-                    // 선택된 날짜의 상세 화면으로 이동
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -140,7 +132,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     _focusedDay = focusedDay;
                   },
                   calendarFormat: CalendarFormat.month,
-                  headerVisible: false, // 헤더 완전히 숨기기
+                  headerVisible: false,
                   calendarStyle: CalendarStyle(
                     selectedDecoration: const BoxDecoration(
                       color: Color(0xFF6366f1),
@@ -151,9 +143,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       shape: BoxShape.circle,
                     ),
                     outsideDaysVisible: false,
-                    // 날짜 셀 높이 더 증가
                     cellMargin: const EdgeInsets.symmetric(vertical: 38),
-                    // 날짜 텍스트 스타일 명시적 설정
                     defaultTextStyle: TextStyle(
                       fontSize: 26 * (0.6 + fontSize * 0.4),
                       color: Colors.black,
@@ -177,10 +167,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       fontSize: 20 * (0.6 + fontSize * 0.4),
                     ),
                   ),
-                  // 요일을 한글로 변경
                   daysOfWeekHeight: 40,
                   locale: 'ko_KR',
-                  // 일정이 있는 날에 점 표시
                   calendarBuilders: CalendarBuilders(
                     markerBuilder: (context, date, events) {
                       final tasks = taskProvider.getTasksForDate(date);
@@ -192,7 +180,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             width: 8,
                             height: 8,
                             decoration: const BoxDecoration(
-                              color: Color(0xFF6366f1), // 인디고 색상 점
+                              color: Color(0xFF6366f1),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -200,7 +188,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       }
                       return null;
                     },
-                    // 날짜 텍스트 직접 렌더링
                     defaultBuilder: (context, date, focusedDay) {
                       return Center(
                         child: Text(
@@ -276,8 +263,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            AddTaskScreen(selectedDate: _selectedDay),
+                        builder: (context) => AddTaskScreen(selectedDate: _selectedDay),
                       ),
                     );
                   },
@@ -301,11 +287,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
 
             const SizedBox(height: 12),
-
-            // 반복일정 관리 버튼 제거
           ],
         ),
       ),
+      floatingActionButton: const GlobalVoiceButton(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

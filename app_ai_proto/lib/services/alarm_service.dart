@@ -12,9 +12,9 @@ import '../screens/alarm_screen.dart';
 import '../providers/task_provider.dart';
 import '../services/task_service.dart';
 import 'text_to_speech_service.dart';
+import '../main.dart';
 
-// 전역 NavigatorKey
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+// 앱 전역 NavigatorKey는 main.dart에서 정의되어 있음 (여기서는 import만 사용)
 
 class AlarmService {
   static final AlarmService _instance = AlarmService._internal();

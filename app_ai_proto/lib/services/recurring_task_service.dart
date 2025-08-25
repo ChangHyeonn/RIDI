@@ -78,13 +78,29 @@ class RecurringTaskService {
     if (tasks.isEmpty) return weekdayStatus;
 
     for (final task in tasks) {
-      if (task.recurrence?.daysOfWeek != null) {
+      if (task.recurrence?.type == 'daily') {
+        // daily 타입: 모든 요일 활성화
+        for (int i = 0; i < 7; i++) {
+          weekdayStatus[i] = true;
+        }
+      } else if (task.recurrence?.type == 'weekdays') {
+        // weekdays 타입: 월~금 (0~4) 활성화
+        for (int i = 0; i < 5; i++) {
+          weekdayStatus[i] = true;
+        }
+      } else if (task.recurrence?.type == 'weekends') {
+        // weekends 타입: 토, 일 (5, 6) 활성화
+        weekdayStatus[5] = true; // 토요일
+        weekdayStatus[6] = true; // 일요일
+      } else if (task.recurrence?.daysOfWeek != null) {
+        // custom_days 타입: 특정 요일들 활성화
         for (final weekday in task.recurrence!.daysOfWeek!) {
           if (weekday >= 0 && weekday < 7) {
             weekdayStatus[weekday] = true;
           }
         }
       } else {
+        // fallback: 시작일의 요일만 활성화 (기존 로직)
         final weekday = task.date.weekday - 1; // 0=월요일, 6=일요일
         if (weekday >= 0 && weekday < 7) {
           weekdayStatus[weekday] = true;

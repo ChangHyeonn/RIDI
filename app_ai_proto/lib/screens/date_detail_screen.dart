@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
+import '../models/task.dart';
 import '../constants/categories.dart';
 import 'edit_task_screen.dart';
 
@@ -29,6 +30,34 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
     final displayHour = hour < 12 ? hour : (hour == 12 ? 12 : hour - 12);
     final displayMinute = minute.toString().padLeft(2, '0');
     return '$period${displayHour.toString().padLeft(2, '0')}:$displayMinute';
+  }
+
+  // 반복 일정 타입 표시
+  String _getRecurrenceText(Task task) {
+    if (!task.isRecurring || task.recurrence == null) {
+      return '';
+    }
+    
+    switch (task.recurrence!.type) {
+      case 'daily':
+        return '매일';
+      case 'weekdays':
+        return '평일';
+      case 'weekends':
+        return '주말';
+      case 'custom_days':
+        // 특정 요일인 경우 요일 정보 표시
+        if (task.recurrence!.daysOfWeek != null && task.recurrence!.daysOfWeek!.isNotEmpty) {
+          final dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+          final selectedDays = task.recurrence!.daysOfWeek!
+              .map((day) => dayNames[day])
+              .join(', ');
+          return '매주 $selectedDays';
+        }
+        return '특정 요일';
+      default:
+        return '반복';
+    }
   }
 
   @override
@@ -195,6 +224,7 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
+                                        // 반복 일정 아이콘 (반복 일정인 경우)
                                         if (task.isRecurring) ...[
                                           Text(
                                             '🔄',
@@ -202,37 +232,28 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                               fontSize: 14 * scaleFactor,
                                             ),
                                           ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            '반복',
-                                            style: TextStyle(
-                                              fontSize: 12 * scaleFactor,
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ] else ...[
-                                          Text(
-                                            TaskCategories.getCategoryIcon(
-                                              task.category,
-                                            ),
-                                            style: TextStyle(
-                                              fontSize: 14 * scaleFactor,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            TaskCategories.getCategoryInfo(
-                                                  task.category,
-                                                )?['name'] ??
-                                                task.category,
-                                            style: TextStyle(
-                                              fontSize: 12 * scaleFactor,
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
+                                          const SizedBox(width: 2),
                                         ],
+                                        Text(
+                                          TaskCategories.getCategoryIcon(
+                                            task.category,
+                                          ),
+                                          style: TextStyle(
+                                            fontSize: 14 * scaleFactor,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          TaskCategories.getCategoryInfo(
+                                                task.category,
+                                              )?['name'] ??
+                                              task.category,
+                                          style: TextStyle(
+                                            fontSize: 12 * scaleFactor,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -272,6 +293,18 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
+                                            // 반복 일정 타입 표시
+                                            if (task.isRecurring) ...[
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                _getRecurrenceText(task),
+                                                style: TextStyle(
+                                                  color: const Color(0xFF6366f1),
+                                                  fontSize: 12 * scaleFactor,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
                                           ],
                                         ),
                                       ],
