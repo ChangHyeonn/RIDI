@@ -19,6 +19,7 @@ class DeleteScheduleResult:
     deleted_title: Optional[str] = None
     error_message: Optional[str] = None
     similar_schedules: Optional[List[Dict[str, Any]]] = None
+    found_schedules: Optional[List[Dict[str, Any]]] = None  # 새로운 필드: 시각적 삭제용
     requires_selection: bool = False
 
 
@@ -253,4 +254,71 @@ class DeleteScheduleUseCase:
                 
         except Exception as e:
             self.logger.error(f"Execute selection failed: {e}")
+            return DeleteScheduleResult(False, error_message=f"일정 삭제 실패: {str(e)}")
+    
+    def execute_search(self, user_id: str, search_info: Dict[str, Any]) -> DeleteScheduleResult:
+        """일정 검색 실행 (시각적 삭제 인터페이스용)"""
+        try:
+            title = (search_info.get('title') or '').strip()
+            date_str = (search_info.get('date') or '').strip()
+            
+            # 1. 검색 조건에 따른 일정 조회
+            if date_str:
+                from datetime import datetime
+                target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                user_schedules = self.schedule_repository.find_by_user_and_date(user_id, target_date)
+            else:
+                user_schedules = self.schedule_repository.find_by_user_id(user_id)
+            
+            # 2. 제목 필터링 (제목이 있는 경우)
+            found_schedules = []
+            if title:
+                for schedule in user_schedules:
+                    if schedule.title and self._calculate_similarity(title, schedule.title) >= 0.15:
+                        found_schedules.append({
+                            'id': schedule.id,
+                            'title': schedule.title,
+                            'datetime': schedule.start_datetime.isoformat() if schedule.start_datetime else None,
+                            'is_recurring': schedule.is_recurring,
+                            'recurrence': schedule.recurrence_pattern.to_dict() if schedule.recurrence_pattern else None,
+                            'category': schedule.category or '일반'
+                        })
+            else:
+                # 제목이 없는 경우 모든 일정 반환
+                for schedule in user_schedules:
+                    found_schedules.append({
+                        'id': schedule.id,
+                        'title': schedule.title,
+                        'datetime': schedule.start_datetime.isoformat() if schedule.start_datetime else None,
+                        'is_recurring': schedule.is_recurring,
+                        'recurrence': schedule.recurrence_pattern.to_dict() if schedule.recurrence_pattern else None,
+                        'category': schedule.category or '일반'
+                    })
+            
+            return DeleteScheduleResult(
+                success=True,
+                found_schedules=found_schedules
+            )
+                
+        except Exception as e:
+            self.logger.error(f"Execute search failed: {e}")
+            return DeleteScheduleResult(False, error_message=f"일정 검색 실패: {str(e)}")
+    
+    def execute_delete_by_id(self, user_id: str, schedule_id: str) -> DeleteScheduleResult:
+        """특정 ID의 일정 삭제"""
+        try:
+            # 일정 존재 확인
+            schedule = self.schedule_repository.find_by_id(schedule_id)
+            if not schedule:
+                return DeleteScheduleResult(False, error_message="일정을 찾을 수 없습니다.")
+            
+            # 삭제 실행
+            success = self.schedule_repository.delete(schedule_id)
+            if success:
+                return DeleteScheduleResult(True, deleted_title=schedule.title)
+            else:
+                return DeleteScheduleResult(False, error_message="일정 삭제에 실패했습니다.")
+                
+        except Exception as e:
+            self.logger.error(f"Execute delete by id failed: {e}")
             return DeleteScheduleResult(False, error_message=f"일정 삭제 실패: {str(e)}")

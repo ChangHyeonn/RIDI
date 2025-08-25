@@ -5,6 +5,7 @@ Process Text Use Case
 """
 
 import time
+import re
 from typing import Dict, Any
 
 from shared.logging.logger import LoggerFactory
@@ -49,6 +50,12 @@ class ProcessTextUseCase:
             # 2. 의도 분석
             intent = self.llm_service.analyze_intent(request.text)
             
+            # 의도 분류 후처리 (LLM 분류 결과 보정)
+            corrected_intent = self._correct_intent_classification(request.text, intent)
+            if corrected_intent.category != intent.category:
+                self.logger.info(f"Intent corrected: {intent.category} -> {corrected_intent.category}")
+                intent = corrected_intent
+            
             # AI_02 스타일 로그: Intent Classification
             self.logger.info(f"Intent classified: {request.text} -> {intent.category}")
             self.logger.info(f"Intent analyzed: {intent.category} (confidence: {intent.confidence})")
@@ -65,7 +72,7 @@ class ProcessTextUseCase:
                 self.logger.info(f"Information extracted: {schedule_info}")
                 
                 # 엄격한 일정 정보 검증
-                validation_result = self._validate_schedule_info(schedule_info)
+                validation_result = self._validate_schedule_info(schedule_info, request)
                 if validation_result['valid']:
                     # AI_02 스타일 로그: Request Analysis
                     self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
@@ -157,18 +164,47 @@ class ProcessTextUseCase:
             )
     
     def _handle_schedule_read(self, request: TextRequest, intent: IntentAnalysis, start_time: float) -> TextProcessingResult:
-        """일정 조회 처리"""
+        """일정 조회 처리 (시각적 인터페이스 방식)"""
         try:
+            # 1. 일정 조회 실행
             result = self.get_schedule_usecase.execute(request.user_id, intent.extracted_info)
             
-            response_text = self._generate_read_response(result.schedules)
-            return TextProcessingResult(
-                success=True,
-                action_type="schedule_read",
-                action_data={"schedules": [s.to_dict() for s in result.schedules]},
-                response_text=response_text,
-                processing_time=time.time() - start_time
-            )
+            # 2. 조회된 일정이 있는 경우 시각적 인터페이스로 표시
+            if result.schedules:
+                # 검색 기준 추출
+                search_info = intent.extracted_info
+                title = (search_info.get('title') or '').strip()
+                date_str = (search_info.get('date') or '').strip()
+                
+                # 시각적 조회 인터페이스 응답 생성
+                search_criteria = title if title else (date_str if date_str else '일정')
+                response_text = f"'{search_criteria}'과 관련된 일정 {len(result.schedules)}개를 찾았습니다."
+                
+                return TextProcessingResult(
+                    success=True,
+                    action_type="schedule_read_visual",
+                    action_data={
+                        "search_criteria": {
+                            "title": title,
+                            "date": date_str
+                        },
+                        "found_schedules": [s.to_dict() for s in result.schedules],
+                        "total_count": len(result.schedules),
+                        "show_read_interface": True
+                    },
+                    response_text=response_text,
+                    processing_time=time.time() - start_time
+                )
+            else:
+                # 조회된 일정이 없는 경우 기존 방식으로 처리
+                response_text = self._generate_read_response(result.schedules)
+                return TextProcessingResult(
+                    success=True,
+                    action_type="schedule_read",
+                    action_data={"schedules": [s.to_dict() for s in result.schedules]},
+                    response_text=response_text,
+                    processing_time=time.time() - start_time
+                )
             
         except Exception as e:
             self.logger.error(f"Schedule read failed: {e}")
@@ -179,26 +215,53 @@ class ProcessTextUseCase:
             )
     
     def _handle_schedule_delete(self, request: TextRequest, schedule_info: dict, start_time: float) -> TextProcessingResult:
-        """일정 삭제 처리 (스펙트럼 검색 지원)"""
+        """일정 삭제 처리 (새로운 시각적 인터페이스 방식)"""
         try:
-            result = self.delete_schedule_usecase.execute(request.user_id, schedule_info)
+            title = (schedule_info.get('title') or '').strip()
+            date_str = (schedule_info.get('date') or '').strip()
             
-            if result.success:
-                # 삭제 성공 응답
-                response_text = f"{result.deleted_title} 일정을 삭제했습니다."
-                return TextProcessingResult(
-                    success=True,
-                    action_type="schedule_delete",
-                    action_data={"deleted_schedule": result.deleted_title},
-                    response_text=response_text,
-                    processing_time=time.time() - start_time
+            # 1. 삭제 요청 검증: 제목이나 날짜 중 하나라도 있어야 함
+            if not title and not date_str:
+                return self._create_error_result(
+                    "삭제할 일정의 제목이나 날짜를 알려주세요.", 
+                    time.time() - start_time,
+                    ErrorTypes.SCHEDULE_VALIDATION_ERROR
                 )
-            elif result.requires_selection:
-                # 일정 선택 UI 제공
-                return self._handle_schedule_selection(request, result, start_time)
-            else:
-                # 삭제 실패 응답
+            
+            # 2. 관련 일정 검색
+            result = self.delete_schedule_usecase.execute_search(request.user_id, schedule_info)
+            
+            if not result.success:
                 return self._create_error_result(result.error_message, time.time() - start_time)
+            
+            # 3. 검색된 일정들을 시각적 인터페이스로 표시
+            found_schedules = result.found_schedules
+            if not found_schedules:
+                return self._create_error_result(
+                    "삭제할 일정을 찾을 수 없습니다.", 
+                    time.time() - start_time,
+                    ErrorTypes.SCHEDULE_NOT_FOUND
+                )
+            
+            # 4. 시각적 삭제 인터페이스 응답 생성
+            search_criteria = title if title else date_str
+            response_text = f"'{search_criteria}'과 관련된 일정 {len(found_schedules)}개를 찾았습니다. 삭제하고 싶은 일정을 선택해주세요."
+            
+            return TextProcessingResult(
+                success=True,
+                action_type="schedule_delete_visual",
+                action_data={
+                    "search_criteria": {
+                        "title": title,
+                        "date": date_str
+                    },
+                    "found_schedules": found_schedules,
+                    "total_count": len(found_schedules),
+                    "show_delete_interface": True
+                },
+                response_text=response_text,
+                processing_time=time.time() - start_time
+            )
                 
         except Exception as e:
             self.logger.error(f"Schedule delete failed: {e}")
@@ -548,7 +611,7 @@ class ProcessTextUseCase:
             else:
                 return f"{count}개의 일정이 있습니다. {title} 외 {count-1}개 일정이 있습니다."
     
-    def _validate_schedule_info(self, schedule_info: Dict[str, Any]) -> Dict[str, Any]:
+    def _validate_schedule_info(self, schedule_info: Dict[str, Any], request: TextRequest = None) -> Dict[str, Any]:
         """일정 정보 엄격 검증"""
         
         # 1. 기본 정보 존재 확인 (None 값 안전 처리)
@@ -563,15 +626,73 @@ class ProcessTextUseCase:
             schedule_info['title'] = improved_title
             title = improved_title
         
-        # 3. 누락된 정보에 따른 구체적인 안내 메시지 생성
+        # 3. 반복 일정 자동 감지: "~마다" 표현이 있지만 반복 설정이 없는 경우
+        is_recurring = schedule_info.get('is_recurring', False)
+        recurrence = schedule_info.get('recurrence', {})
+        
+        # recurrence가 None인 경우 빈 딕셔너리로 처리
+        if recurrence is None:
+            recurrence = {}
+            schedule_info['recurrence'] = recurrence
+        
+        if not is_recurring and request and self._has_recurrence_indicators(request.text) and not recurrence:
+            self.logger.info("반복 일정 자동 감지: ~마다 표현 발견")
+            is_recurring = True
+            schedule_info['is_recurring'] = True
+            
+            # 기본 반복 패턴 설정 (매일)
+            if 'recurrence' not in schedule_info:
+                schedule_info['recurrence'] = {}
+            
+            # 시간 정보가 있는 경우 해당 시간 사용, 없으면 기본값
+            current_time = time or '00:00'
+            current_label = '기본'
+            
+            # 기존 시간 정보가 있으면 활용
+            if time:
+                # 시간에 따른 라벨 자동 설정
+                try:
+                    hour = int(time.split(':')[0])
+                    if 5 <= hour < 12:
+                        current_label = '아침'
+                    elif 12 <= hour < 18:
+                        current_label = '오후'
+                    else:
+                        current_label = '저녁'
+                except (ValueError, IndexError):
+                    current_label = '기본'
+            
+            schedule_info['recurrence']['type'] = 'daily'
+            schedule_info['recurrence']['times'] = [{
+                'time': current_time,
+                'label': current_label
+            }]
+            schedule_info['recurrence']['end_date'] = None
+            schedule_info['recurrence']['days_of_week'] = None
+            
+            recurrence = schedule_info['recurrence']
+        
+        # 3.5. 평일/주말 표현 파싱 및 days_of_week 설정
+        if is_recurring and recurrence and request:
+            self._parse_weekday_expressions(request.text, recurrence)
+        
+        # 3. 반복 일정 시작일 자동 설정
+        if is_recurring and not date:
+            from datetime import datetime
+            today = datetime.now().strftime('%Y-%m-%d')
+            schedule_info['date'] = today
+            date = today
+            self.logger.info(f"반복 일정 시작일을 오늘({today})로 설정")
+        
+        # 4. 누락된 정보에 따른 구체적인 안내 메시지 생성
         missing_info = []
         
         # 일정 내용 검증
         if not title or title.lower() in ['일정', '예약', '할 일', '미팅', '약속', '행사']:
             missing_info.append('일정 내용')
         
-        # 날짜 검증
-        if not date:
+        # 날짜 검증 (반복 일정이 아닌 경우에만)
+        if not date and not is_recurring:
             missing_info.append('일자')
         
         # 시간 검증
@@ -602,16 +723,17 @@ class ProcessTextUseCase:
                 'error_type': error_type
             }
         
-        # 4. 날짜 형식 검증
-        try:
-            from datetime import datetime
-            datetime.strptime(date, '%Y-%m-%d')
-        except ValueError:
-            return {
-                'valid': False,
-                'error_message': '상세한 일자를 말씀해 주시겠어요?',
-                'error_type': ErrorTypes.INVALID_DATE_FORMAT
-            }
+        # 4. 날짜 형식 검증 (반복 일정이 아닌 경우에만)
+        if date and not is_recurring:
+            try:
+                from datetime import datetime
+                datetime.strptime(date, '%Y-%m-%d')
+            except ValueError:
+                return {
+                    'valid': False,
+                    'error_message': '상세한 일자를 말씀해 주시겠어요?',
+                    'error_type': ErrorTypes.INVALID_DATE_FORMAT
+                }
         
         # 5. 시간 형식 검증
         try:
@@ -628,6 +750,62 @@ class ProcessTextUseCase:
             }
         
         return {'valid': True}
+
+    def _has_recurrence_indicators(self, text: str) -> bool:
+        """반복 일정 감지 지표 확인"""
+        if not text:
+            return False
+        
+        import re
+        
+        # 반복 일정 감지 패턴들 (더 정확한 매칭을 위해 단어 경계 사용)
+        recurrence_patterns = [
+            r'\b마다\b',           # "7시마다", "아침마다" (단어 경계)
+            r'\b매일\b',           # "매일" (단어 경계)
+            r'\b매주\b',           # "매주" (단어 경계)
+            r'\b매월\b',           # "매월" (단어 경계)
+            r'\b정기\b',           # "정기적으로" (단어 경계)
+            r'\b반복\b',           # "반복" (단어 경계)
+            r'\b계속\b',           # "계속" (단어 경계)
+            r'\b늘\b',             # "늘" (단어 경계)
+            r'\b항상\b',           # "항상" (단어 경계)
+        ]
+        
+        for pattern in recurrence_patterns:
+            if re.search(pattern, text):
+                return True
+        
+        return False
+
+    def _parse_weekday_expressions(self, text: str, recurrence: Dict[str, Any]) -> None:
+        """평일/주말 표현 파싱 및 days_of_week 설정"""
+        if not text or not recurrence:
+            return
+        
+        import re
+        
+        # 평일/주말 표현 패턴 (더 포괄적인 패턴 추가)
+        weekday_patterns = [
+            (r'\b평일\b', 'weekdays', [0, 1, 2, 3, 4]),  # 월~금
+            (r'\b주말\b', 'weekends', [5, 6]),            # 토, 일
+            (r'\b월\s*~\s*금\b', 'weekdays', [0, 1, 2, 3, 4]),  # 월~금
+            (r'\b토\s*,\s*일\b', 'weekends', [5, 6]),    # 토, 일
+            (r'\b토\s*일\b', 'weekends', [5, 6]),        # 토일
+            (r'\b평일마다\b', 'weekdays', [0, 1, 2, 3, 4]),  # 평일마다
+            (r'\b주말마다\b', 'weekends', [5, 6]),        # 주말마다
+            (r'\b평일에\b', 'weekdays', [0, 1, 2, 3, 4]),  # 평일에
+            (r'\b주말에\b', 'weekends', [5, 6]),          # 주말에
+        ]
+        
+        for pattern, recurrence_type, days in weekday_patterns:
+            if re.search(pattern, text):
+                self.logger.info(f"평일/주말 표현 감지: {pattern} -> {recurrence_type}, days: {days}")
+                recurrence['type'] = recurrence_type
+                recurrence['days_of_week'] = days
+                return
+        
+        # 디버깅: 어떤 패턴도 매칭되지 않은 경우
+        self.logger.info(f"평일/주말 표현 감지 실패: '{text}'")
     
     def _generate_delete_multiple_response(self, deleted_titles: list, deleted_count: int) -> str:
         """다중 삭제 응답 메시지 생성"""
@@ -682,7 +860,9 @@ class ProcessTextUseCase:
         if not text:
             return False
         
-        # 선택 응답 패턴들
+        text = text.strip()
+        
+        # 선택 응답 패턴들 (더 포괄적인 패턴)
         selection_patterns = [
             r'^\d+번$',  # "1번", "2번" 등
             r'^\d+번,\s*\d+번$',  # "1번, 2번" 등
@@ -695,11 +875,28 @@ class ProcessTextUseCase:
             r'^그만$',  # "그만"
         ]
         
+        # 정확한 매칭 먼저 시도
         import re
         for pattern in selection_patterns:
-            if re.match(pattern, text.strip()):
+            if re.match(pattern, text):
+                self.logger.info(f"Selection response detected (exact match): '{text}'")
                 return True
         
+        # 키워드 기반 감지 (더 유연한 매칭)
+        selection_keywords = [
+            '모두', '전부', '다', '취소', '안할래요', '그만', '안해', '싫어'
+        ]
+        
+        for keyword in selection_keywords:
+            if keyword in text:
+                # 문맥 확인: 삭제 관련 키워드와 함께 사용되는지
+                delete_keywords = ['삭제', '지워', '제거', '취소']
+                for delete_keyword in delete_keywords:
+                    if delete_keyword in text:
+                        self.logger.info(f"Selection response detected (keyword match): '{text}' (keyword: {keyword}, delete: {delete_keyword})")
+                        return True
+        
+        self.logger.info(f"Not a selection response: '{text}'")
         return False
     
     def _parse_selection_response(self, text: str, similar_schedules: list) -> dict:
@@ -712,23 +909,27 @@ class ProcessTextUseCase:
         
         text = text.strip()
         
-        # 취소 응답
-        if text in ["취소", "안할래요", "그만"]:
-            return {
-                "is_valid": True,
-                "action": "cancel",
-                "selected_indices": [],
-                "selected_schedule_ids": []
-            }
+        # 취소 응답 (더 포괄적인 매칭)
+        cancel_keywords = ["취소", "안할래요", "그만", "안해", "싫어"]
+        for keyword in cancel_keywords:
+            if keyword in text:
+                return {
+                    "is_valid": True,
+                    "action": "cancel",
+                    "selected_indices": [],
+                    "selected_schedule_ids": []
+                }
         
-        # 모두 삭제
-        if text in ["모두", "전부", "다"]:
-            return {
-                "is_valid": True,
-                "action": "delete_all",
-                "selected_indices": list(range(len(similar_schedules))),
-                "selected_schedule_ids": [schedule["id"] for schedule in similar_schedules]
-            }
+        # 모두 삭제 (더 포괄적인 매칭)
+        delete_all_keywords = ["모두", "전부", "다"]
+        for keyword in delete_all_keywords:
+            if keyword in text:
+                return {
+                    "is_valid": True,
+                    "action": "delete_all",
+                    "selected_indices": list(range(len(similar_schedules))),
+                    "selected_schedule_ids": [schedule["id"] for schedule in similar_schedules]
+                }
         
         # 번호 선택 파싱
         import re
@@ -789,3 +990,75 @@ class ProcessTextUseCase:
             processing_time=processing_time,
             error_message=error_message
         )
+    
+    def _correct_intent_classification(self, text: str, intent: IntentAnalysis) -> IntentAnalysis:
+        """의도 분류 결과 보정 (LLM 분류 오류 수정)"""
+        try:
+            text_lower = text.lower()
+            
+            # 1. 간접적인 일정 추가 요청 감지 및 보정
+            add_indicators = [
+                "약속 있어", "해야 해", "있어", "예약해야", "잡아야",
+                "친구랑", "랑", "와", "과"
+            ]
+            
+            # 시간/날짜 표현과 함께 사용된 경우
+            time_date_patterns = [
+                r"다음\s*주", r"이번\s*주", r"내일", r"모레", r"오늘",
+                r"\d+시", r"오전", r"오후", r"저녁", r"아침"
+            ]
+            
+            has_time_date = any(re.search(pattern, text) for pattern in time_date_patterns)
+            has_add_indicator = any(indicator in text_lower for indicator in add_indicators)
+            
+            # 구체적인 활동 키워드
+            activity_keywords = [
+                "점심", "식사", "영화", "만남", "회의", "진료", "검진",
+                "약", "복용", "운동", "학원", "수업", "미팅"
+            ]
+            
+            has_activity = any(keyword in text_lower for keyword in activity_keywords)
+            
+            # 일정 추가로 보정해야 하는 조건
+            should_correct_to_add = (
+                has_time_date and 
+                has_add_indicator and 
+                has_activity and
+                intent.category == "schedule_read"
+            )
+            
+            if should_correct_to_add:
+                self.logger.info(f"Intent correction: schedule_read -> schedule_add (text: {text})")
+                return IntentAnalysis(
+                    category="schedule_add",
+                    confidence=0.9,  # 높은 신뢰도로 보정
+                    extracted_info={}
+                )
+            
+            # 2. 명확한 조회 요청 감지
+            read_indicators = [
+                "뭐 있어", "일정 뭐야", "알려줘", "보여줘", "언제 있어",
+                "일정이 언제", "일정 보여줘", "일정 알려줘"
+            ]
+            
+            has_read_indicator = any(indicator in text_lower for indicator in read_indicators)
+            
+            # 조회로 보정해야 하는 조건
+            should_correct_to_read = (
+                has_read_indicator and
+                intent.category == "schedule_add"
+            )
+            
+            if should_correct_to_read:
+                self.logger.info(f"Intent correction: schedule_add -> schedule_read (text: {text})")
+                return IntentAnalysis(
+                    category="schedule_read",
+                    confidence=0.9,
+                    extracted_info={}
+                )
+            
+            return intent
+            
+        except Exception as e:
+            self.logger.error(f"Intent correction failed: {e}")
+            return intent

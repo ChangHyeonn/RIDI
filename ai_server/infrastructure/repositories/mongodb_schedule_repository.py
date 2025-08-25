@@ -140,6 +140,31 @@ class MongoDBScheduleRepository(IScheduleRepository):
             self.logger.error(f"Failed to find important schedules: {e}")
             return []
     
+    def find_by_user_and_keyword(self, user_id: str, keyword: str) -> List[Schedule]:
+        """사용자별 키워드로 일정 검색"""
+        try:
+            # MongoDB 텍스트 검색을 위한 정규식 패턴 생성
+            regex_pattern = f".*{keyword}.*"
+            
+            # 제목, 설명, 카테고리에서 키워드 검색
+            cursor = self.collection.find({
+                'user_id': user_id,
+                'status': 'active',
+                '$or': [
+                    {'title': {'$regex': regex_pattern, '$options': 'i'}},
+                    {'description': {'$regex': regex_pattern, '$options': 'i'}},
+                    {'category': {'$regex': regex_pattern, '$options': 'i'}}
+                ]
+            }).sort('start_datetime', 1)
+            
+            schedules = [self._doc_to_schedule(doc) for doc in cursor]
+            self.logger.info(f"Found {len(schedules)} schedules for keyword '{keyword}'")
+            return schedules
+            
+        except Exception as e:
+            self.logger.error(f"Failed to find schedules by keyword: {e}")
+            return []
+    
     def update(self, schedule: Schedule) -> Schedule:
         """일정 수정"""
         schedule.updated_at = datetime.now()

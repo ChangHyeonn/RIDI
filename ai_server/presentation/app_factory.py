@@ -11,6 +11,7 @@ from shared.logging.logger import LoggerFactory
 from shared.config.settings import AppSettings
 from shared.container import container
 from presentation.api.v1.text_controller import text_bp
+from presentation.api.v1.sync_controller import sync_bp, init_sync_controller
 from presentation.middleware.request_logging import RequestLoggingMiddleware
 
 
@@ -44,6 +45,7 @@ def create_app(settings: AppSettings = None) -> Flask:
     
     # 블루프린트 등록
     app.register_blueprint(text_bp, url_prefix='/api/v1')
+    app.register_blueprint(sync_bp, url_prefix='/api/v1')
     
     # 글로벌 에러 핸들러
     @app.errorhandler(Exception)
@@ -87,3 +89,9 @@ def _configure_dependencies(settings: AppSettings):
     container.register_singleton(GetScheduleUseCase, GetScheduleUseCase)
     container.register_singleton(DeleteScheduleUseCase, DeleteScheduleUseCase)
     container.register_singleton(ProcessTextUseCase, ProcessTextUseCase)
+    
+    # 동기화 컨트롤러 초기화
+    add_schedule_usecase = container.get(AddScheduleUseCase)
+    get_schedule_usecase = container.get(GetScheduleUseCase)
+    delete_schedule_usecase = container.get(DeleteScheduleUseCase)
+    init_sync_controller(get_schedule_usecase, add_schedule_usecase, delete_schedule_usecase)

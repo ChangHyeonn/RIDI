@@ -32,6 +32,18 @@ class RecurrencePattern:
     times: List[RecurrenceTime] = field(default_factory=list)  # 하루 내 시간들
     end_date: Optional[str] = None               # "2025-09-30" 또는 None (무기한)
     days_of_week: Optional[List[int]] = None     # [0,2,4] = 월,수,금 (0=월요일)
+    
+    def to_dict(self) -> dict:
+        """딕셔너리 변환"""
+        return {
+            'type': self.type,
+            'times': [{
+                'time': rt.time,
+                'label': rt.label
+            } for rt in self.times],
+            'end_date': self.end_date,
+            'days_of_week': self.days_of_week
+        }
 
 
 @dataclass

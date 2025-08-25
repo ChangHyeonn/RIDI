@@ -35,6 +35,11 @@ class IScheduleRepository(ABC):
         pass
     
     @abstractmethod
+    def find_by_user_and_keyword(self, user_id: str, keyword: str) -> List[Schedule]:
+        """사용자별 키워드로 일정 검색"""
+        pass
+    
+    @abstractmethod
     def find_important_by_user(self, user_id: str) -> List[Schedule]:
         """사용자별 중요 일정 조회"""
         pass

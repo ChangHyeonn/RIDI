@@ -12,6 +12,7 @@ from shared.constants.error_types import ErrorTypes
 from shared.container import container
 from core.entities.text_request import TextRequest
 from core.usecases.text_processing.process_text_usecase import ProcessTextUseCase
+from core.usecases.schedule.delete_schedule_usecase import DeleteScheduleUseCase
 from presentation.dto.requests import ProcessTextRequestDTO
 from presentation.dto.responses import ProcessTextResponseDTO, APIResponseDTO
 
@@ -49,18 +50,42 @@ def _create_ai02_response(result):
         )
     elif result.action_type == "schedule_read":
         schedules = result.action_data.get("schedules", [])
+        grouped_schedules = result.action_data.get("grouped_schedules", {})
+        search_keyword = result.action_data.get("search_keyword")
+        total_count = result.action_data.get("total_count", 0)
+        date_range = result.action_data.get("date_range", {})
+        
+        ui_instructions = {
+            "screen": "schedule_list",
+            "refresh_data": True,
+            "highlight_important": True,
+            "show_visual_list": True,  # 시각적 목록 표시
+            "group_by_date": True,     # 날짜별 그룹핑
+            "total_count": total_count
+        }
+        
+        # 키워드 검색인 경우 UI 지시사항 추가
+        if search_keyword:
+            ui_instructions["search_keyword"] = search_keyword
+        
+        # 날짜 범위 정보 추가
+        if date_range:
+            ui_instructions["date_range"] = date_range
+        
         return _create_app_action_response(
             action_type="schedule_list",
-            data={"schedules": schedules},
+            data={
+                "schedules": schedules, 
+                "grouped_schedules": grouped_schedules,
+                "search_keyword": search_keyword,
+                "total_count": total_count,
+                "date_range": date_range
+            },
             text_response={
                 "text": result.response_text,
                 "display_automatically": True
             },
-            ui_instructions={
-                "screen": "schedule_list",
-                "refresh_data": True,
-                "highlight_important": True  # AI_02 스타일 추가
-            }
+            ui_instructions=ui_instructions
         )
     elif result.action_type == "schedule_selection":
         # 일정 선택 UI 제공
@@ -68,6 +93,60 @@ def _create_ai02_response(result):
     elif result.action_type == "schedule_delete_multiple":
         # 다중 일정 삭제 완료
         return _create_schedule_delete_multiple_response(result)
+    elif result.action_type == "schedule_delete_visual":
+        # 시각적 삭제 인터페이스
+        search_criteria = result.action_data.get("search_criteria", {})
+        found_schedules = result.action_data.get("found_schedules", [])
+        total_count = result.action_data.get("total_count", 0)
+        
+        ui_instructions = {
+            "show_delete_interface": True,
+            "screen": "delete_schedule",
+            "search_criteria": search_criteria,
+            "total_count": total_count
+        }
+        
+        return _create_app_action_response(
+            action_type="schedule_delete_visual",
+            data={
+                "search_criteria": search_criteria,
+                "found_schedules": found_schedules,
+                "total_count": total_count,
+                "show_delete_interface": True
+            },
+            text_response={
+                "text": result.response_text,
+                "display_automatically": True
+            },
+            ui_instructions=ui_instructions
+        )
+    elif result.action_type == "schedule_read_visual":
+        # 시각적 조회 인터페이스
+        search_criteria = result.action_data.get("search_criteria", {})
+        found_schedules = result.action_data.get("found_schedules", [])
+        total_count = result.action_data.get("total_count", 0)
+        
+        ui_instructions = {
+            "show_read_interface": True,
+            "screen": "schedule_list",
+            "search_criteria": search_criteria,
+            "total_count": total_count
+        }
+        
+        return _create_app_action_response(
+            action_type="schedule_read_visual",
+            data={
+                "search_criteria": search_criteria,
+                "found_schedules": found_schedules,
+                "total_count": total_count,
+                "show_read_interface": True
+            },
+            text_response={
+                "text": result.response_text,
+                "display_automatically": True
+            },
+            ui_instructions=ui_instructions
+        )
     elif result.action_type == "schedule_delete_cancelled":
         # 일정 삭제 취소
         return _create_text_response(result.response_text)
@@ -77,7 +156,7 @@ def _create_ai02_response(result):
 
 
 def _create_ai02_error_response(result):
-    """AI_02 호환 에러 응답 생성"""
+    """AI_02 호환 에러 응답 생성 (200 상태 코드로 변경)"""
     from datetime import datetime
     
     error_type = result.action_data.get("error_type", ErrorTypes.SYSTEM_ERROR)
@@ -102,7 +181,7 @@ def _create_ai02_error_response(result):
         "timestamp": result.timestamp.isoformat()
     }
     
-    return jsonify(response), 400
+    return jsonify(response), 200
 
 
 def _create_app_action_response(action_type: str, data: Dict[str, Any], text_response: Dict[str, Any] = None, ui_instructions: Dict[str, Any] = None, is_important: bool = False):
@@ -153,6 +232,11 @@ def _create_schedule_action_response(action_type: str, schedule_data: Dict[str, 
         if is_recurring:
             ui_instructions["highlight_recurring"] = True
             recurrence = schedule_data.get('recurrence', {})
+            
+            # recurrence가 None인 경우 빈 딕셔너리로 처리
+            if recurrence is None:
+                recurrence = {}
+            
             if recurrence.get('times') and len(recurrence['times']) > 1:
                 ui_instructions["show_multiple_times"] = True
             if recurrence.get('end_date'):
@@ -341,6 +425,48 @@ def _create_schedule_delete_cancelled_response(result):
     return jsonify(response), 200
 
 
+def _create_clarification_request_response(result):
+    """명확화 요청 응답 생성"""
+    from datetime import datetime
+    
+    action_data = result.action_data
+    clarification_text = action_data.get("clarification_text", "추가 정보가 필요합니다.")
+    missing_fields = action_data.get("missing_fields", [])
+    
+    response = {
+        "success": False,  # 명확화 요청은 성공이 아님
+        "action": {
+            "type": "clarification_request",
+            "is_important": True,
+            "data": {
+                "clarification_text": clarification_text,
+                "original_request": action_data.get("original_request", ""),
+                "missing_fields": missing_fields,
+                "schedule_info": action_data.get("schedule_info", {})
+            },
+            "ui_instructions": {
+                "notification": {
+                    "type": "warning",
+                    "title": "추가 정보 필요",
+                    "message": clarification_text,
+                    "duration": 5000
+                },
+                "show_clarification_ui": True,
+                "wait_for_user_input": True
+            }
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    # 텍스트 응답 추가
+    response["text_response"] = {
+        "text": clarification_text,
+        "display_automatically": True
+    }
+    
+    return jsonify(response), 200
+
+
 def _create_text_response(text: str, response_text: str = None, simple_text: str = None):
     """AI_02 완전 동일 텍스트 전용 응답 생성"""
     from datetime import datetime
@@ -416,6 +542,10 @@ def process_text():
         if result.success or result.action_type == "schedule_selection":
             response = _create_ai02_response(result)
             logger.info(f"Response sent: {result.action_type} action with text: '{result.response_text[:30]}...'")
+            return response
+        elif result.action_type == "clarification_request":
+            response = _create_clarification_request_response(result)
+            logger.info(f"Clarification request sent: {result.response_text[:30]}...")
             return response
         else:
             response = _create_ai02_error_response(result)
@@ -493,7 +623,7 @@ def _create_health_action_response(health_data: Dict[str, Any]):
 
 
 def _create_error_action_response(error_message: str, error_type: str = ErrorTypes.SYSTEM_ERROR, fallback_action: Dict[str, Any] = None):
-    """에러 액션 응답 생성 (AI_02 동일)"""
+    """에러 액션 응답 생성 (200 상태 코드로 변경)"""
     from datetime import datetime
     
     ui_instructions = {
@@ -522,7 +652,7 @@ def _create_error_action_response(error_message: str, error_type: str = ErrorTyp
         "timestamp": datetime.now().isoformat()
     }
     
-    return jsonify(response), 400
+    return jsonify(response), 200
 
 
 # 에러 핸들러
@@ -552,3 +682,35 @@ def internal_error(error):
         "서버 내부 오류가 발생했습니다.",
         ErrorTypes.INTERNAL_ERROR
     )
+
+
+@text_bp.route('/delete_schedule/<schedule_id>', methods=['DELETE'])
+def delete_schedule_by_id(schedule_id: str):
+    """특정 일정 삭제 API"""
+    try:
+        user_id = request.args.get('user_id', 'user123')  # 기본값 설정
+        
+        # DeleteScheduleUseCase 가져오기
+        delete_usecase = container.get(DeleteScheduleUseCase)
+        
+        # 삭제 실행
+        result = delete_usecase.execute_delete_by_id(user_id, schedule_id)
+        
+        if result.success:
+            return jsonify({
+                'success': True,
+                'message': f'{result.deleted_title} 일정을 삭제했습니다.',
+                'deleted_title': result.deleted_title
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.error_message
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Delete schedule by ID failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': '일정 삭제 중 오류가 발생했습니다.'
+        }), 500

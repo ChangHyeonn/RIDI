@@ -32,7 +32,12 @@ class GetScheduleUseCase:
         try:
             query_type = query_info.get('type', 'all')
             
-            if query_type == 'important':
+            if query_type == 'keyword' and query_info.get('keyword'):
+                # 키워드 기반 검색
+                keyword = query_info['keyword']
+                schedules = self.schedule_repository.find_by_user_and_keyword(user_id, keyword)
+                self.logger.info(f"Keyword search for '{keyword}': found {len(schedules)} schedules")
+            elif query_type == 'important':
                 schedules = self.schedule_repository.find_important_by_user(user_id)
             elif query_type == 'date' and query_info.get('date'):
                 target_date = datetime.fromisoformat(query_info['date']).date()
