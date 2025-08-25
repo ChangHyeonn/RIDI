@@ -37,7 +37,7 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
     if (!task.isRecurring || task.recurrence == null) {
       return '';
     }
-    
+
     switch (task.recurrence!.type) {
       case 'daily':
         return '매일';
@@ -47,7 +47,8 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
         return '주말';
       case 'custom_days':
         // 특정 요일인 경우 요일 정보 표시
-        if (task.recurrence!.daysOfWeek != null && task.recurrence!.daysOfWeek!.isNotEmpty) {
+        if (task.recurrence!.daysOfWeek != null &&
+            task.recurrence!.daysOfWeek!.isNotEmpty) {
           final dayNames = ['월', '화', '수', '목', '금', '토', '일'];
           final selectedDays = task.recurrence!.daysOfWeek!
               .map((day) => dayNames[day])
@@ -135,9 +136,47 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                           final task = tasks[index];
                           return GestureDetector(
                             onTap: () {
-                              // 완료된 일정인지 확인
+                              // 반복 일정은 날짜별 화면에서 개별 수정 금지
+                              if (task.isRecurring) {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      title: Text(
+                                        '반복 일정',
+                                        style: TextStyle(
+                                          fontSize: 18 * scaleFactor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      content: Text(
+                                        '반복 일정은 날짜별 화면에서 수정할 수 없습니다.\n반복 일정 관리 화면에서 수정해주세요.',
+                                        style: TextStyle(
+                                          fontSize: 16 * scaleFactor,
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                          child: Text(
+                                            '확인',
+                                            style: TextStyle(
+                                              fontSize: 16 * scaleFactor,
+                                              color: const Color(0xFF6366f1),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                                return;
+                              }
+
+                              // 완료된 일정은 수정 금지
                               if (task.isCompleted) {
-                                // 완료된 일정이면 알림창 띄우기
                                 showDialog(
                                   context: context,
                                   builder: (BuildContext context) {
@@ -172,16 +211,17 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                     );
                                   },
                                 );
-                              } else {
-                                // 미완료 일정이면 일정 수정창으로 이동
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        EditTaskScreen(task: task),
-                                  ),
-                                );
+                                return;
                               }
+
+                              // 그 외에는 수정 화면으로 이동
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      EditTaskScreen(task: task),
+                                ),
+                              );
                             },
                             child: Container(
                               margin: const EdgeInsets.only(bottom: 12),
@@ -207,7 +247,7 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  // 카테고리 아이콘과 텍스트
+                                  // 카테고리/반복 표시 배지
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 12,
@@ -224,7 +264,6 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        // 반복 일정 아이콘 (반복 일정인 경우)
                                         if (task.isRecurring) ...[
                                           Text(
                                             '🔄',
@@ -232,28 +271,37 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                               fontSize: 14 * scaleFactor,
                                             ),
                                           ),
-                                          const SizedBox(width: 2),
-                                        ],
-                                        Text(
-                                          TaskCategories.getCategoryIcon(
-                                            task.category,
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '반복',
+                                            style: TextStyle(
+                                              fontSize: 12 * scaleFactor,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
-                                          style: TextStyle(
-                                            fontSize: 14 * scaleFactor,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          TaskCategories.getCategoryInfo(
-                                                task.category,
-                                              )?['name'] ??
+                                        ] else ...[
+                                          Text(
+                                            TaskCategories.getCategoryIcon(
                                               task.category,
-                                          style: TextStyle(
-                                            fontSize: 12 * scaleFactor,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
+                                            ),
+                                            style: TextStyle(
+                                              fontSize: 14 * scaleFactor,
+                                            ),
                                           ),
-                                        ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            TaskCategories.getCategoryInfo(
+                                                  task.category,
+                                                )?['name'] ??
+                                                task.category,
+                                            style: TextStyle(
+                                              fontSize: 12 * scaleFactor,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
@@ -275,8 +323,9 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                         const SizedBox(height: 4),
                                         Row(
                                           children: [
-                                            // 중요도 표시
-                                            if (task.isImportant) ...[
+                                            // 중요도 표시 (반복 일정은 표시하지 않음)
+                                            if (!task.isRecurring &&
+                                                task.isImportant) ...[
                                               Icon(
                                                 Icons.star,
                                                 color: const Color(0xFFfbbf24),
@@ -299,7 +348,9 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                               Text(
                                                 _getRecurrenceText(task),
                                                 style: TextStyle(
-                                                  color: const Color(0xFF6366f1),
+                                                  color: const Color(
+                                                    0xFF6366f1,
+                                                  ),
                                                   fontSize: 12 * scaleFactor,
                                                   fontWeight: FontWeight.w600,
                                                 ),
