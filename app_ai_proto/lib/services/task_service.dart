@@ -5,7 +5,8 @@ import '../models/task.dart';
 class TaskService {
   static const String _tasksKey = 'tasks';
   static const String _settingsKey = 'settings';
-  
+  static const String _completedOccurrencesKey = 'completed_occurrences';
+
   // 캐싱을 위한 변수들
   List<Task>? _cachedTasks;
   Map<String, dynamic>? _cachedSettings;
@@ -13,10 +14,12 @@ class TaskService {
   // 일정 목록 가져오기
   Future<List<Task>> getTasks() async {
     if (_cachedTasks != null) return _cachedTasks!;
-    
+
     final prefs = await SharedPreferences.getInstance();
     final tasksJson = prefs.getStringList(_tasksKey) ?? [];
-    _cachedTasks = tasksJson.map((json) => Task.fromJson(jsonDecode(json))).toList();
+    _cachedTasks = tasksJson
+        .map((json) => Task.fromJson(jsonDecode(json)))
+        .toList();
     return _cachedTasks!;
   }
 
@@ -81,7 +84,7 @@ class TaskService {
   // 설정 가져오기
   Future<Map<String, dynamic>> getSettings() async {
     if (_cachedSettings != null) return _cachedSettings!;
-    
+
     final prefs = await SharedPreferences.getInstance();
 
     // JSON으로 저장된 설정을 먼저 시도
@@ -113,7 +116,7 @@ class TaskService {
     // 개별 키로도 저장 (이전 버전 호환성)
     await prefs.setDouble('soundVolume', settings['soundVolume'] ?? 0.5);
     await prefs.setDouble('fontSize', settings['fontSize'] ?? 0.5);
-    
+
     _cachedSettings = settings; // 캐시 업데이트
   }
 
@@ -121,5 +124,17 @@ class TaskService {
   void invalidateCache() {
     _cachedTasks = null;
     _cachedSettings = null;
+  }
+
+  // 반복 일정 개별 발생(날짜별) 완료 목록 가져오기
+  Future<List<String>> getCompletedOccurrences() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_completedOccurrencesKey) ?? const [];
+  }
+
+  // 반복 일정 개별 발생(날짜별) 완료 목록 저장
+  Future<void> saveCompletedOccurrences(List<String> keys) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_completedOccurrencesKey, keys);
   }
 }

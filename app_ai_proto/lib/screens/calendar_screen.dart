@@ -172,7 +172,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   calendarBuilders: CalendarBuilders(
                     markerBuilder: (context, date, events) {
                       final tasks = taskProvider.getTasksForDate(date);
-                      if (tasks.isNotEmpty) {
+                      // 일반 일정이 하나라도 있으면 표시, 반복 일정만 있으면 숨김
+                      final hasNonRecurring = tasks.any(
+                        (task) => task.isRecurring == false,
+                      );
+                      if (hasNonRecurring) {
                         return Positioned(
                           right: 1,
                           top: 1,
@@ -263,7 +267,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AddTaskScreen(selectedDate: _selectedDay),
+                        builder: (context) =>
+                            AddTaskScreen(selectedDate: _selectedDay),
                       ),
                     );
                   },

@@ -256,8 +256,14 @@ class _AlarmScreenState extends State<AlarmScreen>
 
     // 알람 해제 시 일정을 완료 상태로 변경
     final taskProvider = context.read<TaskProvider>();
-    final completedTask = widget.task.copyWith(isCompleted: true);
-    taskProvider.updateTask(completedTask);
+    if (widget.task.isRecurring) {
+      // 반복 일정은 오늘 발생만 완료 처리
+      taskProvider.toggleOccurrenceCompletion(widget.task.id, DateTime.now());
+    } else {
+      // 일반 일정은 전역 완료 처리
+      final completedTask = widget.task.copyWith(isCompleted: true);
+      taskProvider.updateTask(completedTask);
+    }
 
     // 메인 화면으로 돌아가기 (설정 유지)
     Navigator.of(context).pushAndRemoveUntil(

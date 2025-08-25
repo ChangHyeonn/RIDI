@@ -12,6 +12,8 @@ class TaskProvider with ChangeNotifier {
   Map<String, dynamic> _settings = {};
   bool _isLoading = false;
   bool _isSyncing = false;
+  // 반복 일정의 날짜별 완료 상태 저장 (key: "taskId_YYYYMMDD")
+  Set<String> _completedOccurrenceKeys = {};
 
   List<Task> get tasks => _tasks;
   Map<String, dynamic> get settings => _settings;
@@ -26,6 +28,9 @@ class TaskProvider with ChangeNotifier {
     // 로컬 데이터 먼저 로드 (빠른 시작)
     await loadTasks();
     await loadSettings();
+    // 날짜별 완료 상태 로드
+    final completedKeys = await _taskService.getCompletedOccurrences();
+    _completedOccurrenceKeys = completedKeys.toSet();
 
     // 알람 서비스 초기화 및 기존 일정들의 알람 복원
     await _restoreAlarms();
@@ -78,6 +83,7 @@ class TaskProvider with ChangeNotifier {
   // 일정 로드
   Future<void> loadTasks() async {
     _tasks = await _taskService.getTasks();
+    _dedupeRecurringTasksInMemory();
     notifyListeners();
   }
 
@@ -96,7 +102,7 @@ class TaskProvider with ChangeNotifier {
     if (!task.isCompleted) {
       _alarmService.scheduleAlarm(task);
     }
-    
+
     // 반복 일정인 경우 로그 출력
     if (task.isRecurring && task.recurrence != null) {
       print('🔄 반복 일정 추가됨: ${task.title} (${task.recurrence!.type})');
@@ -104,14 +110,31 @@ class TaskProvider with ChangeNotifier {
       print('  - 반복 타입: ${task.recurrence!.type}');
       print('  - 요일: ${task.recurrence!.daysOfWeek}');
     }
-    
+
     // 동기화 시도 (백그라운드에서)
     _syncInBackground();
   }
 
   // 일정 여러 개 추가 (일괄 저장)
   Future<void> addTasks(List<Task> tasks) async {
-    await _taskService.addTasks(tasks);
+    // 기존과 중복되는 반복 일정(제목+카테고리+정확한 시각)을 제거하고 추가
+    final existingKeys = _tasks
+        .map(_composeRecurringKeyOrNull)
+        .whereType<String>()
+        .toSet();
+    final filtered = <Task>[];
+    for (final t in tasks) {
+      final key = _composeRecurringKeyOrNull(t);
+      if (key == null || !existingKeys.contains(key)) {
+        filtered.add(t);
+      }
+    }
+
+    if (filtered.isEmpty) {
+      return; // 추가할 것이 없음
+    }
+
+    await _taskService.addTasks(filtered);
     await loadTasks();
 
     final now = DateTime.now();
@@ -120,9 +143,41 @@ class TaskProvider with ChangeNotifier {
         _alarmService.scheduleAlarm(task);
       }
     }
-    
+
     // 동기화 시도 (백그라운드에서)
     _syncInBackground();
+  }
+
+  // 메모리 내 중복된 반복 일정 제거 (첫 항목만 유지)
+  void _dedupeRecurringTasksInMemory() {
+    final seen = <String>{};
+    final deduped = <Task>[];
+    for (final t in _tasks) {
+      final key = _composeRecurringKeyOrNull(t);
+      if (key == null) {
+        deduped.add(t);
+        continue;
+      }
+      if (!seen.contains(key)) {
+        seen.add(key);
+        deduped.add(t);
+      }
+    }
+    if (deduped.length != _tasks.length) {
+      _tasks = deduped;
+      _saveTasksInBackground();
+    }
+  }
+
+  // 반복 일정은 (제목, 카테고리, 분 단위 시각)으로 동일성 판단, 일반 일정은 null 반환
+  String? _composeRecurringKeyOrNull(Task t) {
+    if (!t.isRecurring) return null;
+    final y = t.date.year.toString().padLeft(4, '0');
+    final m = t.date.month.toString().padLeft(2, '0');
+    final d = t.date.day.toString().padLeft(2, '0');
+    final hh = t.date.hour.toString().padLeft(2, '0');
+    final mm = t.date.minute.toString().padLeft(2, '0');
+    return 'R|${t.title}|${t.category}|$y$m$d$hh$mm';
   }
 
   // 일정 업데이트
@@ -146,7 +201,7 @@ class TaskProvider with ChangeNotifier {
 
     // 백그라운드에서 저장
     _saveTasksInBackground();
-    
+
     // 알람 취소
     _alarmService.cancelAlarm(taskId);
   }
@@ -182,31 +237,79 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
+  // 반복 일정의 특정 날짜 발생을 완료 처리/해제
+  Future<void> toggleOccurrenceCompletion(String taskId, DateTime date) async {
+    final key = _composeOccurrenceKey(taskId, date);
+    if (_completedOccurrenceKeys.contains(key)) {
+      _completedOccurrenceKeys.remove(key);
+    } else {
+      _completedOccurrenceKeys.add(key);
+    }
+    await _taskService.saveCompletedOccurrences(
+      _completedOccurrenceKeys.toList(),
+    );
+    notifyListeners();
+  }
+
+  bool isOccurrenceCompleted(String taskId, DateTime date) {
+    return _completedOccurrenceKeys.contains(
+      _composeOccurrenceKey(taskId, date),
+    );
+  }
+
+  String _composeOccurrenceKey(String taskId, DateTime date) {
+    final d = DateTime(date.year, date.month, date.day);
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final dd = d.day.toString().padLeft(2, '0');
+    return '${taskId}_${y}${m}${dd}';
+  }
+
   // 특정 날짜의 일정 가져오기 (반복 일정 포함)
   List<Task> getTasksForDate(DateTime date) {
+    final hasExplicitRecurringInstances = _tasks.any(
+      (t) =>
+          t.isRecurring &&
+          t.date.year == date.year &&
+          t.date.month == date.month &&
+          t.date.day == date.day,
+    );
+
     final tasks = _tasks.where((task) {
-      // 일반 일정: 정확히 같은 날짜
-      if (!task.isRecurring) {
-        return task.date.year == date.year &&
-            task.date.month == date.month &&
-            task.date.day == date.day;
-      }
-      
-      // 반복 일정: 해당 날짜에 반복되는지 확인
-      if (task.isRecurring && task.recurrence != null) {
+      final isSameDay =
+          task.date.year == date.year &&
+          task.date.month == date.month &&
+          task.date.day == date.day;
+
+      // 일반 일정: 같은 날만 포함
+      if (!task.isRecurring) return isSameDay;
+
+      // 반복 일정: 같은 날에 명시적 인스턴스가 있으면 그 인스턴스만 포함
+      if (hasExplicitRecurringInstances) return isSameDay;
+
+      // 명시적 인스턴스가 없을 때만 규칙 기반 포함
+      if (task.recurrence != null) {
         return _isRecurringOnDate(task, date);
       }
-      
       return false;
     }).toList();
 
-    // 시간 순으로 정렬 (오전/오후, 시간, 분 순서)
+    // 정렬: 1) 미완료 먼저 2) 완료는 뒤 3) 각각 내부는 시간 오름차순
     tasks.sort((a, b) {
-      // 시간 비교
+      final aDone = a.isRecurring
+          ? isOccurrenceCompleted(a.id, date)
+          : a.isCompleted;
+      final bDone = b.isRecurring
+          ? isOccurrenceCompleted(b.id, date)
+          : b.isCompleted;
+
+      if (aDone != bDone) {
+        return aDone ? 1 : -1; // 미완료(false) 우선
+      }
+
+      // 동일 그룹 내 시간 비교
       final hourComparison = a.date.hour.compareTo(b.date.hour);
       if (hourComparison != 0) return hourComparison;
-
-      // 분 비교
       return a.date.minute.compareTo(b.date.minute);
     });
 
@@ -218,19 +321,23 @@ class TaskProvider with ChangeNotifier {
     if (!task.isRecurring || task.recurrence == null) {
       return false;
     }
-    
+
     final recurrence = task.recurrence!;
     final startDate = task.date;
 
     // 날짜만 비교하도록 정규화 (시간 무시)
     final DateTime dateOnly = DateTime(date.year, date.month, date.day);
-    final DateTime startOnly = DateTime(startDate.year, startDate.month, startDate.day);
-    
+    final DateTime startOnly = DateTime(
+      startDate.year,
+      startDate.month,
+      startDate.day,
+    );
+
     // 시작일 이전이면 false
     if (dateOnly.isBefore(startOnly)) {
       return false;
     }
-    
+
     // 종료일이 있고 해당 날짜가 종료일을 넘으면 false (날짜만 비교)
     if (recurrence.endDate != null) {
       final end = recurrence.endDate!;
@@ -239,23 +346,24 @@ class TaskProvider with ChangeNotifier {
         return false;
       }
     }
-    
+
     switch (recurrence.type) {
       case 'daily':
         // 매일: 모든 날짜에 해당
         return true;
-        
+
       case 'weekdays':
         // 평일: 월~금 (1~5)
         return dateOnly.weekday >= 1 && dateOnly.weekday <= 5;
-        
+
       case 'weekends':
         // 주말: 토, 일 (6, 7)
         return dateOnly.weekday == 6 || dateOnly.weekday == 7;
-        
+
       case 'custom_days':
         // 특정 요일: daysOfWeek에 포함된 요일
-        if (recurrence.daysOfWeek != null && recurrence.daysOfWeek!.isNotEmpty) {
+        if (recurrence.daysOfWeek != null &&
+            recurrence.daysOfWeek!.isNotEmpty) {
           // Flutter의 weekday는 1=월요일, 7=일요일
           // 서버의 daysOfWeek는 0=월요일, 6=일요일
           final flutterWeekday = dateOnly.weekday; // 1~7
@@ -263,7 +371,7 @@ class TaskProvider with ChangeNotifier {
           return recurrence.daysOfWeek!.contains(serverWeekday);
         }
         return false;
-        
+
       default:
         return false;
     }
@@ -325,18 +433,18 @@ class TaskProvider with ChangeNotifier {
     return tomorrowTasks.isNotEmpty &&
         tomorrowTasks.every((task) => task.isCompleted);
   }
-  
+
   // 백그라운드 동기화
   Future<void> _syncInBackground() async {
     try {
       final isSyncEnabled = await _syncManager.isSyncEnabled();
       if (!isSyncEnabled) return;
-      
+
       _isSyncing = true;
       notifyListeners();
-      
+
       await _syncManager.syncIncremental();
-      
+
       _isSyncing = false;
       notifyListeners();
     } catch (e) {
@@ -345,16 +453,16 @@ class TaskProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   // 수동 동기화
   Future<void> syncNow() async {
     try {
       _isSyncing = true;
       notifyListeners();
-      
+
       await _syncManager.syncFull();
       await loadTasks();
-      
+
       _isSyncing = false;
       notifyListeners();
     } catch (e) {
@@ -363,7 +471,7 @@ class TaskProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   // 동기화 상태 확인
   Future<Map<String, dynamic>> getSyncStatus() async {
     return await _syncManager.getSyncStatus();

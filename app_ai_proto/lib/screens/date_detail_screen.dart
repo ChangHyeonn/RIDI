@@ -175,8 +175,14 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                 return;
                               }
 
-                              // 완료된 일정은 수정 금지
-                              if (task.isCompleted) {
+                              // 완료된 일정은 수정 금지 (반복 일정은 날짜별 완료 기준)
+                              final isDone = task.isRecurring
+                                  ? taskProvider.isOccurrenceCompleted(
+                                      task.id,
+                                      widget.date,
+                                    )
+                                  : task.isCompleted;
+                              if (isDone) {
                                 showDialog(
                                   context: context,
                                   builder: (BuildContext context) {
@@ -227,12 +233,24 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                               margin: const EdgeInsets.only(bottom: 12),
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: task.isCompleted
+                                color:
+                                    ((task.isRecurring
+                                        ? taskProvider.isOccurrenceCompleted(
+                                            task.id,
+                                            widget.date,
+                                          )
+                                        : task.isCompleted))
                                     ? const Color(0xFFdcfce7) // 밝은 초록색 (완료)
                                     : const Color(0xFFfef2f2), // 밝은 빨간색 (미완료)
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: task.isCompleted
+                                  color:
+                                      ((task.isRecurring
+                                          ? taskProvider.isOccurrenceCompleted(
+                                              task.id,
+                                              widget.date,
+                                            )
+                                          : task.isCompleted))
                                       ? const Color(0xFF22c55e) // 초록색 테두리
                                       : const Color(0xFFef4444), // 빨간색 테두리
                                   width: 1,
@@ -254,11 +272,13 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                       vertical: 8,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Color(
-                                        TaskCategories.getCategoryColor(
-                                          task.category,
-                                        ),
-                                      ),
+                                      color: task.isRecurring
+                                          ? const Color(0xFF6366F1)
+                                          : Color(
+                                              TaskCategories.getCategoryColor(
+                                                task.category,
+                                              ),
+                                            ),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Row(
