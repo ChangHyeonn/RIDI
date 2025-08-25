@@ -23,18 +23,7 @@ class TaskProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    // 동기화 활성화 여부 확인
-    final isSyncEnabled = await _syncManager.isSyncEnabled();
-    
-    if (isSyncEnabled) {
-      // 동기화 시도 (실패해도 로컬 데이터는 로드)
-      try {
-        await _syncManager.syncIncremental();
-      } catch (e) {
-        print('⚠️ 초기 동기화 실패, 로컬 데이터 사용: $e');
-      }
-    }
-
+    // 로컬 데이터 먼저 로드 (빠른 시작)
     await loadTasks();
     await loadSettings();
 
@@ -43,6 +32,25 @@ class TaskProvider with ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
+
+    // 네트워크 동기화는 백그라운드에서 (사용자 경험 개선)
+    _initializeSyncInBackground();
+  }
+
+  // 백그라운드에서 초기 동기화 수행
+  Future<void> _initializeSyncInBackground() async {
+    try {
+      final isSyncEnabled = await _syncManager.isSyncEnabled();
+      if (isSyncEnabled) {
+        print('🔄 백그라운드 동기화 시작...');
+        await _syncManager.syncIncremental();
+        _taskService.invalidateCache(); // 캐시 무효화
+        await loadTasks(); // 동기화 후 데이터 새로고침
+        print('✅ 백그라운드 동기화 완료');
+      }
+    } catch (e) {
+      print('⚠️ 백그라운드 동기화 실패, 로컬 데이터 사용: $e');
+    }
   }
 
   // 기존 일정들의 알람 복원
@@ -132,11 +140,26 @@ class TaskProvider with ChangeNotifier {
 
   // 일정 삭제
   Future<void> deleteTask(String taskId) async {
-    await _taskService.deleteTask(taskId);
-    await loadTasks();
+    // 메모리에서 먼저 제거 (즉시 UI 반영)
+    _tasks.removeWhere((task) => task.id == taskId);
+    notifyListeners();
 
+    // 백그라운드에서 저장
+    _saveTasksInBackground();
+    
     // 알람 취소
     _alarmService.cancelAlarm(taskId);
+  }
+
+  // 백그라운드에서 일정 저장
+  Future<void> _saveTasksInBackground() async {
+    try {
+      await _taskService.saveTasks(_tasks);
+    } catch (e) {
+      print('❌ 백그라운드 저장 실패: $e');
+      // 실패 시 다시 로드
+      await loadTasks();
+    }
   }
 
   // 일정 여러 개 삭제 (일괄)

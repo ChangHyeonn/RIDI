@@ -30,6 +30,7 @@ class AlarmService {
       FlutterLocalNotificationsPlugin();
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isInitialized = false;
+  static bool _timezoneInitialized = false;
   final Set<String> _activeAlarmTaskIds = <String>{};
 
   // 초기화
@@ -39,8 +40,12 @@ class AlarmService {
     try {
       await _ttsService.initialize();
 
-      // timezone 초기화
-      tz.initializeTimeZones();
+      // timezone 초기화 (한 번만 수행)
+      if (!_timezoneInitialized) {
+        tz.initializeTimeZones();
+        _timezoneInitialized = true;
+        print('✅ 타임존 초기화 완료');
+      }
 
       // 로컬 알림 초기화
       const AndroidInitializationSettings initializationSettingsAndroid =
