@@ -16,8 +16,10 @@ from core.interfaces.repositories.schedule_repository import IScheduleRepository
 @dataclass
 class GetScheduleResult:
     """일정 조회 결과"""
+    success: bool
     schedules: List[Schedule]
     total_count: int
+    error_message: str = None
 
 
 class GetScheduleUseCase:
@@ -44,8 +46,8 @@ class GetScheduleUseCase:
             active_schedules = [s for s in schedules if s.is_active()]
             
             self.logger.info(f"Found {len(active_schedules)} schedules for user {user_id}")
-            return GetScheduleResult(active_schedules, len(active_schedules))
+            return GetScheduleResult(True, active_schedules, len(active_schedules))
             
         except Exception as e:
             self.logger.error(f"Get schedule failed: {e}")
-            return GetScheduleResult([], 0)
+            return GetScheduleResult(False, [], 0, str(e))
