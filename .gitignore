@@ -75,6 +75,9 @@ wheels/
 *.egg
 MANIFEST
 
+# Flutter app lib folder (exclude from Python lib ignore)
+!app_ai_proto/lib/
+
 # PyInstaller
 *.manifest
 *.spec

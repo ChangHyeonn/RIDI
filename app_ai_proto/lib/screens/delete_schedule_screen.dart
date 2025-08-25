@@ -330,43 +330,12 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
 
   Future<void> _deleteTask(Task task) async {
     try {
-      // 로딩 표시
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6366f1)),
-            ),
-          );
-        },
-      );
+      // 즉시 UI에서 제거 (사용자 경험 개선)
+      setState(() {
+        widget.schedules.remove(task);
+      });
 
-      // 서버에서 먼저 삭제 시도
-      bool serverSuccess = false;
-      try {
-        serverSuccess = await NetworkService.deleteScheduleFromServer(task.id, 'user123');
-        print('서버 삭제 결과: $serverSuccess');
-      } catch (e) {
-        print('서버 삭제 실패: $e');
-      }
-
-      // 로컬에서 삭제
-      await _taskService.deleteTask(task.id);
-      print('로컬 삭제 완료: ${task.id}');
-
-      // TaskProvider를 통해 데이터 새로고침
-      final taskProvider = context.read<TaskProvider>();
-      await taskProvider.loadTasks();
-      print('TaskProvider 데이터 새로고침 완료');
-
-      // 로딩 다이얼로그 닫기
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-
-      // 성공 메시지 표시
+      // 성공 메시지 즉시 표시
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -384,22 +353,29 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
             ),
           ),
         );
-
-        // 목록에서 제거
-        setState(() {
-          widget.schedules.remove(task);
-        });
-
-        // 모든 일정이 삭제되면 이전 화면으로 돌아가기
-        if (widget.schedules.isEmpty) {
-          Navigator.of(context).pop();
-        }
       }
-    } catch (e) {
-      // 로딩 다이얼로그 닫기
-      if (mounted) {
+
+      // TaskProvider를 통해 최적화된 삭제 수행
+      final taskProvider = context.read<TaskProvider>();
+      await taskProvider.deleteTask(task.id);
+      print('✅ TaskProvider를 통한 최적화된 삭제 완료: ${task.id}');
+
+      // 모든 일정이 삭제되면 이전 화면으로 돌아가기
+      if (widget.schedules.isEmpty) {
         Navigator.of(context).pop();
       }
+
+      // 백그라운드에서 서버 동기화 (사용자 경험 개선)
+      _syncWithServerInBackground(task.id);
+    } catch (e) {
+      print('❌ 일정 삭제 실패: $e');
+      
+      // 실패 시 목록에 다시 추가
+      setState(() {
+        if (!widget.schedules.contains(task)) {
+          widget.schedules.add(task);
+        }
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -408,7 +384,7 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
               children: [
                 const Icon(Icons.error, color: Colors.white),
                 const SizedBox(width: 8),
-                Text('일정 삭제에 실패했습니다: $e'),
+                Text('일정 삭제에 실패했습니다. 다시 시도해주세요.'),
               ],
             ),
             backgroundColor: const Color(0xFFef4444),
@@ -419,6 +395,18 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
           ),
         );
       }
+    }
+  }
+
+  // 백그라운드에서 서버 동기화
+  Future<void> _syncWithServerInBackground(String taskId) async {
+    try {
+      print('🔄 백그라운드 서버 동기화 시작: $taskId');
+      await NetworkService.deleteScheduleFromServer(taskId, 'user123');
+      print('✅ 백그라운드 서버 동기화 완료: $taskId');
+    } catch (e) {
+      print('⚠️ 백그라운드 서버 동기화 실패: $e');
+      // 실패해도 사용자에게는 알리지 않음 (이미 로컬에서 삭제됨)
     }
   }
 }

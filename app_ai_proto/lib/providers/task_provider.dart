@@ -199,11 +199,8 @@ class TaskProvider with ChangeNotifier {
     _tasks.removeWhere((task) => task.id == taskId);
     notifyListeners();
 
-    // 백그라운드에서 저장
-    _saveTasksInBackground();
-
-    // 알람 취소
-    _alarmService.cancelAlarm(taskId);
+    // 백그라운드에서 저장 및 알람 취소
+    _processDeletionInBackground([taskId]);
   }
 
   // 백그라운드에서 일정 저장
@@ -217,14 +214,51 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
+  // 백그라운드에서 삭제 처리 (저장 + 알람 취소)
+  Future<void> _processDeletionInBackground(List<String> taskIds) async {
+    try {
+      // 저장과 알람 취소를 병렬로 처리
+      await Future.wait([
+        _saveTasksInBackground(),
+        _cancelAlarmsInBackground(taskIds),
+      ]);
+      print('✅ 백그라운드 삭제 처리 완료: ${taskIds.length}개');
+
+      // 삭제 후 지연된 동기화 (사용자 경험 개선)
+      _scheduleDelayedSync();
+    } catch (e) {
+      print('❌ 백그라운드 삭제 처리 실패: $e');
+    }
+  }
+
+  // 지연된 동기화 스케줄링
+  void _scheduleDelayedSync() {
+    // 5초 후에 동기화 실행 (사용자가 다른 작업을 할 시간 확보)
+    Future.delayed(const Duration(seconds: 5), () {
+      _syncInBackground();
+    });
+  }
+
+  // 백그라운드에서 알람 취소
+  Future<void> _cancelAlarmsInBackground(List<String> taskIds) async {
+    try {
+      for (final id in taskIds) {
+        _alarmService.cancelAlarm(id);
+      }
+      print('✅ 백그라운드 알람 취소 완료: ${taskIds.length}개');
+    } catch (e) {
+      print('❌ 백그라운드 알람 취소 실패: $e');
+    }
+  }
+
   // 일정 여러 개 삭제 (일괄)
   Future<void> deleteTasks(List<String> taskIds) async {
-    await _taskService.deleteTasks(taskIds);
-    await loadTasks();
+    // 메모리에서 먼저 제거 (즉시 UI 반영)
+    _tasks.removeWhere((task) => taskIds.contains(task.id));
+    notifyListeners();
 
-    for (final id in taskIds) {
-      _alarmService.cancelAlarm(id);
-    }
+    // 백그라운드에서 저장 및 알람 취소
+    _processDeletionInBackground(taskIds);
   }
 
   // 일정 완료 상태 토글
