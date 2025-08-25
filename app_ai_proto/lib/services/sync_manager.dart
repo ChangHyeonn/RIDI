@@ -70,11 +70,29 @@ class SyncManager {
       print('🔄 증분 동기화 시작...');
       
       final lastSync = await getLastSyncTime();
+<<<<<<< HEAD
       final serverTasks = await NetworkService.fetchSchedulesFromServer('user123', lastSync);
+=======
+      print('📅 마지막 동기화 시간: $lastSync');
+      
+      final serverTasks = await NetworkService.fetchSchedulesFromServer('user123', lastSync);
+      print('📥 서버에서 ${serverTasks.length}개 일정 가져옴');
+      
+      // 서버 일정 상세 출력
+      for (int i = 0; i < serverTasks.length; i++) {
+        final task = serverTasks[i];
+        print('  서버 ${i + 1}. ${task.title} (${task.date}) - 반복: ${task.isRecurring}');
+      }
+>>>>>>> app_ai
       
       if (serverTasks.isNotEmpty) {
         print('📥 서버에서 ${serverTasks.length}개 변경사항 가져옴');
         await _mergeSchedules(serverTasks, false);
+<<<<<<< HEAD
+=======
+      } else {
+        print('ℹ️ 서버에서 새로운 일정이 없습니다');
+>>>>>>> app_ai
       }
       
       // 동기화 시간 업데이트
@@ -83,13 +101,25 @@ class SyncManager {
       print('✅ 증분 동기화 완료');
     } catch (e) {
       print('❌ 증분 동기화 실패: $e');
+<<<<<<< HEAD
+=======
+      print('📋 상세 오류: ${e.toString()}');
+>>>>>>> app_ai
     }
   }
   
   // 일정 병합 (로컬과 서버)
   Future<void> _mergeSchedules(List<Task> serverTasks, bool serverPriority) async {
     try {
+<<<<<<< HEAD
       final localTasks = await _taskService.getTasks();
+=======
+      print('🔄 일정 병합 시작...');
+      
+      final localTasks = await _taskService.getTasks();
+      print('📊 로컬 일정 개수: ${localTasks.length}');
+      
+>>>>>>> app_ai
       final Map<String, Task> localTaskMap = {
         for (var task in localTasks) task.id: task
       };
@@ -103,7 +133,11 @@ class SyncManager {
         if (localTask == null) {
           // 서버에만 있는 일정: 로컬에 추가
           mergedTasks.add(serverTask);
+<<<<<<< HEAD
           print('➕ 새 일정 추가: ${serverTask.title}');
+=======
+          print('➕ 새 일정 추가: ${serverTask.title} (ID: ${serverTask.id})');
+>>>>>>> app_ai
         } else {
           // 양쪽에 있는 일정: 우선순위에 따라 처리
           if (serverPriority) {
@@ -127,8 +161,18 @@ class SyncManager {
       await _taskService.saveTasks(mergedTasks);
       print('💾 병합된 일정 ${mergedTasks.length}개 저장');
       
+<<<<<<< HEAD
     } catch (e) {
       print('❌ 일정 병합 실패: $e');
+=======
+      // 병합 결과 확인
+      final savedTasks = await _taskService.getTasks();
+      print('📊 저장 후 일정 개수: ${savedTasks.length}');
+      
+    } catch (e) {
+      print('❌ 일정 병합 실패: $e');
+      print('📋 상세 오류: ${e.toString()}');
+>>>>>>> app_ai
     }
   }
   
