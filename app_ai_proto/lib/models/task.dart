@@ -21,15 +21,52 @@ class RecurrenceInfo {
   }
 
   factory RecurrenceInfo.fromJson(Map<String, dynamic> json) {
+    // 필수 필드 검증
+    final type = json['type']?.toString();
+    if (type == null) {
+      throw FormatException('RecurrenceInfo.fromJson: type은 필수 필드입니다. JSON: $json');
+    }
+    
+    // times 필드 안전하게 파싱
+    List<RecurrenceTime> times = [];
+    if (json['times'] != null && json['times'] is List) {
+      try {
+        times = (json['times'] as List)
+            .map((time) => RecurrenceTime.fromJson(time))
+            .toList();
+      } catch (e) {
+        // RecurrenceTime 파싱 실패는 무시 (빈 리스트 사용)
+        times = [];
+      }
+    }
+    
+    // endDate 필드 안전하게 파싱
+    DateTime? endDate;
+    if (json['endDate'] != null) {
+      try {
+        endDate = DateTime.parse(json['endDate']);
+      } catch (e) {
+        // endDate 파싱 실패는 무시 (null 사용)
+        endDate = null;
+      }
+    }
+    
+    // daysOfWeek 필드 안전하게 파싱
+    List<int>? daysOfWeek;
+    if (json['daysOfWeek'] != null && json['daysOfWeek'] is List) {
+      try {
+        daysOfWeek = List<int>.from(json['daysOfWeek']);
+      } catch (e) {
+        // daysOfWeek 파싱 실패는 무시 (null 사용)
+        daysOfWeek = null;
+      }
+    }
+    
     return RecurrenceInfo(
-      type: json['type'],
-      times: (json['times'] as List)
-          .map((time) => RecurrenceTime.fromJson(time))
-          .toList(),
-      endDate: json['endDate'] != null ? DateTime.parse(json['endDate']) : null,
-      daysOfWeek: json['daysOfWeek'] != null
-          ? List<int>.from(json['daysOfWeek'])
-          : null,
+      type: type,
+      times: times,
+      endDate: endDate,
+      daysOfWeek: daysOfWeek,
     );
   }
 }
@@ -45,7 +82,14 @@ class RecurrenceTime {
   }
 
   factory RecurrenceTime.fromJson(Map<String, dynamic> json) {
-    return RecurrenceTime(time: json['time'], label: json['label']);
+    final time = json['time']?.toString();
+    final label = json['label']?.toString();
+    
+    if (time == null || label == null) {
+      throw FormatException('RecurrenceTime.fromJson: time과 label은 필수 필드입니다. JSON: $json');
+    }
+    
+    return RecurrenceTime(time: time, label: label);
   }
 }
 
@@ -106,17 +150,79 @@ class Task {
   }
 
   factory Task.fromJson(Map<String, dynamic> json) {
+    // 디버깅 모드 (개발 시에만 활성화)
+    const bool debugMode = false;
+    
+    // 필수 필드 검증
+    final id = json['id']?.toString();
+    final title = json['title']?.toString();
+    
+    if (id == null || title == null) {
+      throw FormatException('Task.fromJson: id와 title은 필수 필드입니다. JSON: $json');
+    }
+    
+    // datetime 필드 처리 (AI 서버 응답용)
+    DateTime? dateTime;
+    String? dateTimeSource; // 디버깅용
+    
+    // 1. datetime 필드 우선 시도
+    if (json['datetime'] != null) {
+      try {
+        dateTime = DateTime.parse(json['datetime']);
+        dateTimeSource = 'datetime';
+        if (debugMode) print('📅 Task.fromJson: datetime 파싱 성공 - $dateTime');
+      } catch (e) {
+        if (debugMode) print('⚠️ Task.fromJson: datetime 파싱 실패 - ${json['datetime']}');
+        // 파싱 실패 시 로그만 남기고 계속 진행
+      }
+    }
+    
+    // 2. date 필드 시도 (datetime이 없거나 실패한 경우)
+    if (dateTime == null && json['date'] != null) {
+      try {
+        dateTime = DateTime.parse(json['date']);
+        dateTimeSource = 'date';
+        if (debugMode) print('📅 Task.fromJson: date 파싱 성공 - $dateTime');
+      } catch (e) {
+        if (debugMode) print('⚠️ Task.fromJson: date 파싱 실패 - ${json['date']}');
+        // 파싱 실패 시 로그만 남기고 계속 진행
+      }
+    }
+    
+    // 3. 스마트 기본값 결정
+    if (dateTime == null) {
+      // 삭제 화면에서는 시간 정보가 없어도 괜찮음
+      // 현재 시간 대신 오늘 날짜의 기본 시간 사용
+      final now = DateTime.now();
+      dateTime = DateTime(now.year, now.month, now.day, 12, 0); // 오늘 정오
+      dateTimeSource = 'default_noon';
+      if (debugMode) print('📅 Task.fromJson: 기본값 사용 - $dateTime');
+    }
+    
+    // RecurrenceInfo 안전하게 파싱
+    RecurrenceInfo? recurrence;
+    if (json['recurrence'] != null) {
+      try {
+        recurrence = RecurrenceInfo.fromJson(json['recurrence']);
+        if (debugMode) print('🔄 Task.fromJson: RecurrenceInfo 파싱 성공');
+      } catch (e) {
+        if (debugMode) print('⚠️ Task.fromJson: RecurrenceInfo 파싱 실패 - $e');
+        // RecurrenceInfo 파싱 실패는 무시 (선택적 필드)
+        recurrence = null;
+      }
+    }
+    
+    if (debugMode) print('✅ Task.fromJson: 완료 - $title ($dateTimeSource)');
+    
     return Task(
-      id: json['id'],
-      title: json['title'],
-      date: DateTime.parse(json['date']),
+      id: id,
+      title: title,
+      date: dateTime,
       isCompleted: json['isCompleted'] ?? false,
       isImportant: json['isImportant'] ?? false,
       category: json['category'] ?? '일반',
       isRecurring: json['isRecurring'] ?? false,
-      recurrence: json['recurrence'] != null
-          ? RecurrenceInfo.fromJson(json['recurrence'])
-          : null,
+      recurrence: recurrence,
     );
   }
 }

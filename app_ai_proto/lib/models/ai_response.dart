@@ -62,15 +62,37 @@ class AIResponse {
     // 구형 응답 구조 처리 (action + text_response)
     AIAction? action;
     TextResponse? textResponse;
+    
+    print('🔍 JSON 키들: ${json.keys.toList()}');
+    print('🔍 action 필드 존재 여부: ${json.containsKey('action')}');
+    print('🔍 text_response 필드 존재 여부: ${json.containsKey('text_response')}');
 
     if (json.containsKey('action')) {
       print('🔍 구형 action 발견');
-      action = AIAction.fromJson(json['action']);
+      print('🔍 action 데이터: ${json['action']}');
+      try {
+        action = AIAction.fromJson(json['action']);
+        print('🔍 AIAction 파싱 성공 - type: ${action?.type}');
+      } catch (e) {
+        print('❌ AIAction 파싱 실패: $e');
+        action = null;
+      }
+    } else {
+      print('⚠️ action 필드 없음');
     }
 
     if (json.containsKey('text_response')) {
       print('🔍 구형 text_response 발견');
-      textResponse = TextResponse.fromJson(json['text_response']);
+      print('🔍 text_response 데이터: ${json['text_response']}');
+      try {
+        textResponse = TextResponse.fromJson(json['text_response']);
+        print('🔍 TextResponse 파싱 성공 - text: ${textResponse?.text}');
+      } catch (e) {
+        print('❌ TextResponse 파싱 실패: $e');
+        textResponse = null;
+      }
+    } else {
+      print('⚠️ text_response 필드 없음');
     }
 
     final response = AIResponse(
@@ -156,17 +178,37 @@ class AIAction {
   });
 
   factory AIAction.fromJson(Map<String, dynamic> json) {
+    print('🔍 AIAction.fromJson 시작');
+    print('🔍 AIAction JSON 데이터: $json');
+    
+    final type = json['type'] ?? '';
+    final priority = json['priority'] ?? 'medium';
+    final isImportant = json['is_important'] == true;
+    
     final dynamic rawData = json['data'];
     final Map<String, dynamic> data = rawData is Map
         ? Map<String, dynamic>.from(rawData)
         : <String, dynamic>{};
-    return AIAction(
-      type: json['type'] ?? '',
-      priority: json['priority'] ?? 'medium',
-      isImportant: json['is_important'] == true,
+    
+    print('🔍 AIAction 파싱 결과:');
+    print('  - type: $type');
+    print('  - priority: $priority');
+    print('  - isImportant: $isImportant');
+    print('  - data 키들: ${data.keys.toList()}');
+    
+    final uiInstructions = UIInstructions.fromJson(json['ui_instructions'] ?? {});
+    print('🔍 UIInstructions 파싱 완료');
+    
+    final result = AIAction(
+      type: type,
+      priority: priority,
+      isImportant: isImportant,
       data: data,
-      uiInstructions: UIInstructions.fromJson(json['ui_instructions'] ?? {}),
+      uiInstructions: uiInstructions,
     );
+    
+    print('🔍 AIAction 생성 완료 - type: ${result.type}');
+    return result;
   }
 
   Map<String, dynamic> toJson() {
@@ -203,24 +245,53 @@ class UIInstructions {
   final String? screen;
   final bool? refreshData;
   final bool? showConfirmation;
+  final bool? showVisualList;  // 시각적 목록 표시
+  final bool? groupByDate;     // 날짜별 그룹핑
+  final bool? highlightImportant; // 중요한 일정 강조
+  final int? totalCount;       // 총 일정 개수
+  final String? searchKeyword; // 검색 키워드
+  final Map<String, dynamic>? dateRange; // 날짜 범위
   final NotificationInfo? notification;
 
   UIInstructions({
     this.screen,
     this.refreshData,
     this.showConfirmation,
+    this.showVisualList,
+    this.groupByDate,
+    this.highlightImportant,
+    this.totalCount,
+    this.searchKeyword,
+    this.dateRange,
     this.notification,
   });
 
   factory UIInstructions.fromJson(Map<String, dynamic> json) {
-    return UIInstructions(
+    print('🔍 UIInstructions.fromJson 시작');
+    print('🔍 json 데이터: $json');
+    
+    final showVisualList = json['show_visual_list'];
+    print('🔍 show_visual_list 원본값: $showVisualList (타입: ${showVisualList.runtimeType})');
+    
+    final result = UIInstructions(
       screen: json['screen'],
       refreshData: json['refresh_data'],
       showConfirmation: json['show_confirmation'],
+      showVisualList: showVisualList,
+      groupByDate: json['group_by_date'],
+      highlightImportant: json['highlight_important'],
+      totalCount: json['total_count'],
+      searchKeyword: json['search_keyword'],
+      dateRange: json['date_range'] != null 
+          ? Map<String, dynamic>.from(json['date_range'])
+          : null,
       notification: json['notification'] != null
           ? NotificationInfo.fromJson(json['notification'])
           : null,
     );
+    
+    print('🔍 UIInstructions 생성 완료 - showVisualList: ${result.showVisualList}');
+    return result;
   }
 
   Map<String, dynamic> toJson() {
@@ -228,6 +299,12 @@ class UIInstructions {
       'screen': screen,
       'refresh_data': refreshData,
       'show_confirmation': showConfirmation,
+      'show_visual_list': showVisualList,
+      'group_by_date': groupByDate,
+      'highlight_important': highlightImportant,
+      'total_count': totalCount,
+      'search_keyword': searchKeyword,
+      'date_range': dateRange,
       'notification': notification?.toJson(),
     }..removeWhere((k, v) => v == null);
   }

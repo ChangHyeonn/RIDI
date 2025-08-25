@@ -4,8 +4,14 @@ import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'providers/task_provider.dart';
 import 'screens/login_screen.dart';
+import 'screens/schedule_list_screen.dart';
+import 'screens/delete_schedule_screen.dart';
+import 'models/task.dart';
 import 'services/alarm_service.dart';
 import 'permissions_init.dart';
+
+// 전역 NavigatorKey 정의
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   // iOS 18.6 검은 화면 문제 해결을 위한 초기화 순서
@@ -49,6 +55,36 @@ class MyApp extends StatelessWidget {
         ],
         supportedLocales: const [Locale('ko', 'KR')],
         home: const LoginScreen(),
+        routes: {
+          '/delete-schedule': (context) {
+            final arguments = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+            if (arguments != null) {
+              return DeleteScheduleScreen(
+                schedules: arguments['schedules'] as List<Task>,
+                searchCriteria: arguments['searchCriteria'] as String,
+              );
+            } else {
+              // arguments가 없는 경우 빈 화면 반환
+              return const Scaffold(
+                body: Center(child: Text('삭제할 일정이 없습니다.')),
+              );
+            }
+          },
+          '/schedule-list': (context) {
+            final arguments = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+            if (arguments != null) {
+              return ScheduleListScreen(
+                schedules: arguments['schedules'] as List<Task>,
+                searchCriteria: arguments['searchCriteria'] as String,
+              );
+            } else {
+              // arguments가 없는 경우 빈 화면 반환
+              return const Scaffold(
+                body: Center(child: Text('조회할 일정이 없습니다.')),
+              );
+            }
+          },
+        },
         debugShowCheckedModeBanner: false,
       ),
     );

@@ -12,11 +12,13 @@ import '../models/ai_response.dart';
 import '../models/task.dart';
 import '../providers/task_provider.dart';
 import '../main.dart';
+import 'action_handler.dart';
 
 class RecordService {
   final SpeechToTextService _sttService = SpeechToTextService();
   final TextToSpeechService _ttsService = TextToSpeechService();
   TaskProvider? _taskProvider; // TaskProvider 참조 추가
+  BuildContext? _context; // Context 참조 추가
 
   bool _isRecording = false;
   bool _isPlaying = false;
@@ -454,6 +456,12 @@ class RecordService {
         case 'schedule_delete':
           await _handleScheduleDelete(action);
           break;
+        case 'schedule_delete_visual':
+          await _handleScheduleDeleteVisual(action);
+          break;
+        case 'schedule_read_visual':
+          await _handleScheduleReadVisual(action);
+          break;
         case 'schedule_modify':
           await _handleScheduleModify(action);
           break;
@@ -578,13 +586,19 @@ class RecordService {
         parsedDateTime = DateTime.now();
       }
 
-      // 지난 시간 검증 (가이드 방식에 따른 체계적 에러 처리)
+      // 반복 일정 여부 확인 (시간 검증 전에)
+      bool isRecurring =
+          scheduleData['is_recurring'] == true ||
+          scheduleData['recurrence'] != null;
+
+      // 지난 시간 검증 (반복 일정의 경우 첫 번째 일정이 지난 시간이어도 허용)
       final now = DateTime.now();
-      if (parsedDateTime.isBefore(now)) {
+      if (parsedDateTime.isBefore(now) && !isRecurring) {
         print('❌ 지난 시간의 일정은 추가할 수 없습니다');
         print('  - 일정 시간: $parsedDateTime');
         print('  - 현재 시간: $now');
         print('  - 차이: ${now.difference(parsedDateTime).inMinutes}분 전');
+        print('  - 반복 일정 여부: $isRecurring');
 
         // 가이드 방식에 따른 체계적 에러 메시지 생성
         String errorMessage;
@@ -617,6 +631,13 @@ class RecordService {
         return; // 일정 추가 중단 (가이드의 success: false 방식과 유사)
       }
 
+      if (isRecurring && parsedDateTime.isBefore(now)) {
+        print('✅ 반복 일정의 첫 번째 일정이 지난 시간이지만 허용됨');
+        print('  - 일정 시간: $parsedDateTime');
+        print('  - 현재 시간: $now');
+        print('  - 반복 일정: $isRecurring');
+      }
+
       print('✅ 일정 시간 검증 통과: $parsedDateTime (현재 시간: $now)');
 
       // 서버에서 받은 카테고리와 중요도 정보 확인
@@ -630,10 +651,7 @@ class RecordService {
           scheduleData['priority'] == 'high' ||
           category == '건강';
 
-      // 반복 일정 정보 처리 (서버 포맷 다양성 허용)
-      bool isRecurring =
-          scheduleData['is_recurring'] == true ||
-          scheduleData['recurrence'] != null;
+      // 반복 일정 정보 처리 (서버 포맷 다양성 허용) - 이미 위에서 확인됨
       RecurrenceInfo? recurrence;
 
       if (scheduleData['recurrence'] != null) {
@@ -773,13 +791,19 @@ class RecordService {
           parsedDateTime = DateTime.now();
         }
 
-        // 지난 시간 검증 (가이드 방식에 따른 체계적 에러 처리)
+        // 반복 일정 여부 확인 (시간 검증 전에)
+        bool isRecurring =
+            scheduleData['is_recurring'] == true ||
+            scheduleData['recurrence'] != null;
+
+        // 지난 시간 검증 (반복 일정의 경우 첫 번째 일정이 지난 시간이어도 허용)
         final now = DateTime.now();
-        if (parsedDateTime.isBefore(now)) {
+        if (parsedDateTime.isBefore(now) && !isRecurring) {
           print('❌ 지난 시간의 일정은 추가할 수 없습니다');
           print('  - 일정 시간: $parsedDateTime');
           print('  - 현재 시간: $now');
           print('  - 차이: ${now.difference(parsedDateTime).inMinutes}분 전');
+          print('  - 반복 일정 여부: $isRecurring');
 
           // 가이드 방식에 따른 체계적 에러 메시지 생성
           String errorMessage;
@@ -812,6 +836,13 @@ class RecordService {
           return; // 일정 추가 중단 (가이드의 success: false 방식과 유사)
         }
 
+        if (isRecurring && parsedDateTime.isBefore(now)) {
+          print('✅ 반복 일정의 첫 번째 일정이 지난 시간이지만 허용됨');
+          print('  - 일정 시간: $parsedDateTime');
+          print('  - 현재 시간: $now');
+          print('  - 반복 일정: $isRecurring');
+        }
+
         // 서버에서 받은 카테고리와 중요도 정보 확인
         print('🔍 원본 scheduleData: $scheduleData');
         print('🔍 scheduleData 타입: ${scheduleData.runtimeType}');
@@ -831,10 +862,7 @@ class RecordService {
         print('  - priority: ${scheduleData['priority']}');
         print('  - 최종 중요도: $isImportant');
 
-        // 반복 일정 정보 파싱 (action 경로)
-        bool isRecurring =
-            scheduleData['is_recurring'] == true ||
-            scheduleData['recurrence'] != null;
+        // 반복 일정 정보 파싱 (action 경로) - 이미 위에서 확인됨
         RecurrenceInfo? recurrence;
         if (scheduleData['recurrence'] != null) {
           try {
@@ -940,7 +968,29 @@ class RecordService {
 
   // TaskProvider 인스턴스 가져오기
   TaskProvider? _getTaskProvider() {
-    return _taskProvider;
+    if (_taskProvider != null) return _taskProvider;
+    try {
+      if (navigatorKey.currentContext != null) {
+        final tp = Provider.of<TaskProvider>(navigatorKey.currentContext!, listen: false);
+        _taskProvider = tp;
+        print('✅ RecordService: navigatorKey로 TaskProvider 획득');
+        return tp;
+      }
+    } catch (e) {
+      print('⚠️ RecordService: TaskProvider 자동 획득 실패: $e');
+    }
+    return null;
+  }
+
+  // Context 설정 메서드
+  void setContext(BuildContext context) {
+    _context = context;
+    print('✅ Context 설정 완료');
+  }
+
+  // Context 가져오기 메서드
+  BuildContext? _getContext() {
+    return _context;
   }
 
   // 명확화 요청 처리
@@ -1047,8 +1097,80 @@ class RecordService {
       } else {
         print('❌ TaskProvider에 접근할 수 없습니다');
       }
+      
+      // ActionHandler 호출 추가
+      print('🔍 ActionHandler 호출 시도');
+      try {
+        final context = _getContext();
+        if (context != null) {
+          print('🔍 ActionHandler.handleAction 호출');
+          ActionHandler.handleAction(action, context);
+          print('✅ ActionHandler.handleAction 호출 완료');
+        } else {
+          print('❌ Context를 가져올 수 없습니다');
+        }
+      } catch (e) {
+        print('❌ ActionHandler 호출 중 오류: $e');
+      }
     } catch (e) {
       print('❌ 일정 조회 처리 중 오류: $e');
+    }
+  }
+
+  // 시각적 일정 삭제 처리
+  Future<void> _handleScheduleDeleteVisual(AIAction action) async {
+    try {
+      print('📅 시각적 일정 삭제 처리 시작');
+      
+      // 전역 navigatorKey를 사용하여 네비게이션 처리
+      if (navigatorKey.currentContext != null) {
+        // ActionHandler를 통해 시각적 삭제 화면으로 이동
+        ActionHandler.handleScheduleDeleteVisual(action, navigatorKey.currentContext!);
+        print('✅ 시각적 삭제 화면으로 이동 완료');
+      } else {
+        print('❌ 전역 Context를 가져올 수 없습니다');
+        // 대안: UI 지시사항을 통해 화면 이동 시도
+        print('🔄 UI 지시사항을 통한 화면 이동 시도');
+        _tryNavigateToDeleteScreen(action);
+      }
+    } catch (e) {
+      print('❌ 시각적 일정 삭제 처리 중 오류: $e');
+    }
+  }
+  
+  // UI 지시사항을 통한 삭제 화면 이동 시도
+  void _tryNavigateToDeleteScreen(AIAction action) {
+    try {
+      final taskData = action.data;
+      final searchCriteria = taskData['search_criteria'] as Map<String, dynamic>? ?? {};
+      final foundSchedules = taskData['found_schedules'] as List<dynamic>? ?? [];
+      
+      // Task 객체로 변환
+      final tasks = foundSchedules.map((schedule) {
+        return Task.fromJson(schedule);
+      }).toList();
+      
+      // 검색 기준 텍스트 생성
+      final title = searchCriteria['title'] as String? ?? '';
+      final date = searchCriteria['date'] as String? ?? '';
+      final searchText = title.isNotEmpty ? title : date;
+      
+      // 전역 navigatorKey를 사용하여 화면 이동
+      if (navigatorKey.currentContext != null) {
+        Navigator.pushNamed(
+          navigatorKey.currentContext!,
+          '/delete-schedule',
+          arguments: {
+            'schedules': tasks,
+            'searchCriteria': searchText,
+          },
+        );
+        print('✅ 삭제 화면으로 이동 완료 (UI 지시사항 경로)');
+      } else {
+        print('❌ 전역 Context를 가져올 수 없어 화면 이동 실패');
+      }
+    } catch (e) {
+      print('❌ UI 지시사항을 통한 화면 이동 실패: $e');
     }
   }
 
@@ -1076,6 +1198,44 @@ class RecordService {
       }
     } catch (e) {
       print('❌ 일정 삭제 처리 중 오류: $e');
+    }
+  }
+
+  // 시각적 일정 조회 처리
+  Future<void> _handleScheduleReadVisual(AIAction action) async {
+    try {
+      print('📅 시각적 일정 조회 처리 시작');
+      
+      final taskData = action.data;
+      final searchCriteria = taskData['search_criteria'] as Map<String, dynamic>? ?? {};
+      final foundSchedules = taskData['found_schedules'] as List<dynamic>? ?? [];
+      
+      // Task 객체로 변환
+      final tasks = foundSchedules.map((schedule) {
+        return Task.fromJson(schedule);
+      }).toList();
+      
+      // 검색 기준 텍스트 생성
+      final title = searchCriteria['title'] as String? ?? '';
+      final date = searchCriteria['date'] as String? ?? '';
+      final searchText = title.isNotEmpty ? title : (date.isNotEmpty ? date : '일정');
+      
+      // 전역 navigatorKey를 사용하여 화면 이동
+      if (navigatorKey.currentContext != null) {
+        Navigator.pushNamed(
+          navigatorKey.currentContext!,
+          '/schedule-list',
+          arguments: {
+            'schedules': tasks,
+            'searchCriteria': searchText,
+          },
+        );
+        print('✅ 일정 조회 화면으로 이동 완료');
+      } else {
+        print('❌ 전역 Context를 가져올 수 없어 화면 이동 실패');
+      }
+    } catch (e) {
+      print('❌ 시각적 일정 조회 처리 오류: $e');
     }
   }
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
+import '../models/task.dart';
 import '../constants/categories.dart';
+import '../widgets/global_voice_button.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
 import 'date_detail_screen.dart';
@@ -78,107 +80,126 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     return '${date.month}월 ${date.day}일';
   }
 
+  // 반복 일정 타입 표시
+  String _getRecurrenceText(Task task) {
+    if (!task.isRecurring || task.recurrence == null) {
+      return '반복';
+    }
+    
+    switch (task.recurrence!.type) {
+      case 'daily':
+        return '매일';
+      case 'weekdays':
+        return '평일';
+      case 'weekends':
+        return '주말';
+      case 'custom_days':
+        // 특정 요일인 경우 요일 정보 표시
+        if (task.recurrence!.daysOfWeek != null && task.recurrence!.daysOfWeek!.isNotEmpty) {
+          final dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+          final selectedDays = task.recurrence!.daysOfWeek!
+              .map((day) => dayNames[day])
+              .join(', ');
+          return '매주 $selectedDays';
+        }
+        return '특정 요일';
+      default:
+        return '반복';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFfafafa), // 밝은 배경
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFfafafa), // 밝은 회색
-              Color(0xFFf5f5f5), // 더 밝은 회색
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Consumer<TaskProvider>(
-                builder: (context, taskProvider, child) {
-                  if (taskProvider.isLoading) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(0xFF6366f1),
-                        ),
+      backgroundColor: const Color(0xFFfafafa),
+      floatingActionButton: const GlobalVoiceButton(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      body: SafeArea(
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: Consumer<TaskProvider>(
+              builder: (context, taskProvider, child) {
+                if (taskProvider.isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF6366f1),
                       ),
-                    );
-                  }
+                    ),
+                  );
+                }
 
-                  final todayTasks = taskProvider.getTodayTasks();
-                  final tomorrowTasks = taskProvider.getTomorrowTasks();
-                  final fontSize = taskProvider.fontSize;
+                final todayTasks = taskProvider.getTodayTasks();
+                final tomorrowTasks = taskProvider.getTomorrowTasks();
+                final fontSize = taskProvider.fontSize;
 
-                  return Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      children: [
-                        // 하단 기존 버튼 영역을 재사용하므로 상단 액션 제거
-                        // 메인 콘텐츠 영역 (헤더 없이 바로 시작)
-                        Expanded(
-                          child: Column(
-                            children: [
-                              // 오늘/내일 패널
-                              Expanded(
-                                flex: 3,
-                                child: Column(
-                                  children: [
-                                    // 오늘 패널
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  DateDetailScreen(
-                                                    date: DateTime.now(),
-                                                    title: '오늘',
-                                                  ),
-                                            ),
-                                          );
-                                        },
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(
-                                              24,
-                                            ),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withOpacity(
-                                                  0.08,
+                return Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    children: [
+                      // 하단 기존 버튼 영역을 재사용하므로 상단 액션 제거
+                      // 메인 콘텐츠 영역 (헤더 없이 바로 시작)
+                      Expanded(
+                        child: Column(
+                          children: [
+                            // 오늘/내일 패널
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                children: [
+                                  // 오늘 패널
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                DateDetailScreen(
+                                                  date: DateTime.now(),
+                                                  title: '오늘',
                                                 ),
-                                                blurRadius: 20,
-                                                offset: const Offset(0, 8),
-                                              ),
-                                            ],
                                           ),
-                                          padding: const EdgeInsets.all(12),
-                                          child: LayoutBuilder(
-                                            builder: (context, constraints) {
-                                              final scaleFactor =
-                                                  0.75 + (fontSize * 0.5);
-                                              final titleFontSize =
-                                                  (20 + 5) * scaleFactor;
-                                              final taskFontSize =
-                                                  (14 + 5) * scaleFactor;
+                                        );
+                                      },
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(
+                                            24,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                0.08,
+                                              ),
+                                              blurRadius: 20,
+                                              offset: const Offset(0, 8),
+                                            ),
+                                          ],
+                                        ),
+                                        padding: const EdgeInsets.all(12),
+                                        child: LayoutBuilder(
+                                          builder: (context, constraints) {
+                                            final scaleFactor =
+                                                0.75 + (fontSize * 0.5);
+                                            final titleFontSize =
+                                                (20 + 5) * scaleFactor;
+                                            final taskFontSize =
+                                                (14 + 5) * scaleFactor;
 
-                                              final panelHeight =
-                                                  constraints.maxHeight;
-                                              final topPadding = 4.0; // 여백 더 줄임
-                                              final bottomPadding =
-                                                  4.0; // 여백 더 줄임
-                                              final headerHeight =
-                                                  titleFontSize + 12;
-                                              final buttonHeight = 40.0;
-                                              final spaceBetweenTitleAndTasks =
-                                                  8 * scaleFactor; // 여백 줄임
+                                            final panelHeight =
+                                                constraints.maxHeight;
+                                            final topPadding = 4.0; // 여백 더 줄임
+                                            final bottomPadding =
+                                                4.0; // 여백 더 줄임
+                                            final headerHeight =
+                                                titleFontSize + 12;
+                                            final buttonHeight = 40.0;
+                                            final spaceBetweenTitleAndTasks =
+                                                8 * scaleFactor; // 여백 줄임
 
                                               final fixedHeight =
                                                   topPadding +
@@ -709,7 +730,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                                                 scaleFactor,
                                                                                           ),
                                                                                           Text(
-                                                                                            '반복',
+                                                                                            _getRecurrenceText(task),
                                                                                             style: TextStyle(
                                                                                               fontSize:
                                                                                                   12 *
@@ -1666,39 +1687,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                 ),
                               ),
                               const SizedBox(width: 16),
-                              // 중앙: 녹음 버튼 (원형 빨간 버튼)
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const RecordScreen(),
-                                    ),
-                                  );
-                                },
-                                child: Container(
-                                  width: 72,
-                                  height: 72,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFD35445),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: const Color(0xFF263238),
-                                      width: 6,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.12,
-                                        ),
-                                        blurRadius: 12,
-                                        offset: const Offset(0, 6),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                              // 중앙: 빈 공간 (전역 음성 버튼으로 대체됨)
+                              const SizedBox(width: 72),
                               const SizedBox(width: 16),
                               // 우측: 설정 버튼 (원래 카드 스타일)
                               Expanded(
@@ -1765,7 +1755,6 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
             ),
           ),
         ),
-      ),
     );
   }
 
