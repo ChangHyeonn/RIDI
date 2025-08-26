@@ -229,7 +229,7 @@ class RecordService {
 
       // 음성 인식 시작 (권한은 이미 RecordScreen에서 확인됨)
       final success = await _sttService.startListening(
-        localeId: 'ko_KR',
+        // localeId를 강제하지 않고 기기 지원 로케일을 서비스 내부에서 선택
         partialResults: true,
         onDevice: false,
         assumePermissionGranted: true,
@@ -287,9 +287,9 @@ class RecordService {
       print('📏 텍스트 길이: ${text.length}');
       print('❓ 명확화 모드: $_isClarificationMode');
 
-      // 텍스트 유효성 검증
-      if (!_isValidTextForAI(text)) {
-        print('⚠️ 유효하지 않은 텍스트는 AI로 전송하지 않습니다: "$text"');
+      // 텍스트 유효성 검증 최소화 — 서버 판단 우선
+      if (text.trim().isEmpty) {
+        print('⚠️ 빈 텍스트는 전송하지 않습니다.');
         _aiResponseStreamController.add('음성을 다시 말씀해주세요.');
         return;
       }
@@ -366,7 +366,7 @@ class RecordService {
         print('  - responseText: ${aiResponse.responseText}');
         print('⚠️ AI 서버 실패했지만 STT 텍스트는 저장됨: "$text"');
 
-        // APP_INTEGRATION_GUIDE에 따른 에러 처리
+        // 서버 지시에 따른 에러 처리만 수행
         await _handleErrorResponse(aiResponse);
       }
 
@@ -586,59 +586,7 @@ class RecordService {
         parsedDateTime = DateTime.now();
       }
 
-      // 반복 일정 여부 확인 (시간 검증 전에)
-      bool isRecurring =
-          scheduleData['is_recurring'] == true ||
-          scheduleData['recurrence'] != null;
-
-      // 지난 시간 검증 (반복 일정의 경우 첫 번째 일정이 지난 시간이어도 허용)
-      final now = DateTime.now();
-      if (parsedDateTime.isBefore(now) && !isRecurring) {
-        print('❌ 지난 시간의 일정은 추가할 수 없습니다');
-        print('  - 일정 시간: $parsedDateTime');
-        print('  - 현재 시간: $now');
-        print('  - 차이: ${now.difference(parsedDateTime).inMinutes}분 전');
-        print('  - 반복 일정 여부: $isRecurring');
-
-        // 가이드 방식에 따른 체계적 에러 메시지 생성
-        String errorMessage;
-        final timeDifference = now.difference(parsedDateTime);
-
-        if (timeDifference.inDays > 0) {
-          errorMessage = '지난 날짜의 일정은 추가할 수 없습니다. 미래의 날짜를 말씀해주세요.';
-        } else if (timeDifference.inHours > 0) {
-          errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
-        } else if (timeDifference.inMinutes > 0) {
-          errorMessage = '방금 지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
-        } else {
-          errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
-        }
-
-        // 가이드 방식에 따른 에러 처리
-        print('🚫 가이드 방식 에러 처리: $errorMessage');
-        _aiResponseText = errorMessage;
-        _aiResponseStreamController.add(_aiResponseText);
-
-        // TTS로 오류 메시지 재생 (가이드의 음성 피드백 방식)
-        try {
-          print('🔊 지난 시간 오류 메시지 TTS 재생 시작...');
-          await _ttsService.speak(_aiResponseText);
-          print('✅ 지난 시간 오류 메시지 TTS 재생 완료');
-        } catch (ttsError) {
-          print('❌ 지난 시간 오류 메시지 TTS 재생 실패: $ttsError');
-        }
-
-        return; // 일정 추가 중단 (가이드의 success: false 방식과 유사)
-      }
-
-      if (isRecurring && parsedDateTime.isBefore(now)) {
-        print('✅ 반복 일정의 첫 번째 일정이 지난 시간이지만 허용됨');
-        print('  - 일정 시간: $parsedDateTime');
-        print('  - 현재 시간: $now');
-        print('  - 반복 일정: $isRecurring');
-      }
-
-      print('✅ 일정 시간 검증 통과: $parsedDateTime (현재 시간: $now)');
+      // 시간 검증은 서버에서 수행 — 클라이언트는 서버 지시에만 따름
 
       // 서버에서 받은 카테고리와 중요도 정보 확인
       print('🔍 원본 scheduleData: $scheduleData');
@@ -651,55 +599,29 @@ class RecordService {
           scheduleData['priority'] == 'high' ||
           category == '건강';
 
-      // 반복 일정 정보 처리 (서버 포맷 다양성 허용) - 이미 위에서 확인됨
+      // 반복 일정 정보 처리
+      bool isRecurring = scheduleData['is_recurring'] ?? false;
       RecurrenceInfo? recurrence;
 
-      if (scheduleData['recurrence'] != null) {
+      if (isRecurring && scheduleData['recurrence'] != null) {
         try {
-          final recurrenceData = Map<String, dynamic>.from(
-            scheduleData['recurrence'],
-          );
-
-          // times: ["07:00", ...] 또는 [{"time":"07:00","label":"아침"}, ...]
-          final rawTimes = recurrenceData['times'] as List? ?? [];
-          final times = rawTimes.map((t) {
-            if (t is String) {
-              return RecurrenceTime(time: t, label: t);
-            } else if (t is Map<String, dynamic>) {
-              final timeStr = (t['time'] ?? '').toString();
-              final labelStr = (t['label'] ?? timeStr).toString();
-              return RecurrenceTime(time: timeStr, label: labelStr);
-            } else {
-              return RecurrenceTime(time: '00:00', label: '00:00');
-            }
-          }).toList();
-
-          // end_date: ISO 문자열 또는 null
-          DateTime? endDate;
-          if (recurrenceData['end_date'] != null) {
-            final ed = recurrenceData['end_date'];
-            if (ed is String && ed.isNotEmpty) {
-              try {
-                endDate = DateTime.parse(ed);
-              } catch (_) {}
-            }
-          }
-
-          // days_of_week: 정수/문자열 혼합 가능 → int 리스트로 정규화(0=월..6=일)
-          List<int>? daysOfWeek;
-          if (recurrenceData['days_of_week'] != null) {
-            final raw = recurrenceData['days_of_week'] as List;
-            daysOfWeek = raw.map((e) {
-              if (e is int) return e;
-              return int.tryParse(e.toString()) ?? 0;
-            }).toList();
-          }
+          final recurrenceData =
+              scheduleData['recurrence'] as Map<String, dynamic>;
+          final times =
+              (recurrenceData['times'] as List?)
+                  ?.map((time) => RecurrenceTime.fromJson(time))
+                  .toList() ??
+              [];
 
           recurrence = RecurrenceInfo(
-            type: (recurrenceData['type'] ?? 'daily').toString(),
+            type: recurrenceData['type'] ?? 'daily',
             times: times,
-            endDate: endDate,
-            daysOfWeek: daysOfWeek,
+            endDate: recurrenceData['end_date'] != null
+                ? DateTime.parse(recurrenceData['end_date'])
+                : null,
+            daysOfWeek: recurrenceData['days_of_week'] != null
+                ? List<int>.from(recurrenceData['days_of_week'])
+                : null,
           );
 
           print('📋 반복 일정 정보:');
@@ -710,8 +632,9 @@ class RecordService {
           print('  - 종료 날짜: ${recurrence.endDate}');
           print('  - 요일: ${recurrence.daysOfWeek}');
         } catch (e) {
-          print('⚠️ 반복 일정 정보 파싱 실패(관대한 처리 실패): $e');
-          // recurrence 파싱 실패해도 is_recurring은 false로 강등하지 않음
+          print('⚠️ 반복 일정 정보 파싱 실패: $e');
+          isRecurring = false;
+          recurrence = null;
         }
       }
 
@@ -766,9 +689,7 @@ class RecordService {
       final scheduleData = action.data;
       print('📋 일정 데이터: $scheduleData');
       print('📋 일정 데이터 타입: ${scheduleData.runtimeType}');
-      print(
-        '📋 일정 데이터 키들: ${scheduleData is Map ? scheduleData.keys.toList() : 'Map이 아님'}',
-      );
+      print('📋 일정 데이터 키들: ${scheduleData.keys.toList()}');
 
       // AI 서버 응답에서 일정 정보 파싱
       if (scheduleData is Map<String, dynamic>) {
@@ -791,59 +712,7 @@ class RecordService {
           parsedDateTime = DateTime.now();
         }
 
-        // 반복 일정 여부 확인 (시간 검증 전에)
-        bool isRecurring =
-            scheduleData['is_recurring'] == true ||
-            scheduleData['recurrence'] != null;
-
-        // 지난 시간 검증 (반복 일정의 경우 첫 번째 일정이 지난 시간이어도 허용)
-        final now = DateTime.now();
-        if (parsedDateTime.isBefore(now) && !isRecurring) {
-          print('❌ 지난 시간의 일정은 추가할 수 없습니다');
-          print('  - 일정 시간: $parsedDateTime');
-          print('  - 현재 시간: $now');
-          print('  - 차이: ${now.difference(parsedDateTime).inMinutes}분 전');
-          print('  - 반복 일정 여부: $isRecurring');
-
-          // 가이드 방식에 따른 체계적 에러 메시지 생성
-          String errorMessage;
-          final timeDifference = now.difference(parsedDateTime);
-
-          if (timeDifference.inDays > 0) {
-            errorMessage = '지난 날짜의 일정은 추가할 수 없습니다. 미래의 날짜를 말씀해주세요.';
-          } else if (timeDifference.inHours > 0) {
-            errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
-          } else if (timeDifference.inMinutes > 0) {
-            errorMessage = '방금 지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
-          } else {
-            errorMessage = '지난 시간의 일정은 추가할 수 없습니다. 미래의 시간을 말씀해주세요.';
-          }
-
-          // 가이드 방식에 따른 에러 처리
-          print('🚫 가이드 방식 에러 처리: $errorMessage');
-          _aiResponseText = errorMessage;
-          _aiResponseStreamController.add(_aiResponseText);
-
-          // TTS로 오류 메시지 재생 (가이드의 음성 피드백 방식)
-          try {
-            print('🔊 지난 시간 오류 메시지 TTS 재생 시작...');
-            await _ttsService.speak(_aiResponseText);
-            print('✅ 지난 시간 오류 메시지 TTS 재생 완료');
-          } catch (ttsError) {
-            print('❌ 지난 시간 오류 메시지 TTS 재생 실패: $ttsError');
-          }
-
-          return; // 일정 추가 중단 (가이드의 success: false 방식과 유사)
-        }
-
-        if (isRecurring && parsedDateTime.isBefore(now)) {
-          print('✅ 반복 일정의 첫 번째 일정이 지난 시간이지만 허용됨');
-          print('  - 일정 시간: $parsedDateTime');
-          print('  - 현재 시간: $now');
-          print('  - 반복 일정: $isRecurring');
-        }
-
-        // 서버에서 받은 카테고리와 중요도 정보 확인
+        // 서버에서 받은 카테고리와 중요도 정보 확인 (시간 검증은 서버에 위임)
         print('🔍 원본 scheduleData: $scheduleData');
         print('🔍 scheduleData 타입: ${scheduleData.runtimeType}');
 
@@ -854,15 +723,10 @@ class RecordService {
             scheduleData['priority'] == 'high' ||
             category == '건강';
 
-        print('📋 서버에서 받은 정보:');
-        print('  - 원본 category 값: ${scheduleData['category']}');
-        print('  - category 타입: ${scheduleData['category']?.runtimeType}');
-        print('  - 최종 카테고리: $category');
-        print('  - is_important: ${scheduleData['is_important']}');
-        print('  - priority: ${scheduleData['priority']}');
-        print('  - 최종 중요도: $isImportant');
-
-        // 반복 일정 정보 파싱 (action 경로) - 이미 위에서 확인됨
+        // 반복 일정 정보 처리 (액션 경로도 지원)
+        bool isRecurring =
+            scheduleData['is_recurring'] == true ||
+            scheduleData['recurrence'] != null;
         RecurrenceInfo? recurrence;
         if (scheduleData['recurrence'] != null) {
           try {
@@ -870,18 +734,11 @@ class RecordService {
               scheduleData['recurrence'],
             );
 
-            final rawTimes = recurrenceData['times'] as List? ?? [];
-            final times = rawTimes.map((t) {
-              if (t is String) {
-                return RecurrenceTime(time: t, label: t);
-              } else if (t is Map<String, dynamic>) {
-                final timeStr = (t['time'] ?? '').toString();
-                final labelStr = (t['label'] ?? timeStr).toString();
-                return RecurrenceTime(time: timeStr, label: labelStr);
-              } else {
-                return RecurrenceTime(time: '00:00', label: '00:00');
-              }
-            }).toList();
+            final times =
+                (recurrenceData['times'] as List?)
+                    ?.map((time) => RecurrenceTime.fromJson(time))
+                    .toList() ??
+                [];
 
             DateTime? endDate;
             if (recurrenceData['end_date'] != null) {
@@ -895,7 +752,7 @@ class RecordService {
 
             List<int>? daysOfWeek;
             if (recurrenceData['days_of_week'] != null) {
-              final raw = recurrenceData['days_of_week'] as List? ?? [];
+              final raw = recurrenceData['days_of_week'] as List;
               daysOfWeek = raw.map((e) {
                 if (e is int) return e;
                 return int.tryParse(e.toString()) ?? 0;
@@ -908,14 +765,25 @@ class RecordService {
               endDate: endDate,
               daysOfWeek: daysOfWeek,
             );
-
             print(
               '📋(action) 반복 일정 정보: type=${recurrence.type}, times=${times.map((t) => t.time).join(',')}, end=${recurrence.endDate}, days=${recurrence.daysOfWeek}',
             );
           } catch (e) {
             print('⚠️(action) 반복 일정 파싱 실패: $e');
+            // 파싱 실패해도 단일 일정으로 진행
+            isRecurring = false;
+            recurrence = null;
           }
         }
+
+        print('📋 서버에서 받은 정보:');
+        print('  - 원본 category 값: ${scheduleData['category']}');
+        print('  - category 타입: ${scheduleData['category']?.runtimeType}');
+        print('  - 최종 카테고리: $category');
+        print('  - is_important: ${scheduleData['is_important']}');
+        print('  - priority: ${scheduleData['priority']}');
+        print('  - 최종 중요도: $isImportant');
+        print('  - 반복 일정: $isRecurring');
 
         // Task 객체 생성
         final task = Task(
@@ -945,7 +813,7 @@ class RecordService {
           if (taskProvider != null) {
             await taskProvider.addTask(task);
             print('✅ TaskProvider를 통해 일정 추가 완료 (알람은 TaskProvider에서 자동 설정됨)');
-            print('✅ 일정 시간 검증 통과: $parsedDateTime (현재 시간: $now)');
+            print('✅ 일정 시간 처리 완료: $parsedDateTime');
           } else {
             print('❌ TaskProvider에 접근할 수 없습니다');
           }
@@ -971,7 +839,10 @@ class RecordService {
     if (_taskProvider != null) return _taskProvider;
     try {
       if (navigatorKey.currentContext != null) {
-        final tp = Provider.of<TaskProvider>(navigatorKey.currentContext!, listen: false);
+        final tp = Provider.of<TaskProvider>(
+          navigatorKey.currentContext!,
+          listen: false,
+        );
         _taskProvider = tp;
         print('✅ RecordService: navigatorKey로 TaskProvider 획득');
         return tp;
@@ -1097,7 +968,7 @@ class RecordService {
       } else {
         print('❌ TaskProvider에 접근할 수 없습니다');
       }
-      
+
       // ActionHandler 호출 추가
       print('🔍 ActionHandler 호출 시도');
       try {
@@ -1121,11 +992,14 @@ class RecordService {
   Future<void> _handleScheduleDeleteVisual(AIAction action) async {
     try {
       print('📅 시각적 일정 삭제 처리 시작');
-      
+
       // 전역 navigatorKey를 사용하여 네비게이션 처리
       if (navigatorKey.currentContext != null) {
         // ActionHandler를 통해 시각적 삭제 화면으로 이동
-        ActionHandler.handleScheduleDeleteVisual(action, navigatorKey.currentContext!);
+        ActionHandler.handleScheduleDeleteVisual(
+          action,
+          navigatorKey.currentContext!,
+        );
         print('✅ 시각적 삭제 화면으로 이동 완료');
       } else {
         print('❌ 전역 Context를 가져올 수 없습니다');
@@ -1137,33 +1011,32 @@ class RecordService {
       print('❌ 시각적 일정 삭제 처리 중 오류: $e');
     }
   }
-  
+
   // UI 지시사항을 통한 삭제 화면 이동 시도
   void _tryNavigateToDeleteScreen(AIAction action) {
     try {
       final taskData = action.data;
-      final searchCriteria = taskData['search_criteria'] as Map<String, dynamic>? ?? {};
-      final foundSchedules = taskData['found_schedules'] as List<dynamic>? ?? [];
-      
+      final searchCriteria =
+          taskData['search_criteria'] as Map<String, dynamic>? ?? {};
+      final foundSchedules =
+          taskData['found_schedules'] as List<dynamic>? ?? [];
+
       // Task 객체로 변환
       final tasks = foundSchedules.map((schedule) {
         return Task.fromJson(schedule);
       }).toList();
-      
+
       // 검색 기준 텍스트 생성
       final title = searchCriteria['title'] as String? ?? '';
       final date = searchCriteria['date'] as String? ?? '';
       final searchText = title.isNotEmpty ? title : date;
-      
+
       // 전역 navigatorKey를 사용하여 화면 이동
       if (navigatorKey.currentContext != null) {
         Navigator.pushNamed(
           navigatorKey.currentContext!,
           '/delete-schedule',
-          arguments: {
-            'schedules': tasks,
-            'searchCriteria': searchText,
-          },
+          arguments: {'schedules': tasks, 'searchCriteria': searchText},
         );
         print('✅ 삭제 화면으로 이동 완료 (UI 지시사항 경로)');
       } else {
@@ -1205,30 +1078,31 @@ class RecordService {
   Future<void> _handleScheduleReadVisual(AIAction action) async {
     try {
       print('📅 시각적 일정 조회 처리 시작');
-      
+
       final taskData = action.data;
-      final searchCriteria = taskData['search_criteria'] as Map<String, dynamic>? ?? {};
-      final foundSchedules = taskData['found_schedules'] as List<dynamic>? ?? [];
-      
+      final searchCriteria =
+          taskData['search_criteria'] as Map<String, dynamic>? ?? {};
+      final foundSchedules =
+          taskData['found_schedules'] as List<dynamic>? ?? [];
+
       // Task 객체로 변환
       final tasks = foundSchedules.map((schedule) {
         return Task.fromJson(schedule);
       }).toList();
-      
+
       // 검색 기준 텍스트 생성
       final title = searchCriteria['title'] as String? ?? '';
       final date = searchCriteria['date'] as String? ?? '';
-      final searchText = title.isNotEmpty ? title : (date.isNotEmpty ? date : '일정');
-      
+      final searchText = title.isNotEmpty
+          ? title
+          : (date.isNotEmpty ? date : '일정');
+
       // 전역 navigatorKey를 사용하여 화면 이동
       if (navigatorKey.currentContext != null) {
         Navigator.pushNamed(
           navigatorKey.currentContext!,
           '/schedule-list',
-          arguments: {
-            'schedules': tasks,
-            'searchCriteria': searchText,
-          },
+          arguments: {'schedules': tasks, 'searchCriteria': searchText},
         );
         print('✅ 일정 조회 화면으로 이동 완료');
       } else {
@@ -1390,21 +1264,9 @@ class RecordService {
     }
   }
 
-  // 특정 에러 타입에 대해서만 자동 재시작할지 판단
+  // 자동 재녹음은 서버의 명확화/선택 지시에만 따름
   bool _shouldAutoRestartForError(String errorType) {
-    // 자동 재시작이 필요한 에러 타입들
-    final autoRestartErrorTypes = [
-      'missing_schedule_title',
-      'generic_schedule_title',
-      'short_schedule_title',
-      'missing_schedule_date',
-      'missing_schedule_time',
-      'invalid_date_format',
-      'invalid_time_format',
-      'insufficient_delete_info',
-    ];
-
-    return autoRestartErrorTypes.contains(errorType);
+    return false;
   }
 
   // 자동 녹음 재시작 메서드

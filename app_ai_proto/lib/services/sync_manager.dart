@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task.dart';
 import 'network_service.dart';
@@ -7,21 +6,21 @@ import 'task_service.dart';
 class SyncManager {
   static const String _lastSyncKey = 'last_sync_timestamp';
   static const String _syncEnabledKey = 'sync_enabled';
-  
+
   final TaskService _taskService = TaskService();
-  
+
   // 동기화 활성화 여부
   Future<bool> isSyncEnabled() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_syncEnabledKey) ?? true; // 기본값: 활성화
   }
-  
+
   // 동기화 활성화/비활성화
   Future<void> setSyncEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_syncEnabledKey, enabled);
   }
-  
+
   // 마지막 동기화 시간 가져오기
   Future<DateTime?> getLastSyncTime() async {
     final prefs = await SharedPreferences.getInstance();
@@ -36,90 +35,83 @@ class SyncManager {
     }
     return null;
   }
-  
+
   // 마지막 동기화 시간 업데이트
   Future<void> updateLastSyncTime() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lastSyncKey, DateTime.now().toIso8601String());
   }
-  
+
   // 전체 동기화 (초기 로드 또는 강제 동기화)
   Future<void> syncFull() async {
     try {
       print('🔄 전체 동기화 시작...');
-      
+
       // 서버에서 모든 일정 가져오기
-      final serverTasks = await NetworkService.fetchSchedulesFromServer('user123', null);
+      final serverTasks = await NetworkService.fetchSchedulesFromServer(
+        'user123',
+        null,
+      );
       print('📥 서버에서 ${serverTasks.length}개 일정 가져옴');
-      
+
       // 로컬 일정과 병합 (서버 우선)
       await _mergeSchedules(serverTasks, true);
-      
+
       // 동기화 시간 업데이트
       await updateLastSyncTime();
-      
+
       print('✅ 전체 동기화 완료');
     } catch (e) {
       print('❌ 전체 동기화 실패: $e');
     }
   }
-  
+
   // 증분 동기화 (변경된 일정만)
   Future<void> syncIncremental() async {
     try {
       print('🔄 증분 동기화 시작...');
-      
+
       final lastSync = await getLastSyncTime();
-      print('📅 마지막 동기화 시간: $lastSync');
-      
-      final serverTasks = await NetworkService.fetchSchedulesFromServer('user123', lastSync);
-      print('📥 서버에서 ${serverTasks.length}개 일정 가져옴');
-      
-      // 서버 일정 상세 출력
-      for (int i = 0; i < serverTasks.length; i++) {
-        final task = serverTasks[i];
-        print('  서버 ${i + 1}. ${task.title} (${task.date}) - 반복: ${task.isRecurring}');
-      }
-      
+      final serverTasks = await NetworkService.fetchSchedulesFromServer(
+        'user123',
+        lastSync,
+      );
+
       if (serverTasks.isNotEmpty) {
         print('📥 서버에서 ${serverTasks.length}개 변경사항 가져옴');
         await _mergeSchedules(serverTasks, false);
-      } else {
-        print('ℹ️ 서버에서 새로운 일정이 없습니다');
       }
-      
+
       // 동기화 시간 업데이트
       await updateLastSyncTime();
-      
+
       print('✅ 증분 동기화 완료');
     } catch (e) {
       print('❌ 증분 동기화 실패: $e');
-      print('📋 상세 오류: ${e.toString()}');
     }
   }
-  
+
   // 일정 병합 (로컬과 서버)
-  Future<void> _mergeSchedules(List<Task> serverTasks, bool serverPriority) async {
+  Future<void> _mergeSchedules(
+    List<Task> serverTasks,
+    bool serverPriority,
+  ) async {
     try {
-      print('🔄 일정 병합 시작...');
-      
       final localTasks = await _taskService.getTasks();
-      print('📊 로컬 일정 개수: ${localTasks.length}');
-      
       final Map<String, Task> localTaskMap = {
-        for (var task in localTasks) task.id: task
+        for (var task in localTasks) task.id: task,
       };
-      
+
       final List<Task> mergedTasks = [];
-      
+
       // 서버 일정 처리
       for (final serverTask in serverTasks) {
         final localTask = localTaskMap[serverTask.id];
-        
+
         if (localTask == null) {
           // 서버에만 있는 일정: 로컬에 추가
           mergedTasks.add(serverTask);
-          print('➕ 새 일정 추가: ${serverTask.title} (ID: ${serverTask.id})');
+          print('➕ 새 일정 추가: ${serverTask.title}');
         } else {
           // 양쪽에 있는 일정: 우선순위에 따라 처리
           if (serverPriority) {
@@ -132,35 +124,29 @@ class SyncManager {
           localTaskMap.remove(serverTask.id);
         }
       }
-      
+
       // 로컬에만 있는 일정 처리
       if (!serverPriority) {
         mergedTasks.addAll(localTaskMap.values);
         print('💾 로컬 일정 ${localTaskMap.length}개 유지');
       }
-      
+
       // 병합된 일정 저장
       await _taskService.saveTasks(mergedTasks);
       print('💾 병합된 일정 ${mergedTasks.length}개 저장');
-      
-      // 병합 결과 확인
-      final savedTasks = await _taskService.getTasks();
-      print('📊 저장 후 일정 개수: ${savedTasks.length}');
-      
     } catch (e) {
       print('❌ 일정 병합 실패: $e');
-      print('📋 상세 오류: ${e.toString()}');
     }
   }
-  
+
   // 오프라인 변경사항 업로드
   Future<void> uploadOfflineChanges() async {
     try {
       print('📤 오프라인 변경사항 업로드 시작...');
-      
+
       final localTasks = await _taskService.getTasks();
       int uploadCount = 0;
-      
+
       for (final task in localTasks) {
         // TODO: 실제로는 변경된 일정만 업로드하는 로직 필요
         final success = await NetworkService.uploadScheduleToServer(task);
@@ -168,20 +154,20 @@ class SyncManager {
           uploadCount++;
         }
       }
-      
+
       print('✅ 오프라인 변경사항 ${uploadCount}개 업로드 완료');
     } catch (e) {
       print('❌ 오프라인 변경사항 업로드 실패: $e');
     }
   }
-  
+
   // 동기화 상태 확인
   Future<Map<String, dynamic>> getSyncStatus() async {
     try {
       final isEnabled = await isSyncEnabled();
       final lastSync = await getLastSyncTime();
       final isConnected = await NetworkService.testConnection();
-      
+
       return {
         'enabled': isEnabled,
         'lastSync': lastSync?.toIso8601String(),

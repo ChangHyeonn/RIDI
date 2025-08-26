@@ -361,20 +361,24 @@ class AlarmService {
       print('❌ NavigatorKey가 null이어서 알람 화면을 표시할 수 없음');
     }
 
-    // 반복 일정이면 다음 1회 발생 시점으로 재예약
+    // 반복 일정이면 다음 1회 발생 시점을 재예약 — 단, 현재 알람이 해제되면 재예약하지 않음
     if (task.isRecurring && task.recurrence != null) {
-      final next = _computeNextOccurrence(
-        task.recurrence!,
-        DateTime.now().add(const Duration(seconds: 1)),
-      );
-      if (next != null) {
-        final nextTask = task.copyWith(date: next);
-        print('🔁 반복 일정 — 다음 발생 시점 재예약: ${next.toString()}');
-        // 기존 예약 정리 후 재예약
-        cancelAlarm(task.id);
-        _scheduleSingleAlarm(nextTask, context);
+      if (_activeAlarmTaskIds.contains(task.id)) {
+        final next = _computeNextOccurrence(
+          task.recurrence!,
+          DateTime.now().add(const Duration(seconds: 1)),
+        );
+        if (next != null) {
+          final nextTask = task.copyWith(date: next);
+          print('🔁 반복 일정 — 다음 발생 시점 재예약: ${next.toString()}');
+          // 기존 예약 정리 후 재예약
+          cancelAlarm(task.id);
+          _scheduleSingleAlarm(nextTask, context);
+        } else {
+          print('⚠️ 반복 일정 재예약 불가(다음 시점 없음)');
+        }
       } else {
-        print('⚠️ 반복 일정 재예약 불가(다음 시점 없음)');
+        print('⏹️ 알람이 이미 해제됨 — 다음 반복 재예약 생략: ${task.id}');
       }
     }
   }
@@ -440,6 +444,33 @@ class AlarmService {
       final repeatTimer = Timer.periodic(const Duration(seconds: 6), (
         timer,
       ) async {
+        // 알람이 더 이상 활성 상태가 아니면 반복 중단
+        if (!_activeAlarmTaskIds.contains(task.id)) {
+          print('⏹️ 알람 비활성화 감지 — 반복 재생 종료: ${task.id}');
+          timer.cancel();
+          _alarmSoundTimers.remove(task.id);
+          return;
+        }
+
+        // 알람 창(유효 시간)을 벗어난 경우 자동 중지 (안전장치)
+        final nowCheck = DateTime.now();
+        final scheduled = DateTime(
+          task.date.year,
+          task.date.month,
+          task.date.day,
+          task.date.hour,
+          task.date.minute,
+        );
+        if (nowCheck.difference(scheduled).inMinutes >= 1) {
+          print('⏹️ 알람 유효 시간 경과 — 반복 재생 자동 종료: ${task.title}');
+          timer.cancel();
+          _alarmSoundTimers.remove(task.id);
+          _activeAlarmTaskIds.remove(task.id);
+          // 소리/진동 정지 (await 생략)
+          stopAlarmSound(task.id);
+          return;
+        }
+
         print('🔄 알람 소리 반복 재생: ${task.title}');
 
         // 진동 추가

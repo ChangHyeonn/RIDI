@@ -102,6 +102,41 @@ class MemoryScheduleRepository(IScheduleRepository):
             self.logger.error(f"Failed to find important schedules: {e}")
             return []
     
+    def find_by_user_and_keyword(self, user_id: str, keyword: str) -> List[Schedule]:
+        """사용자별 키워드로 일정 검색"""
+        try:
+            user_schedules = self.find_by_user_id(user_id)
+            keyword_schedules = []
+            
+            # 키워드 정규화 (소문자 변환)
+            normalized_keyword = keyword.lower().strip()
+            
+            for schedule in user_schedules:
+                # 제목에서 키워드 검색
+                if normalized_keyword in schedule.title.lower():
+                    keyword_schedules.append(schedule)
+                    continue
+                
+                # 설명에서 키워드 검색
+                if schedule.description and normalized_keyword in schedule.description.lower():
+                    keyword_schedules.append(schedule)
+                    continue
+                
+                # 카테고리에서 키워드 검색
+                if schedule.category and normalized_keyword in schedule.category.lower():
+                    keyword_schedules.append(schedule)
+                    continue
+            
+            # 날짜순 정렬
+            keyword_schedules.sort(key=lambda s: s.start_datetime)
+            
+            self.logger.info(f"Found {len(keyword_schedules)} schedules for keyword '{keyword}'")
+            return keyword_schedules
+            
+        except Exception as e:
+            self.logger.error(f"Failed to find schedules by keyword: {e}")
+            return []
+    
     def update(self, schedule: Schedule) -> Schedule:
         """일정 수정"""
         schedule.updated_at = datetime.now()

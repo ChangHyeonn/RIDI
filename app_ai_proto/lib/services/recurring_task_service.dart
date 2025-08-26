@@ -26,11 +26,11 @@ class RecurringTaskService {
     if (times.isEmpty) {
       final hh = fallbackDate.hour.toString().padLeft(2, '0');
       final mm = fallbackDate.minute.toString().padLeft(2, '0');
-      times = ['${hh}:${mm}'];
+      times = ['$hh:$mm'];
     }
     final dayStr = days.join(',');
     final timeStr = times.join(',');
-    return 'd:${dayStr}|t:${timeStr}';
+    return 'd:$dayStr|t:$timeStr';
   }
 
   static String buildPatternSignatureForTask(Task task) {
@@ -78,29 +78,13 @@ class RecurringTaskService {
     if (tasks.isEmpty) return weekdayStatus;
 
     for (final task in tasks) {
-      if (task.recurrence?.type == 'daily') {
-        // daily 타입: 모든 요일 활성화
-        for (int i = 0; i < 7; i++) {
-          weekdayStatus[i] = true;
-        }
-      } else if (task.recurrence?.type == 'weekdays') {
-        // weekdays 타입: 월~금 (0~4) 활성화
-        for (int i = 0; i < 5; i++) {
-          weekdayStatus[i] = true;
-        }
-      } else if (task.recurrence?.type == 'weekends') {
-        // weekends 타입: 토, 일 (5, 6) 활성화
-        weekdayStatus[5] = true; // 토요일
-        weekdayStatus[6] = true; // 일요일
-      } else if (task.recurrence?.daysOfWeek != null) {
-        // custom_days 타입: 특정 요일들 활성화
+      if (task.recurrence?.daysOfWeek != null) {
         for (final weekday in task.recurrence!.daysOfWeek!) {
           if (weekday >= 0 && weekday < 7) {
             weekdayStatus[weekday] = true;
           }
         }
       } else {
-        // fallback: 시작일의 요일만 활성화 (기존 로직)
         final weekday = task.date.weekday - 1; // 0=월요일, 6=일요일
         if (weekday >= 0 && weekday < 7) {
           weekdayStatus[weekday] = true;
@@ -120,6 +104,19 @@ class RecurringTaskService {
     for (final task in tasks) {
       if (task.recurrence?.times != null && task.recurrence!.times.isNotEmpty) {
         for (final recurrenceTime in task.recurrence!.times) {
+          // 음성 생성 경로는 label(예: "오후")만 주는 경우가 있어 시간 표시가 사라짐
+          // 시간 문자열(HH:MM)을 파싱해 12시간제 표기로 통일하여 표시
+          final parts = recurrenceTime.time.split(':');
+          if (parts.length == 2) {
+            final hour = int.tryParse(parts[0]);
+            final minute = int.tryParse(parts[1]);
+            if (hour != null && minute != null) {
+              final tod = TimeOfDay(hour: hour, minute: minute);
+              uniqueTimes.add(RecurringTaskConstants.formatTime12Hour(tod));
+              continue;
+            }
+          }
+          // 파싱 실패 시 label을 폴백으로 사용
           uniqueTimes.add(recurrenceTime.label);
         }
       } else {

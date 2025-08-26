@@ -1722,6 +1722,64 @@ except json.JSONDecodeError:
 3. **Python 딕셔너리 지원**: `{'title': '...'}` 형태의 응답도 안전하게 처리
 4. **프롬프트 개선**: 마크다운 코드 블록 사용 금지 명시
 5. **에러 로깅 강화**: 파싱 실패 시 상세한 에러 정보 기록
+6. **오류 응답 상태 코드 변경**: 모든 오류 응답을 200 상태 코드로 변경하여 애플리케이션 오류 파싱 방지
+
+---
+
+## 🔧 오류 응답 상태 코드 변경 (v3.2.1)
+
+### 🎯 변경 목적
+애플리케이션에서 HTTP 상태 코드 파싱 오류를 방지하기 위해 모든 오류 응답을 200 상태 코드로 변경
+
+### ✅ 변경 내용
+
+#### **이전 (v3.2.0 이하)**
+```json
+// 정보 누락 시
+HTTP/1.1 400 Bad Request
+{
+  "success": false,
+  "action": {
+    "type": "error",
+    "data": {
+      "error_type": "missing_schedule_title",
+      "message": "상세한 일정 내용, 일자와 시간을 말씀해 주시겠어요?"
+    }
+  }
+}
+```
+
+#### **현재 (v3.2.1)**
+```json
+// 정보 누락 시
+HTTP/1.1 200 OK
+{
+  "success": false,
+  "action": {
+    "type": "error",
+    "data": {
+      "error_type": "missing_schedule_title",
+      "message": "상세한 일정 내용, 일자와 시간을 말씀해 주시겠어요?"
+    }
+  }
+}
+```
+
+### 💡 개발 시 주의사항
+
+- **상태 코드 확인**: HTTP 상태 코드가 아닌 JSON의 `success` 필드로 성공/실패 판단
+- **오류 타입 확인**: `action.data.error_type`으로 구체적인 오류 유형 파악
+- **사용자 메시지**: `action.data.message`로 사용자에게 표시할 메시지 확인
+- **UI 지시사항**: `action.ui_instructions`로 클라이언트 UI 동작 지시
+
+### 🔄 영향받는 오류 유형들
+
+1. **입력 검증 오류**: `missing_content_type`, `missing_required_data`
+2. **일정 정보 검증 오류**: `missing_schedule_title`, `missing_schedule_date`, `missing_schedule_time`
+3. **일정 처리 오류**: `schedule_not_found`, `schedule_selection_required`
+4. **시스템 오류**: `internal_error`, `system_error`
+
+---
 
 ### 📝 v3.2.0 주요 변경사항
 

@@ -280,18 +280,36 @@ class SpeechToTextService {
         _lastWords = '';
 
         // audio_app2 방식: 매우 간단한 listen 파라미터
-        // 한국어 우선 로케일 선택
+        // 로케일 자동 선택 로직 (에러 방지)
         String? selectedLocaleId = localeId;
         try {
           final locales = await _speech.locales();
-          final koLocale = locales.firstWhere(
-            (l) => l.localeId.toLowerCase().startsWith('ko'),
-            orElse: () => stt.LocaleName('ko_KR', '한국어(대한민국)'),
-          );
-          selectedLocaleId ??= koLocale.localeId;
-          print('🌏 STT 로케일 선택: $selectedLocaleId');
+          // 1) 사용자가 넘긴 localeId가 지원되는지 확인
+          if (selectedLocaleId != null &&
+              !locales.any(
+                (l) =>
+                    l.localeId.toLowerCase() == selectedLocaleId!.toLowerCase(),
+              )) {
+            print('⚠️ 전달된 localeId가 기기에서 지원되지 않습니다: $selectedLocaleId');
+            selectedLocaleId = null;
+          }
+
+          // 2) ko_* 지원 시 ko 우선 선택
+          if (selectedLocaleId == null) {
+            final ko = locales.firstWhere(
+              (l) => l.localeId.toLowerCase().startsWith('ko'),
+              orElse: () => stt.LocaleName('', ''),
+            );
+            if (ko.localeId.isNotEmpty) {
+              selectedLocaleId = ko.localeId;
+            }
+          }
+
+          // 3) 그래도 없으면 시스템 기본 로케일 사용 시 null 유지 (플러그인이 자동 선택)
+          print('🌏 STT 로케일 최종 선택: ${selectedLocaleId ?? '(system default)'}');
         } catch (e) {
-          print('로케일 조회 실패, 기본값 사용: $e');
+          print('로케일 조회 실패, 시스템 기본값 사용: $e');
+          selectedLocaleId = null; // 기본값에 위임
         }
 
         _speech.listen(
@@ -319,7 +337,7 @@ class SpeechToTextService {
           listenFor: const Duration(seconds: 60), // 60초로 늘림
           pauseFor: const Duration(seconds: 60), // 60초로 늘림
           partialResults: partialResults,
-          localeId: selectedLocaleId,
+          localeId: selectedLocaleId, // null이면 시스템 기본 로케일 사용
           listenMode: stt.ListenMode.dictation,
           onDevice: onDevice,
         );

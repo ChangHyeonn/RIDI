@@ -8,7 +8,6 @@ import 'calendar_screen.dart';
 import 'settings_screen.dart';
 import 'date_detail_screen.dart';
 import 'record_screen.dart';
-import 'voice_test_screen.dart';
 import 'recurring_tasks_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -85,7 +84,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
     if (!task.isRecurring || task.recurrence == null) {
       return '반복';
     }
-    
+
     switch (task.recurrence!.type) {
       case 'daily':
         return '매일';
@@ -95,7 +94,8 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
         return '주말';
       case 'custom_days':
         // 특정 요일인 경우 요일 정보 표시
-        if (task.recurrence!.daysOfWeek != null && task.recurrence!.daysOfWeek!.isNotEmpty) {
+        if (task.recurrence!.daysOfWeek != null &&
+            task.recurrence!.daysOfWeek!.isNotEmpty) {
           final dayNames = ['월', '화', '수', '목', '금', '토', '일'];
           final selectedDays = task.recurrence!.daysOfWeek!
               .map((day) => dayNames[day])
@@ -201,334 +201,341 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                             final spaceBetweenTitleAndTasks =
                                                 8 * scaleFactor; // 여백 줄임
 
-                                              final fixedHeight =
-                                                  topPadding +
-                                                  headerHeight +
-                                                  buttonHeight +
-                                                  spaceBetweenTitleAndTasks +
-                                                  bottomPadding;
-                                              final availableHeight =
-                                                  panelHeight - fixedHeight;
+                                            final fixedHeight =
+                                                topPadding +
+                                                headerHeight +
+                                                buttonHeight +
+                                                spaceBetweenTitleAndTasks +
+                                                bottomPadding;
+                                            final availableHeight =
+                                                panelHeight - fixedHeight;
 
-                                              final itemVerticalPadding =
-                                                  6 * scaleFactor;
-                                              final itemMargin =
-                                                  6 * scaleFactor;
-                                              final textHeight = taskFontSize;
-                                              // 실제 렌더링 높이 계산 (margin 포함)
-                                              final actualItemMargin =
-                                                  12 * scaleFactor;
-                                              final taskItemHeight =
-                                                  (itemVerticalPadding * 2) +
-                                                  textHeight +
-                                                  actualItemMargin;
+                                            final itemVerticalPadding =
+                                                6 * scaleFactor;
+                                            final itemMargin = 6 * scaleFactor;
+                                            final textHeight = taskFontSize;
+                                            // 실제 렌더링 높이 계산 (margin 포함)
+                                            final actualItemMargin =
+                                                12 * scaleFactor;
+                                            final taskItemHeight =
+                                                (itemVerticalPadding * 2) +
+                                                textHeight +
+                                                actualItemMargin;
 
-                                              // 패널 높이의 90% 제한으로 이상적인 여백 확보
-                                              final maxAllowedHeight =
-                                                  panelHeight *
-                                                  0.90; // 패널 높이의 90%
-                                              final maxAvailableHeight =
-                                                  maxAllowedHeight -
-                                                  (topPadding +
-                                                      headerHeight +
-                                                      buttonHeight +
-                                                      spaceBetweenTitleAndTasks); // 헤더 영역만 제외
+                                            // 패널 높이의 90% 제한으로 이상적인 여백 확보
+                                            final maxAllowedHeight =
+                                                panelHeight *
+                                                0.90; // 패널 높이의 90%
+                                            final maxAvailableHeight =
+                                                maxAllowedHeight -
+                                                (topPadding +
+                                                    headerHeight +
+                                                    buttonHeight +
+                                                    spaceBetweenTitleAndTasks); // 헤더 영역만 제외
 
-                                              // 90% 제한 내에서 들어갈 수 있는 최대 일정 개수 계산
-                                              int maxTasks =
-                                                  (maxAvailableHeight /
-                                                          taskItemHeight)
-                                                      .floor();
+                                            // 90% 제한 내에서 들어갈 수 있는 최대 일정 개수 계산
+                                            int maxTasks =
+                                                (maxAvailableHeight /
+                                                        taskItemHeight)
+                                                    .floor();
 
-                                              // 더 적극적인 최적화로 최대한 많은 일정 표시
-                                              maxTasks = (maxTasks - 0.3)
-                                                  .round()
-                                                  .clamp(1, 10);
+                                            // 더 적극적인 최적화로 최대한 많은 일정 표시
+                                            maxTasks = (maxTasks - 0.3)
+                                                .round()
+                                                .clamp(1, 10);
 
-                                              // 디버깅: 실제 계산값들 출력
-                                              print(
-                                                '오늘 패널 - panelHeight: $panelHeight, maxTasks: $maxTasks, taskItemHeight: $taskItemHeight',
-                                              );
+                                            // 디버깅: 실제 계산값들 출력
+                                            print(
+                                              '오늘 패널 - panelHeight: $panelHeight, maxTasks: $maxTasks, taskItemHeight: $taskItemHeight',
+                                            );
 
-                                              return Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    children: [
-                                                      Container(
-                                                        padding:
-                                                            const EdgeInsets.all(
-                                                              10,
-                                                            ),
-                                                        decoration: BoxDecoration(
-                                                          color: const Color(
-                                                            0xFF6366f1,
+                                            return Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                            10,
                                                           ),
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                14,
-                                                              ),
-                                                          boxShadow: [
-                                                            BoxShadow(
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(
+                                                          0xFF6366f1,
+                                                        ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              14,
+                                                            ),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: const Color(
+                                                              0xFF6366f1,
+                                                            ).withOpacity(0.3),
+                                                            blurRadius: 12,
+                                                            offset:
+                                                                const Offset(
+                                                                  0,
+                                                                  4,
+                                                                ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: const Icon(
+                                                        Icons.today,
+                                                        color: Colors.white,
+                                                        size: 22,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 16),
+                                                    Expanded(
+                                                      child: Row(
+                                                        children: [
+                                                          Text(
+                                                            '오늘',
+                                                            style: TextStyle(
                                                               color:
                                                                   const Color(
-                                                                    0xFF6366f1,
-                                                                  ).withOpacity(
-                                                                    0.3,
+                                                                    0xFF1f2937,
                                                                   ),
-                                                              blurRadius: 12,
-                                                              offset:
-                                                                  const Offset(
-                                                                    0,
-                                                                    4,
+                                                              fontSize:
+                                                                  titleFontSize +
+                                                                  5,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 8,
+                                                          ),
+                                                          Text(
+                                                            '-',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF6b7280,
                                                                   ),
+                                                              fontSize:
+                                                                  titleFontSize -
+                                                                  2,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .normal,
                                                             ),
-                                                          ],
-                                                        ),
-                                                        child: const Icon(
-                                                          Icons.today,
-                                                          color: Colors.white,
-                                                          size: 22,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 16),
-                                                      Expanded(
-                                                        child: Row(
-                                                          children: [
-                                                            Text(
-                                                              '오늘',
-                                                              style: TextStyle(
-                                                                color:
-                                                                    const Color(
-                                                                      0xFF1f2937,
-                                                                    ),
-                                                                fontSize:
-                                                                    titleFontSize +
-                                                                    5,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                              ),
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 8,
+                                                          ),
+                                                          Text(
+                                                            _formatDate(
+                                                              DateTime.now(),
                                                             ),
-                                                            const SizedBox(
-                                                              width: 8,
+                                                            style: TextStyle(
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF6b7280,
+                                                                  ),
+                                                              fontSize:
+                                                                  titleFontSize -
+                                                                  6,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .normal,
                                                             ),
-                                                            Text(
-                                                              '-',
-                                                              style: TextStyle(
-                                                                color:
-                                                                    const Color(
-                                                                      0xFF6b7280,
-                                                                    ),
-                                                                fontSize:
-                                                                    titleFontSize -
-                                                                    2,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .normal,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 8,
-                                                            ),
-                                                            Text(
-                                                              _formatDate(
-                                                                DateTime.now(),
-                                                              ),
-                                                              style: TextStyle(
-                                                                color:
-                                                                    const Color(
-                                                                      0xFF6b7280,
-                                                                    ),
-                                                                fontSize:
-                                                                    titleFontSize -
-                                                                    6,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .normal,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 12,
-                                                            ),
-                                                            // 일정 개수 배지 (공간 부족시 숨김)
-                                                            Builder(
-                                                              builder: (context) {
-                                                                final screenWidth =
-                                                                    MediaQuery.of(
-                                                                      context,
-                                                                    ).size.width;
-                                                                final availableWidth =
-                                                                    screenWidth -
-                                                                    40; // 패딩 제외
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 12,
+                                                          ),
+                                                          // 일정 개수 배지 (공간 부족시 숨김)
+                                                          Builder(
+                                                            builder: (context) {
+                                                              final screenWidth =
+                                                                  MediaQuery.of(
+                                                                    context,
+                                                                  ).size.width;
+                                                              final availableWidth =
+                                                                  screenWidth -
+                                                                  40; // 패딩 제외
 
-                                                                // 배지가 들어갈 수 있는 공간 계산
-                                                                final titleWidth =
-                                                                    (titleFontSize +
-                                                                        5) *
-                                                                    2; // "오늘" 텍스트
-                                                                final dateWidth =
-                                                                    (titleFontSize -
-                                                                        6) *
-                                                                    4; // 날짜 텍스트
-                                                                final dashWidth =
-                                                                    (titleFontSize -
-                                                                        2) *
-                                                                    1; // "-" 텍스트
-                                                                final spacingWidth =
-                                                                    8 +
-                                                                    8 +
-                                                                    12; // 간격들
-                                                                final importantButtonWidth =
-                                                                    60; // 중요 버튼
-                                                                final iconWidth =
-                                                                    44; // 아이콘 컨테이너
-                                                                final iconSpacing =
-                                                                    16; // 아이콘과 텍스트 간격
+                                                              // 배지가 들어갈 수 있는 공간 계산
+                                                              final titleWidth =
+                                                                  (titleFontSize +
+                                                                      5) *
+                                                                  2; // "오늘" 텍스트
+                                                              final dateWidth =
+                                                                  (titleFontSize -
+                                                                      6) *
+                                                                  4; // 날짜 텍스트
+                                                              final dashWidth =
+                                                                  (titleFontSize -
+                                                                      2) *
+                                                                  1; // "-" 텍스트
+                                                              final spacingWidth =
+                                                                  8 +
+                                                                  8 +
+                                                                  12; // 간격들
+                                                              final importantButtonWidth =
+                                                                  60; // 중요 버튼
+                                                              final iconWidth =
+                                                                  44; // 아이콘 컨테이너
+                                                              final iconSpacing =
+                                                                  16; // 아이콘과 텍스트 간격
 
-                                                                // 배지가 들어갈 수 있는 공간
-                                                                final spaceForBadge =
-                                                                    availableWidth -
-                                                                    titleWidth -
-                                                                    dateWidth -
-                                                                    dashWidth -
-                                                                    spacingWidth -
-                                                                    importantButtonWidth -
-                                                                    iconWidth -
-                                                                    iconSpacing;
+                                                              // 배지가 들어갈 수 있는 공간
+                                                              final spaceForBadge =
+                                                                  availableWidth -
+                                                                  titleWidth -
+                                                                  dateWidth -
+                                                                  dashWidth -
+                                                                  spacingWidth -
+                                                                  importantButtonWidth -
+                                                                  iconWidth -
+                                                                  iconSpacing;
 
-                                                                // 배지 대략적 너비
-                                                                final estimatedBadgeWidth =
-                                                                    8 +
-                                                                    8 +
-                                                                    12 +
-                                                                    4 +
-                                                                    ((14 + 2) *
-                                                                        scaleFactor *
-                                                                        3);
+                                                              // 배지 대략적 너비
+                                                              final estimatedBadgeWidth =
+                                                                  8 +
+                                                                  8 +
+                                                                  12 +
+                                                                  4 +
+                                                                  ((14 + 2) *
+                                                                      scaleFactor *
+                                                                      3);
 
-                                                                // 공간이 충분한지 확인
-                                                                if (spaceForBadge >=
-                                                                    estimatedBadgeWidth) {
-                                                                  return Container(
-                                                                    padding: const EdgeInsets.symmetric(
-                                                                      horizontal:
-                                                                          8,
-                                                                      vertical:
-                                                                          4,
+                                                              // 공간이 충분한지 확인
+                                                              if (spaceForBadge >=
+                                                                  estimatedBadgeWidth) {
+                                                                return Container(
+                                                                  padding:
+                                                                      const EdgeInsets.symmetric(
+                                                                        horizontal:
+                                                                            8,
+                                                                        vertical:
+                                                                            4,
+                                                                      ),
+                                                                  decoration: BoxDecoration(
+                                                                    color: const Color(
+                                                                      0xFFf3f4f6,
                                                                     ),
-                                                                    decoration: BoxDecoration(
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                          12,
+                                                                        ),
+                                                                    border: Border.all(
                                                                       color: const Color(
-                                                                        0xFFf3f4f6,
+                                                                        0xFFd1d5db,
                                                                       ),
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
+                                                                      width: 1,
+                                                                    ),
+                                                                  ),
+                                                                  child: Row(
+                                                                    mainAxisSize:
+                                                                        MainAxisSize
+                                                                            .min,
+                                                                    children: [
+                                                                      Icon(
+                                                                        Icons
+                                                                            .check_circle,
+                                                                        size:
                                                                             12,
-                                                                          ),
-                                                                      border: Border.all(
                                                                         color: const Color(
-                                                                          0xFFd1d5db,
+                                                                          0xFF10b981,
                                                                         ),
-                                                                        width:
-                                                                            1,
                                                                       ),
-                                                                    ),
-                                                                    child: Row(
-                                                                      mainAxisSize:
-                                                                          MainAxisSize
-                                                                              .min,
-                                                                      children: [
-                                                                        Icon(
-                                                                          Icons
-                                                                              .check_circle,
-                                                                          size:
-                                                                              12,
+                                                                      const SizedBox(
+                                                                        width:
+                                                                            4,
+                                                                      ),
+                                                                      Text(
+                                                                        '${todayTasks.where((task) => !task.isRecurring && task.isCompleted || (task.isRecurring && context.read<TaskProvider>().isOccurrenceCompleted(task.id, DateTime.now()))).length}/${todayTasks.length}',
+                                                                        style: TextStyle(
+                                                                          fontSize:
+                                                                              (14 + 2) *
+                                                                              scaleFactor,
+                                                                          fontWeight:
+                                                                              FontWeight.w600,
                                                                           color: const Color(
-                                                                            0xFF10b981,
+                                                                            0xFF6b7280,
                                                                           ),
                                                                         ),
-                                                                        const SizedBox(
-                                                                          width:
-                                                                              4,
-                                                                        ),
-                                                                        Text(
-                                                                          '${todayTasks.where((task) => task.isCompleted).length}/${todayTasks.length}',
-                                                                          style: TextStyle(
-                                                                            fontSize:
-                                                                                (14 +
-                                                                                    2) *
-                                                                                scaleFactor,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                            color: const Color(
-                                                                              0xFF6b7280,
-                                                                            ),
-                                                                          ),
-                                                                        ),
-                                                                      ],
-                                                                    ),
-                                                                  );
-                                                                } else {
-                                                                  // 공간이 부족하면 완전히 숨김
-                                                                  return const SizedBox.shrink();
-                                                                }
-                                                              },
-                                                            ),
-                                                          ],
-                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                );
+                                                              } else {
+                                                                // 공간이 부족하면 완전히 숨김
+                                                                return const SizedBox.shrink();
+                                                              }
+                                                            },
+                                                          ),
+                                                        ],
                                                       ),
-                                                      // 중요 버튼
-                                                      GestureDetector(
-                                                        onTap: () {
-                                                          setState(() {
-                                                            _showTodayImportantOnly =
-                                                                !_showTodayImportantOnly;
-                                                          });
-                                                        },
-                                                        child: AnimatedContainer(
-                                                          duration:
-                                                              const Duration(
-                                                                milliseconds:
-                                                                    300,
+                                                    ),
+                                                    // 중요 버튼
+                                                    GestureDetector(
+                                                      onTap: () {
+                                                        setState(() {
+                                                          _showTodayImportantOnly =
+                                                              !_showTodayImportantOnly;
+                                                        });
+                                                      },
+                                                      child: AnimatedContainer(
+                                                        duration:
+                                                            const Duration(
+                                                              milliseconds: 300,
+                                                            ),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 16,
+                                                              vertical: 8,
+                                                            ),
+                                                        decoration: BoxDecoration(
+                                                          color:
+                                                              _showTodayImportantOnly
+                                                              ? const Color(
+                                                                  0xFFfbbf24,
+                                                                )
+                                                              : const Color(
+                                                                  0xFFf3f4f6,
+                                                                ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                20,
                                                               ),
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                horizontal: 16,
-                                                                vertical: 8,
-                                                              ),
-                                                          decoration: BoxDecoration(
+                                                          border: Border.all(
                                                             color:
                                                                 _showTodayImportantOnly
                                                                 ? const Color(
                                                                     0xFFfbbf24,
                                                                   )
                                                                 : const Color(
-                                                                    0xFFf3f4f6,
+                                                                    0xFFd1d5db,
                                                                   ),
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  20,
-                                                                ),
-                                                            border: Border.all(
+                                                            width: 1,
+                                                          ),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                              Icons.star,
                                                               color:
                                                                   _showTodayImportantOnly
-                                                                  ? const Color(
-                                                                      0xFFfbbf24,
-                                                                    )
+                                                                  ? Colors.white
                                                                   : const Color(
-                                                                      0xFFd1d5db,
+                                                                      0xFF6b7280,
                                                                     ),
-                                                              width: 1,
+                                                              size: 18,
                                                             ),
-                                                          ),
-                                                          child: Row(
-                                                            mainAxisSize:
-                                                                MainAxisSize
-                                                                    .min,
-                                                            children: [
-                                                              Icon(
-                                                                Icons.star,
+                                                            const SizedBox(
+                                                              width: 6,
+                                                            ),
+                                                            Text(
+                                                              '${todayTasks.where((task) => task.isImportant).length}',
+                                                              style: TextStyle(
                                                                 color:
                                                                     _showTodayImportantOnly
                                                                     ? Colors
@@ -536,702 +543,721 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                     : const Color(
                                                                         0xFF6b7280,
                                                                       ),
-                                                                size: 18,
-                                                              ),
-                                                              const SizedBox(
-                                                                width: 6,
-                                                              ),
-                                                              Text(
-                                                                '${todayTasks.where((task) => task.isImportant).length}',
-                                                                style: TextStyle(
-                                                                  color:
-                                                                      _showTodayImportantOnly
-                                                                      ? Colors
-                                                                            .white
-                                                                      : const Color(
-                                                                          0xFF6b7280,
-                                                                        ),
-                                                                  fontSize: 16,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  SizedBox(
-                                                    height: 8 * scaleFactor,
-                                                  ),
-                                                  // 일정 목록 (스크롤 가능하게 수정)
-                                                  Expanded(
-                                                    child: todayTasks.isEmpty
-                                                        ? LayoutBuilder(
-                                                            builder:
-                                                                (
-                                                                  context,
-                                                                  constraints,
-                                                                ) {
-                                                                  // 화면 높이에 따라 동적으로 조정
-                                                                  final availableHeight =
-                                                                      constraints
-                                                                          .maxHeight;
-                                                                  final isSmallScreen =
-                                                                      availableHeight <
-                                                                      100;
-
-                                                                  return Center(
-                                                                    child: Column(
-                                                                      mainAxisAlignment:
-                                                                          MainAxisAlignment
-                                                                              .center,
-                                                                      mainAxisSize:
-                                                                          MainAxisSize
-                                                                              .min,
-                                                                      children: [
-                                                                        if (!isSmallScreen) ...[
-                                                                          Icon(
-                                                                            Icons.event_note,
-                                                                            color: const Color(
-                                                                              0xFFd1d5db,
-                                                                            ),
-                                                                            size:
-                                                                                isSmallScreen
-                                                                                ? 24
-                                                                                : 48,
-                                                                          ),
-                                                                          SizedBox(
-                                                                            height:
-                                                                                isSmallScreen
-                                                                                ? 8
-                                                                                : 16,
-                                                                          ),
-                                                                        ],
-                                                                        Flexible(
-                                                                          child: Text(
-                                                                            isSmallScreen
-                                                                                ? '일정 없음'
-                                                                                : '오늘 일정이 없습니다',
-                                                                            style: TextStyle(
-                                                                              color: const Color(
-                                                                                0xFF9ca3af,
-                                                                              ),
-                                                                              fontSize: isSmallScreen
-                                                                                  ? taskFontSize *
-                                                                                        0.8
-                                                                                  : taskFontSize,
-                                                                              fontStyle: FontStyle.italic,
-                                                                            ),
-                                                                            textAlign:
-                                                                                TextAlign.center,
-                                                                            overflow:
-                                                                                TextOverflow.ellipsis,
-                                                                            maxLines:
-                                                                                2,
-                                                                          ),
-                                                                        ),
-                                                                      ],
-                                                                    ),
-                                                                  );
-                                                                },
-                                                          )
-                                                        : SingleChildScrollView(
-                                                            child: Column(
-                                                              children:
-                                                                  (_showTodayImportantOnly
-                                                                          ? todayTasks.where(
-                                                                              (
-                                                                                task,
-                                                                              ) => task.isImportant,
-                                                                            )
-                                                                          : todayTasks)
-                                                                      .take(
-                                                                        maxTasks,
-                                                                      )
-                                                                      .map(
-                                                                        (
-                                                                          task,
-                                                                        ) => Container(
-                                                                          margin: EdgeInsets.only(
-                                                                            bottom:
-                                                                                12 *
-                                                                                scaleFactor,
-                                                                          ),
-                                                                          child: Container(
-                                                                            padding: EdgeInsets.symmetric(
-                                                                              horizontal:
-                                                                                  16 *
-                                                                                  scaleFactor,
-                                                                              vertical:
-                                                                                  12 *
-                                                                                  scaleFactor,
-                                                                            ),
-                                                                            decoration: BoxDecoration(
-                                                                              color: task.isCompleted
-                                                                                  ? const Color(
-                                                                                      0xFFdcfce7,
-                                                                                    )
-                                                                                  : const Color(
-                                                                                      0xFFfef2f2,
-                                                                                    ),
-                                                                              borderRadius: BorderRadius.circular(
-                                                                                16,
-                                                                              ),
-                                                                              border: Border.all(
-                                                                                color: task.isCompleted
-                                                                                    ? const Color(
-                                                                                        0xFF22c55e,
-                                                                                      )
-                                                                                    : const Color(
-                                                                                        0xFFef4444,
-                                                                                      ),
-                                                                                width: 1,
-                                                                              ),
-                                                                            ),
-                                                                            child: Row(
-                                                                              children: [
-                                                                                // 상태 아이콘
-                                                                                Container(
-                                                                                  padding: EdgeInsets.all(
-                                                                                    6 *
-                                                                                        scaleFactor,
-                                                                                  ),
-                                                                                  decoration: BoxDecoration(
-                                                                                    color: Color(
-                                                                                      TaskCategories.getCategoryColor(
-                                                                                        task.category,
-                                                                                      ),
-                                                                                    ),
-                                                                                    borderRadius: BorderRadius.circular(
-                                                                                      8 *
-                                                                                          scaleFactor,
-                                                                                    ),
-                                                                                  ),
-                                                                                  child: Center(
-                                                                                    child: Row(
-                                                                                      mainAxisSize: MainAxisSize.min,
-                                                                                      children: [
-                                                                                        // 반복 일정 아이콘 (반복 일정인 경우)
-                                                                                        if (task.isRecurring) ...[
-                                                                                          Text(
-                                                                                            '🔄',
-                                                                                            style: TextStyle(
-                                                                                              fontSize:
-                                                                                                  16 *
-                                                                                                  scaleFactor,
-                                                                                            ),
-                                                                                          ),
-                                                                                          SizedBox(
-                                                                                            width:
-                                                                                                4 *
-                                                                                                scaleFactor,
-                                                                                          ),
-                                                                                          Text(
-                                                                                            _getRecurrenceText(task),
-                                                                                            style: TextStyle(
-                                                                                              fontSize:
-                                                                                                  12 *
-                                                                                                  scaleFactor,
-                                                                                              color: Colors.white,
-                                                                                              fontWeight: FontWeight.bold,
-                                                                                            ),
-                                                                                          ),
-                                                                                        ] else ...[
-                                                                                          Text(
-                                                                                            TaskCategories.getCategoryIcon(
-                                                                                              task.category,
-                                                                                            ),
-                                                                                            style: TextStyle(
-                                                                                              fontSize:
-                                                                                                  16 *
-                                                                                                  scaleFactor,
-                                                                                            ),
-                                                                                          ),
-                                                                                          SizedBox(
-                                                                                            width:
-                                                                                                4 *
-                                                                                                scaleFactor,
-                                                                                          ),
-                                                                                          Text(
-                                                                                            TaskCategories.getCategoryInfo(
-                                                                                                  task.category,
-                                                                                                )?['name'] ??
-                                                                                                task.category,
-                                                                                            style: TextStyle(
-                                                                                              fontSize:
-                                                                                                  12 *
-                                                                                                  scaleFactor,
-                                                                                              color: Colors.white,
-                                                                                              fontWeight: FontWeight.bold,
-                                                                                            ),
-                                                                                          ),
-                                                                                        ],
-                                                                                      ],
-                                                                                    ),
-                                                                                  ),
-                                                                                ),
-                                                                                const SizedBox(
-                                                                                  width: 12,
-                                                                                ),
-                                                                                // 일정 제목
-                                                                                Expanded(
-                                                                                  child: Row(
-                                                                                    children: [
-                                                                                      // 별 아이콘 또는 빈 공간 (일관된 레이아웃을 위해)
-                                                                                      if (task.isImportant)
-                                                                                        Icon(
-                                                                                          Icons.star,
-                                                                                          color: const Color(
-                                                                                            0xFFfbbf24,
-                                                                                          ),
-                                                                                          size: 16,
-                                                                                        )
-                                                                                      else
-                                                                                        const SizedBox(
-                                                                                          width: 20, // 별 아이콘 + 간격과 동일한 공간
-                                                                                        ),
-                                                                                      const SizedBox(
-                                                                                        width: 4,
-                                                                                      ),
-                                                                                      Expanded(
-                                                                                        child: Text(
-                                                                                          task.title,
-                                                                                          style: TextStyle(
-                                                                                            color: const Color(
-                                                                                              0xFF1f2937,
-                                                                                            ),
-                                                                                            fontSize: taskFontSize,
-                                                                                            fontWeight: FontWeight.w600,
-                                                                                          ),
-                                                                                          overflow: TextOverflow.ellipsis,
-                                                                                        ),
-                                                                                      ),
-                                                                                    ],
-                                                                                  ),
-                                                                                ),
-                                                                                const SizedBox(
-                                                                                  width: 8,
-                                                                                ),
-                                                                                // 시간 표시 (오른쪽으로 이동)
-                                                                                Text(
-                                                                                  _formatTime(
-                                                                                    task.date,
-                                                                                  ),
-                                                                                  style: TextStyle(
-                                                                                    color: const Color(
-                                                                                      0xFF6b7280,
-                                                                                    ),
-                                                                                    fontSize:
-                                                                                        taskFontSize -
-                                                                                        2,
-                                                                                  ),
-                                                                                ),
-                                                                              ],
-                                                                            ),
-                                                                          ),
-                                                                        ),
-                                                                      )
-                                                                      .toList(),
-                                                            ),
-                                                          ),
-                                                  ),
-                                                ],
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 20),
-                                    // 내일 패널
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  DateDetailScreen(
-                                                    date: DateTime.now().add(
-                                                      const Duration(days: 1),
-                                                    ),
-                                                    title: '내일',
-                                                  ),
-                                            ),
-                                          );
-                                        },
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(
-                                              24,
-                                            ),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withOpacity(
-                                                  0.08,
-                                                ),
-                                                blurRadius: 20,
-                                                offset: const Offset(0, 8),
-                                              ),
-                                            ],
-                                          ),
-                                          padding: const EdgeInsets.all(12),
-                                          child: LayoutBuilder(
-                                            builder: (context, constraints) {
-                                              final scaleFactor =
-                                                  0.75 + (fontSize * 0.5);
-                                              final titleFontSize =
-                                                  (20 + 5) * scaleFactor;
-                                              final taskFontSize =
-                                                  (14 + 5) * scaleFactor;
-
-                                              final panelHeight =
-                                                  constraints.maxHeight;
-                                              final topPadding = 4.0; // 여백 더 줄임
-                                              final bottomPadding =
-                                                  4.0; // 여백 더 줄임
-                                              final headerHeight =
-                                                  titleFontSize + 12;
-                                              final buttonHeight = 40.0;
-                                              final spaceBetweenTitleAndTasks =
-                                                  8 * scaleFactor; // 여백 줄임
-
-                                              final fixedHeight =
-                                                  topPadding +
-                                                  headerHeight +
-                                                  buttonHeight +
-                                                  spaceBetweenTitleAndTasks +
-                                                  bottomPadding;
-                                              final availableHeight =
-                                                  panelHeight - fixedHeight;
-
-                                              final itemVerticalPadding =
-                                                  6 * scaleFactor;
-                                              final itemMargin =
-                                                  6 * scaleFactor;
-                                              final textHeight = taskFontSize;
-                                              // 실제 렌더링 높이 계산 (margin 포함)
-                                              final actualItemMargin =
-                                                  12 * scaleFactor;
-                                              final taskItemHeight =
-                                                  (itemVerticalPadding * 2) +
-                                                  textHeight +
-                                                  actualItemMargin;
-
-                                              // 패널 높이의 90% 제한으로 이상적인 여백 확보
-                                              final maxAllowedHeight =
-                                                  panelHeight *
-                                                  0.90; // 패널 높이의 90%
-                                              final maxAvailableHeight =
-                                                  maxAllowedHeight -
-                                                  (topPadding +
-                                                      headerHeight +
-                                                      buttonHeight +
-                                                      spaceBetweenTitleAndTasks); // 헤더 영역만 제외
-
-                                              // 90% 제한 내에서 들어갈 수 있는 최대 일정 개수 계산
-                                              int maxTasks =
-                                                  (maxAvailableHeight /
-                                                          taskItemHeight)
-                                                      .floor();
-
-                                              // 오버플로우 방지와 일정 표시 균형 조정
-                                              maxTasks = (maxTasks - 0.5)
-                                                  .round()
-                                                  .clamp(1, 10);
-
-                                              // 디버깅: 실제 계산값들 출력
-                                              print(
-                                                '내일 패널 - panelHeight: $panelHeight, maxTasks: $maxTasks, taskItemHeight: $taskItemHeight',
-                                              );
-
-                                              return Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    children: [
-                                                      Container(
-                                                        padding:
-                                                            const EdgeInsets.all(
-                                                              10,
-                                                            ),
-                                                        decoration: BoxDecoration(
-                                                          color: const Color(
-                                                            0xFF6366f1,
-                                                          ),
-                                                          borderRadius:
-                                                              BorderRadius.circular(
-                                                                14,
-                                                              ),
-                                                          boxShadow: [
-                                                            BoxShadow(
-                                                              color:
-                                                                  const Color(
-                                                                    0xFF6366f1,
-                                                                  ).withOpacity(
-                                                                    0.3,
-                                                                  ),
-                                                              blurRadius: 12,
-                                                              offset:
-                                                                  const Offset(
-                                                                    0,
-                                                                    4,
-                                                                  ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        child: const Icon(
-                                                          Icons.event,
-                                                          color: Colors.white,
-                                                          size: 22,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 16),
-                                                      Expanded(
-                                                        child: Row(
-                                                          children: [
-                                                            Text(
-                                                              '내일',
-                                                              style: TextStyle(
-                                                                color:
-                                                                    const Color(
-                                                                      0xFF1f2937,
-                                                                    ),
-                                                                fontSize:
-                                                                    titleFontSize +
-                                                                    5,
+                                                                fontSize: 16,
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .bold,
                                                               ),
                                                             ),
-                                                            const SizedBox(
-                                                              width: 8,
-                                                            ),
-                                                            Text(
-                                                              '-',
-                                                              style: TextStyle(
-                                                                color:
-                                                                    const Color(
-                                                                      0xFF6b7280,
-                                                                    ),
-                                                                fontSize:
-                                                                    titleFontSize -
-                                                                    2,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .normal,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 8,
-                                                            ),
-                                                            Text(
-                                                              _formatDate(
-                                                                DateTime.now().add(
-                                                                  const Duration(
-                                                                    days: 1,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              style: TextStyle(
-                                                                color:
-                                                                    const Color(
-                                                                      0xFF6b7280,
-                                                                    ),
-                                                                fontSize:
-                                                                    titleFontSize -
-                                                                    6,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .normal,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 12,
-                                                            ),
-                                                            // 일정 개수 배지 (공간 부족시 숨김)
-                                                            Builder(
-                                                              builder: (context) {
-                                                                final screenWidth =
-                                                                    MediaQuery.of(
-                                                                      context,
-                                                                    ).size.width;
-                                                                final availableWidth =
-                                                                    screenWidth -
-                                                                    40; // 패딩 제외
-
-                                                                // 배지가 들어갈 수 있는 공간 계산
-                                                                final titleWidth =
-                                                                    (titleFontSize +
-                                                                        5) *
-                                                                    2; // "내일" 텍스트
-                                                                final dateWidth =
-                                                                    (titleFontSize -
-                                                                        6) *
-                                                                    4; // 날짜 텍스트
-                                                                final dashWidth =
-                                                                    (titleFontSize -
-                                                                        2) *
-                                                                    1; // "-" 텍스트
-                                                                final spacingWidth =
-                                                                    8 +
-                                                                    8 +
-                                                                    12; // 간격들
-                                                                final importantButtonWidth =
-                                                                    60; // 중요 버튼
-                                                                final iconWidth =
-                                                                    44; // 아이콘 컨테이너
-                                                                final iconSpacing =
-                                                                    16; // 아이콘과 텍스트 간격
-
-                                                                // 배지가 들어갈 수 있는 공간
-                                                                final spaceForBadge =
-                                                                    availableWidth -
-                                                                    titleWidth -
-                                                                    dateWidth -
-                                                                    dashWidth -
-                                                                    spacingWidth -
-                                                                    importantButtonWidth -
-                                                                    iconWidth -
-                                                                    iconSpacing;
-
-                                                                // 배지 대략적 너비
-                                                                final estimatedBadgeWidth =
-                                                                    8 +
-                                                                    8 +
-                                                                    12 +
-                                                                    4 +
-                                                                    ((14 + 2) *
-                                                                        scaleFactor *
-                                                                        3);
-
-                                                                // 공간이 충분한지 확인
-                                                                if (spaceForBadge >=
-                                                                    estimatedBadgeWidth) {
-                                                                  return Container(
-                                                                    padding: const EdgeInsets.symmetric(
-                                                                      horizontal:
-                                                                          8,
-                                                                      vertical:
-                                                                          4,
-                                                                    ),
-                                                                    decoration: BoxDecoration(
-                                                                      color: const Color(
-                                                                        0xFFf3f4f6,
-                                                                      ),
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
-                                                                            12,
-                                                                          ),
-                                                                      border: Border.all(
-                                                                        color: const Color(
-                                                                          0xFFd1d5db,
-                                                                        ),
-                                                                        width:
-                                                                            1,
-                                                                      ),
-                                                                    ),
-                                                                    child: Row(
-                                                                      mainAxisSize:
-                                                                          MainAxisSize
-                                                                              .min,
-                                                                      children: [
-                                                                        Icon(
-                                                                          Icons
-                                                                              .check_circle,
-                                                                          size:
-                                                                              12,
-                                                                          color: const Color(
-                                                                            0xFF10b981,
-                                                                          ),
-                                                                        ),
-                                                                        const SizedBox(
-                                                                          width:
-                                                                              4,
-                                                                        ),
-                                                                        Text(
-                                                                          '${tomorrowTasks.where((task) => task.isCompleted).length}/${tomorrowTasks.length}',
-                                                                          style: TextStyle(
-                                                                            fontSize:
-                                                                                (14 +
-                                                                                    2) *
-                                                                                scaleFactor,
-                                                                            fontWeight:
-                                                                                FontWeight.w600,
-                                                                            color: const Color(
-                                                                              0xFF6b7280,
-                                                                            ),
-                                                                          ),
-                                                                        ),
-                                                                      ],
-                                                                    ),
-                                                                  );
-                                                                } else {
-                                                                  // 공간이 부족하면 완전히 숨김
-                                                                  return const SizedBox.shrink();
-                                                                }
-                                                              },
-                                                            ),
                                                           ],
                                                         ),
                                                       ),
-                                                      // 중요 버튼
-                                                      GestureDetector(
-                                                        onTap: () {
-                                                          setState(() {
-                                                            _showTomorrowImportantOnly =
-                                                                !_showTomorrowImportantOnly;
-                                                          });
-                                                        },
-                                                        child: AnimatedContainer(
-                                                          duration:
-                                                              const Duration(
-                                                                milliseconds:
-                                                                    300,
+                                                    ),
+                                                  ],
+                                                ),
+                                                SizedBox(
+                                                  height: 8 * scaleFactor,
+                                                ),
+                                                // 일정 목록 (스크롤 가능하게 수정)
+                                                Expanded(
+                                                  child: todayTasks.isEmpty
+                                                      ? LayoutBuilder(
+                                                          builder: (context, constraints) {
+                                                            // 화면 높이에 따라 동적으로 조정
+                                                            final availableHeight =
+                                                                constraints
+                                                                    .maxHeight;
+                                                            final isSmallScreen =
+                                                                availableHeight <
+                                                                100;
+
+                                                            return Center(
+                                                              child: Column(
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .center,
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  if (!isSmallScreen) ...[
+                                                                    Icon(
+                                                                      Icons
+                                                                          .event_note,
+                                                                      color: const Color(
+                                                                        0xFFd1d5db,
+                                                                      ),
+                                                                      size:
+                                                                          isSmallScreen
+                                                                          ? 24
+                                                                          : 48,
+                                                                    ),
+                                                                    SizedBox(
+                                                                      height:
+                                                                          isSmallScreen
+                                                                          ? 8
+                                                                          : 16,
+                                                                    ),
+                                                                  ],
+                                                                  Flexible(
+                                                                    child: Text(
+                                                                      isSmallScreen
+                                                                          ? '일정 없음'
+                                                                          : '오늘 일정이 없습니다',
+                                                                      style: TextStyle(
+                                                                        color: const Color(
+                                                                          0xFF9ca3af,
+                                                                        ),
+                                                                        fontSize:
+                                                                            isSmallScreen
+                                                                            ? taskFontSize *
+                                                                                  0.8
+                                                                            : taskFontSize,
+                                                                        fontStyle:
+                                                                            FontStyle.italic,
+                                                                      ),
+                                                                      textAlign:
+                                                                          TextAlign
+                                                                              .center,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis,
+                                                                      maxLines:
+                                                                          2,
+                                                                    ),
+                                                                  ),
+                                                                ],
                                                               ),
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                horizontal: 16,
-                                                                vertical: 8,
+                                                            );
+                                                          },
+                                                        )
+                                                      : SingleChildScrollView(
+                                                          child: Column(
+                                                            children:
+                                                                (_showTodayImportantOnly
+                                                                        ? todayTasks.where(
+                                                                            (
+                                                                              task,
+                                                                            ) =>
+                                                                                task.isImportant,
+                                                                          )
+                                                                        : todayTasks)
+                                                                    .take(
+                                                                      maxTasks,
+                                                                    )
+                                                                    .map(
+                                                                      (
+                                                                        task,
+                                                                      ) => Container(
+                                                                        margin: EdgeInsets.only(
+                                                                          bottom:
+                                                                              12 *
+                                                                              scaleFactor,
+                                                                        ),
+                                                                        child: Container(
+                                                                          padding: EdgeInsets.symmetric(
+                                                                            horizontal:
+                                                                                16 *
+                                                                                scaleFactor,
+                                                                            vertical:
+                                                                                12 *
+                                                                                scaleFactor,
+                                                                          ),
+                                                                          decoration: BoxDecoration(
+                                                                            color:
+                                                                                ((task.isRecurring
+                                                                                    ? context
+                                                                                          .read<
+                                                                                            TaskProvider
+                                                                                          >()
+                                                                                          .isOccurrenceCompleted(
+                                                                                            task.id,
+                                                                                            DateTime.now(),
+                                                                                          )
+                                                                                    : task.isCompleted))
+                                                                                ? const Color(
+                                                                                    0xFFdcfce7,
+                                                                                  )
+                                                                                : const Color(
+                                                                                    0xFFfef2f2,
+                                                                                  ),
+                                                                            borderRadius: BorderRadius.circular(
+                                                                              16,
+                                                                            ),
+                                                                            border: Border.all(
+                                                                              color:
+                                                                                  ((task.isRecurring
+                                                                                      ? context
+                                                                                            .read<
+                                                                                              TaskProvider
+                                                                                            >()
+                                                                                            .isOccurrenceCompleted(
+                                                                                              task.id,
+                                                                                              DateTime.now(),
+                                                                                            )
+                                                                                      : task.isCompleted))
+                                                                                  ? const Color(
+                                                                                      0xFF22c55e,
+                                                                                    )
+                                                                                  : const Color(
+                                                                                      0xFFef4444,
+                                                                                    ),
+                                                                              width: 1,
+                                                                            ),
+                                                                          ),
+                                                                          child: Row(
+                                                                            children: [
+                                                                              // 상태 아이콘
+                                                                              Container(
+                                                                                padding: EdgeInsets.all(
+                                                                                  6 *
+                                                                                      scaleFactor,
+                                                                                ),
+                                                                                decoration: BoxDecoration(
+                                                                                  color: task.isRecurring
+                                                                                      ? const Color(
+                                                                                          0xFF6366F1,
+                                                                                        )
+                                                                                      : Color(
+                                                                                          TaskCategories.getCategoryColor(
+                                                                                            task.category,
+                                                                                          ),
+                                                                                        ),
+                                                                                  borderRadius: BorderRadius.circular(
+                                                                                    8 *
+                                                                                        scaleFactor,
+                                                                                  ),
+                                                                                ),
+                                                                                child: Center(
+                                                                                  child: Row(
+                                                                                    mainAxisSize: MainAxisSize.min,
+                                                                                    children: [
+                                                                                      // 반복 일정 아이콘 (반복 일정인 경우)
+                                                                                      if (task.isRecurring) ...[
+                                                                                        Text(
+                                                                                          '🔄',
+                                                                                          style: TextStyle(
+                                                                                            fontSize:
+                                                                                                16 *
+                                                                                                scaleFactor,
+                                                                                          ),
+                                                                                        ),
+                                                                                        SizedBox(
+                                                                                          width:
+                                                                                              4 *
+                                                                                              scaleFactor,
+                                                                                        ),
+                                                                                        Text(
+                                                                                          '반복',
+                                                                                          style: TextStyle(
+                                                                                            fontSize:
+                                                                                                12 *
+                                                                                                scaleFactor,
+                                                                                            color: Colors.white,
+                                                                                            fontWeight: FontWeight.bold,
+                                                                                          ),
+                                                                                        ),
+                                                                                      ] else ...[
+                                                                                        Text(
+                                                                                          TaskCategories.getCategoryIcon(
+                                                                                            task.category,
+                                                                                          ),
+                                                                                          style: TextStyle(
+                                                                                            fontSize:
+                                                                                                16 *
+                                                                                                scaleFactor,
+                                                                                          ),
+                                                                                        ),
+                                                                                        SizedBox(
+                                                                                          width:
+                                                                                              4 *
+                                                                                              scaleFactor,
+                                                                                        ),
+                                                                                        Text(
+                                                                                          TaskCategories.getCategoryInfo(
+                                                                                                task.category,
+                                                                                              )?['name'] ??
+                                                                                              task.category,
+                                                                                          style: TextStyle(
+                                                                                            fontSize:
+                                                                                                12 *
+                                                                                                scaleFactor,
+                                                                                            color: Colors.white,
+                                                                                            fontWeight: FontWeight.bold,
+                                                                                          ),
+                                                                                        ),
+                                                                                      ],
+                                                                                    ],
+                                                                                  ),
+                                                                                ),
+                                                                              ),
+                                                                              const SizedBox(
+                                                                                width: 12,
+                                                                              ),
+                                                                              // 일정 제목
+                                                                              Expanded(
+                                                                                child: Row(
+                                                                                  children: [
+                                                                                    // 별 아이콘 또는 빈 공간 (일관된 레이아웃을 위해)
+                                                                                    if (!task.isRecurring &&
+                                                                                        task.isImportant)
+                                                                                      Icon(
+                                                                                        Icons.star,
+                                                                                        color: const Color(
+                                                                                          0xFFfbbf24,
+                                                                                        ),
+                                                                                        size: 16,
+                                                                                      )
+                                                                                    else
+                                                                                      const SizedBox(
+                                                                                        width: 20, // 별 아이콘 + 간격과 동일한 공간
+                                                                                      ),
+                                                                                    const SizedBox(
+                                                                                      width: 4,
+                                                                                    ),
+                                                                                    Expanded(
+                                                                                      child: Text(
+                                                                                        task.title,
+                                                                                        style: TextStyle(
+                                                                                          color: const Color(
+                                                                                            0xFF1f2937,
+                                                                                          ),
+                                                                                          fontSize: taskFontSize,
+                                                                                          fontWeight: FontWeight.w600,
+                                                                                        ),
+                                                                                        overflow: TextOverflow.ellipsis,
+                                                                                      ),
+                                                                                    ),
+                                                                                  ],
+                                                                                ),
+                                                                              ),
+                                                                              const SizedBox(
+                                                                                width: 8,
+                                                                              ),
+                                                                              // 시간 표시 (오른쪽으로 이동)
+                                                                              Text(
+                                                                                _formatTime(
+                                                                                  task.date,
+                                                                                ),
+                                                                                style: TextStyle(
+                                                                                  color: const Color(
+                                                                                    0xFF6b7280,
+                                                                                  ),
+                                                                                  fontSize:
+                                                                                      taskFontSize -
+                                                                                      2,
+                                                                                ),
+                                                                              ),
+                                                                            ],
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    )
+                                                                    .toList(),
+                                                          ),
+                                                        ),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  // 내일 패널
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                DateDetailScreen(
+                                                  date: DateTime.now().add(
+                                                    const Duration(days: 1),
+                                                  ),
+                                                  title: '내일',
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(
+                                            24,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                0.08,
+                                              ),
+                                              blurRadius: 20,
+                                              offset: const Offset(0, 8),
+                                            ),
+                                          ],
+                                        ),
+                                        padding: const EdgeInsets.all(12),
+                                        child: LayoutBuilder(
+                                          builder: (context, constraints) {
+                                            final scaleFactor =
+                                                0.75 + (fontSize * 0.5);
+                                            final titleFontSize =
+                                                (20 + 5) * scaleFactor;
+                                            final taskFontSize =
+                                                (14 + 5) * scaleFactor;
+
+                                            final panelHeight =
+                                                constraints.maxHeight;
+                                            final topPadding = 4.0; // 여백 더 줄임
+                                            final bottomPadding =
+                                                4.0; // 여백 더 줄임
+                                            final headerHeight =
+                                                titleFontSize + 12;
+                                            final buttonHeight = 40.0;
+                                            final spaceBetweenTitleAndTasks =
+                                                8 * scaleFactor; // 여백 줄임
+
+                                            final fixedHeight =
+                                                topPadding +
+                                                headerHeight +
+                                                buttonHeight +
+                                                spaceBetweenTitleAndTasks +
+                                                bottomPadding;
+                                            final availableHeight =
+                                                panelHeight - fixedHeight;
+
+                                            final itemVerticalPadding =
+                                                6 * scaleFactor;
+                                            final itemMargin = 6 * scaleFactor;
+                                            final textHeight = taskFontSize;
+                                            // 실제 렌더링 높이 계산 (margin 포함)
+                                            final actualItemMargin =
+                                                12 * scaleFactor;
+                                            final taskItemHeight =
+                                                (itemVerticalPadding * 2) +
+                                                textHeight +
+                                                actualItemMargin;
+
+                                            // 패널 높이의 90% 제한으로 이상적인 여백 확보
+                                            final maxAllowedHeight =
+                                                panelHeight *
+                                                0.90; // 패널 높이의 90%
+                                            final maxAvailableHeight =
+                                                maxAllowedHeight -
+                                                (topPadding +
+                                                    headerHeight +
+                                                    buttonHeight +
+                                                    spaceBetweenTitleAndTasks); // 헤더 영역만 제외
+
+                                            // 90% 제한 내에서 들어갈 수 있는 최대 일정 개수 계산
+                                            int maxTasks =
+                                                (maxAvailableHeight /
+                                                        taskItemHeight)
+                                                    .floor();
+
+                                            // 오버플로우 방지와 일정 표시 균형 조정
+                                            maxTasks = (maxTasks - 0.5)
+                                                .round()
+                                                .clamp(1, 10);
+
+                                            // 디버깅: 실제 계산값들 출력
+                                            print(
+                                              '내일 패널 - panelHeight: $panelHeight, maxTasks: $maxTasks, taskItemHeight: $taskItemHeight',
+                                            );
+
+                                            return Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                            10,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(
+                                                          0xFF6366f1,
+                                                        ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              14,
+                                                            ),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: const Color(
+                                                              0xFF6366f1,
+                                                            ).withOpacity(0.3),
+                                                            blurRadius: 12,
+                                                            offset:
+                                                                const Offset(
+                                                                  0,
+                                                                  4,
+                                                                ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: const Icon(
+                                                        Icons.event,
+                                                        color: Colors.white,
+                                                        size: 22,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 16),
+                                                    Expanded(
+                                                      child: Row(
+                                                        children: [
+                                                          Text(
+                                                            '내일',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF1f2937,
+                                                                  ),
+                                                              fontSize:
+                                                                  titleFontSize +
+                                                                  5,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 8,
+                                                          ),
+                                                          Text(
+                                                            '-',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF6b7280,
+                                                                  ),
+                                                              fontSize:
+                                                                  titleFontSize -
+                                                                  2,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .normal,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 8,
+                                                          ),
+                                                          Text(
+                                                            _formatDate(
+                                                              DateTime.now().add(
+                                                                const Duration(
+                                                                  days: 1,
+                                                                ),
                                                               ),
-                                                          decoration: BoxDecoration(
+                                                            ),
+                                                            style: TextStyle(
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF6b7280,
+                                                                  ),
+                                                              fontSize:
+                                                                  titleFontSize -
+                                                                  6,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .normal,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 12,
+                                                          ),
+                                                          // 일정 개수 배지 (공간 부족시 숨김)
+                                                          Builder(
+                                                            builder: (context) {
+                                                              final screenWidth =
+                                                                  MediaQuery.of(
+                                                                    context,
+                                                                  ).size.width;
+                                                              final availableWidth =
+                                                                  screenWidth -
+                                                                  40; // 패딩 제외
+
+                                                              // 배지가 들어갈 수 있는 공간 계산
+                                                              final titleWidth =
+                                                                  (titleFontSize +
+                                                                      5) *
+                                                                  2; // "내일" 텍스트
+                                                              final dateWidth =
+                                                                  (titleFontSize -
+                                                                      6) *
+                                                                  4; // 날짜 텍스트
+                                                              final dashWidth =
+                                                                  (titleFontSize -
+                                                                      2) *
+                                                                  1; // "-" 텍스트
+                                                              final spacingWidth =
+                                                                  8 +
+                                                                  8 +
+                                                                  12; // 간격들
+                                                              final importantButtonWidth =
+                                                                  60; // 중요 버튼
+                                                              final iconWidth =
+                                                                  44; // 아이콘 컨테이너
+                                                              final iconSpacing =
+                                                                  16; // 아이콘과 텍스트 간격
+
+                                                              // 배지가 들어갈 수 있는 공간
+                                                              final spaceForBadge =
+                                                                  availableWidth -
+                                                                  titleWidth -
+                                                                  dateWidth -
+                                                                  dashWidth -
+                                                                  spacingWidth -
+                                                                  importantButtonWidth -
+                                                                  iconWidth -
+                                                                  iconSpacing;
+
+                                                              // 배지 대략적 너비
+                                                              final estimatedBadgeWidth =
+                                                                  8 +
+                                                                  8 +
+                                                                  12 +
+                                                                  4 +
+                                                                  ((14 + 2) *
+                                                                      scaleFactor *
+                                                                      3);
+
+                                                              // 공간이 충분한지 확인
+                                                              if (spaceForBadge >=
+                                                                  estimatedBadgeWidth) {
+                                                                return Container(
+                                                                  padding:
+                                                                      const EdgeInsets.symmetric(
+                                                                        horizontal:
+                                                                            8,
+                                                                        vertical:
+                                                                            4,
+                                                                      ),
+                                                                  decoration: BoxDecoration(
+                                                                    color: const Color(
+                                                                      0xFFf3f4f6,
+                                                                    ),
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                          12,
+                                                                        ),
+                                                                    border: Border.all(
+                                                                      color: const Color(
+                                                                        0xFFd1d5db,
+                                                                      ),
+                                                                      width: 1,
+                                                                    ),
+                                                                  ),
+                                                                  child: Row(
+                                                                    mainAxisSize:
+                                                                        MainAxisSize
+                                                                            .min,
+                                                                    children: [
+                                                                      Icon(
+                                                                        Icons
+                                                                            .check_circle,
+                                                                        size:
+                                                                            12,
+                                                                        color: const Color(
+                                                                          0xFF10b981,
+                                                                        ),
+                                                                      ),
+                                                                      const SizedBox(
+                                                                        width:
+                                                                            4,
+                                                                      ),
+                                                                      Text(
+                                                                        '${tomorrowTasks.where((task) => !task.isRecurring && task.isCompleted || (task.isRecurring && context.read<TaskProvider>().isOccurrenceCompleted(task.id, DateTime.now().add(const Duration(days: 1))))).length}/${tomorrowTasks.length}',
+                                                                        style: TextStyle(
+                                                                          fontSize:
+                                                                              (14 + 2) *
+                                                                              scaleFactor,
+                                                                          fontWeight:
+                                                                              FontWeight.w600,
+                                                                          color: const Color(
+                                                                            0xFF6b7280,
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                );
+                                                              } else {
+                                                                // 공간이 부족하면 완전히 숨김
+                                                                return const SizedBox.shrink();
+                                                              }
+                                                            },
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    // 중요 버튼
+                                                    GestureDetector(
+                                                      onTap: () {
+                                                        setState(() {
+                                                          _showTomorrowImportantOnly =
+                                                              !_showTomorrowImportantOnly;
+                                                        });
+                                                      },
+                                                      child: AnimatedContainer(
+                                                        duration:
+                                                            const Duration(
+                                                              milliseconds: 300,
+                                                            ),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 16,
+                                                              vertical: 8,
+                                                            ),
+                                                        decoration: BoxDecoration(
+                                                          color:
+                                                              _showTomorrowImportantOnly
+                                                              ? const Color(
+                                                                  0xFFfbbf24,
+                                                                )
+                                                              : const Color(
+                                                                  0xFFf3f4f6,
+                                                                ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                20,
+                                                              ),
+                                                          border: Border.all(
                                                             color:
                                                                 _showTomorrowImportantOnly
                                                                 ? const Color(
                                                                     0xFFfbbf24,
                                                                   )
                                                                 : const Color(
-                                                                    0xFFf3f4f6,
+                                                                    0xFFd1d5db,
                                                                   ),
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  20,
-                                                                ),
-                                                            border: Border.all(
+                                                            width: 1,
+                                                          ),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                              Icons.star,
                                                               color:
                                                                   _showTomorrowImportantOnly
-                                                                  ? const Color(
-                                                                      0xFFfbbf24,
-                                                                    )
+                                                                  ? Colors.white
                                                                   : const Color(
-                                                                      0xFFd1d5db,
+                                                                      0xFF6b7280,
                                                                     ),
-                                                              width: 1,
+                                                              size: 18,
                                                             ),
-                                                          ),
-                                                          child: Row(
-                                                            mainAxisSize:
-                                                                MainAxisSize
-                                                                    .min,
-                                                            children: [
-                                                              Icon(
-                                                                Icons.star,
+                                                            const SizedBox(
+                                                              width: 6,
+                                                            ),
+                                                            Text(
+                                                              '${tomorrowTasks.where((task) => task.isImportant).length}',
+                                                              style: TextStyle(
                                                                 color:
                                                                     _showTomorrowImportantOnly
                                                                     ? Colors
@@ -1239,383 +1265,436 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                                     : const Color(
                                                                         0xFF6b7280,
                                                                       ),
-                                                                size: 18,
+                                                                fontSize: 16,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
                                                               ),
-                                                              const SizedBox(
-                                                                width: 6,
-                                                              ),
-                                                              Text(
-                                                                '${tomorrowTasks.where((task) => task.isImportant).length}',
-                                                                style: TextStyle(
-                                                                  color:
-                                                                      _showTomorrowImportantOnly
-                                                                      ? Colors
-                                                                            .white
-                                                                      : const Color(
-                                                                          0xFF6b7280,
-                                                                        ),
-                                                                  fontSize: 16,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
+                                                            ),
+                                                          ],
                                                         ),
                                                       ),
-                                                    ],
-                                                  ),
-                                                  SizedBox(
-                                                    height: 8 * scaleFactor,
-                                                  ),
-                                                  // 일정 목록 (스크롤 가능하게 수정)
-                                                  Expanded(
-                                                    child: tomorrowTasks.isEmpty
-                                                        ? LayoutBuilder(
-                                                            builder:
-                                                                (
-                                                                  context,
-                                                                  constraints,
-                                                                ) {
-                                                                  // 화면 높이에 따라 동적으로 조정
-                                                                  final availableHeight =
-                                                                      constraints
-                                                                          .maxHeight;
-                                                                  final isSmallScreen =
-                                                                      availableHeight <
-                                                                      100;
+                                                    ),
+                                                  ],
+                                                ),
+                                                SizedBox(
+                                                  height: 8 * scaleFactor,
+                                                ),
+                                                // 일정 목록 (스크롤 가능하게 수정)
+                                                Expanded(
+                                                  child: tomorrowTasks.isEmpty
+                                                      ? LayoutBuilder(
+                                                          builder: (context, constraints) {
+                                                            // 화면 높이에 따라 동적으로 조정
+                                                            final availableHeight =
+                                                                constraints
+                                                                    .maxHeight;
+                                                            final isSmallScreen =
+                                                                availableHeight <
+                                                                100;
 
-                                                                  return Center(
-                                                                    child: Column(
-                                                                      mainAxisAlignment:
-                                                                          MainAxisAlignment
-                                                                              .center,
-                                                                      mainAxisSize:
-                                                                          MainAxisSize
-                                                                              .min,
-                                                                      children: [
-                                                                        if (!isSmallScreen) ...[
-                                                                          Icon(
-                                                                            Icons.event_note,
-                                                                            color: const Color(
-                                                                              0xFFd1d5db,
-                                                                            ),
-                                                                            size:
-                                                                                isSmallScreen
-                                                                                ? 24
-                                                                                : 48,
-                                                                          ),
-                                                                          SizedBox(
-                                                                            height:
-                                                                                isSmallScreen
-                                                                                ? 8
-                                                                                : 16,
-                                                                          ),
-                                                                        ],
-                                                                        Flexible(
-                                                                          child: Text(
-                                                                            isSmallScreen
-                                                                                ? '일정 없음'
-                                                                                : '내일 일정이 없습니다',
-                                                                            style: TextStyle(
-                                                                              color: const Color(
-                                                                                0xFF9ca3af,
-                                                                              ),
-                                                                              fontSize: isSmallScreen
-                                                                                  ? taskFontSize *
-                                                                                        0.8
-                                                                                  : taskFontSize,
-                                                                              fontStyle: FontStyle.italic,
-                                                                            ),
-                                                                            textAlign:
-                                                                                TextAlign.center,
-                                                                            overflow:
-                                                                                TextOverflow.ellipsis,
-                                                                            maxLines:
-                                                                                2,
-                                                                          ),
-                                                                        ),
-                                                                      ],
+                                                            return Center(
+                                                              child: Column(
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .center,
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  if (!isSmallScreen) ...[
+                                                                    Icon(
+                                                                      Icons
+                                                                          .event_note,
+                                                                      color: const Color(
+                                                                        0xFFd1d5db,
+                                                                      ),
+                                                                      size:
+                                                                          isSmallScreen
+                                                                          ? 24
+                                                                          : 48,
                                                                     ),
-                                                                  );
-                                                                },
-                                                          )
-                                                        : SingleChildScrollView(
-                                                            child: Column(
-                                                              children:
-                                                                  (_showTomorrowImportantOnly
-                                                                          ? tomorrowTasks.where(
-                                                                              (
-                                                                                task,
-                                                                              ) => task.isImportant,
-                                                                            )
-                                                                          : tomorrowTasks)
-                                                                      .take(
-                                                                        maxTasks,
-                                                                      )
-                                                                      .map(
-                                                                        (
-                                                                          task,
-                                                                        ) => Container(
-                                                                          margin: EdgeInsets.only(
-                                                                            bottom:
+                                                                    SizedBox(
+                                                                      height:
+                                                                          isSmallScreen
+                                                                          ? 8
+                                                                          : 16,
+                                                                    ),
+                                                                  ],
+                                                                  Flexible(
+                                                                    child: Text(
+                                                                      isSmallScreen
+                                                                          ? '일정 없음'
+                                                                          : '내일 일정이 없습니다',
+                                                                      style: TextStyle(
+                                                                        color: const Color(
+                                                                          0xFF9ca3af,
+                                                                        ),
+                                                                        fontSize:
+                                                                            isSmallScreen
+                                                                            ? taskFontSize *
+                                                                                  0.8
+                                                                            : taskFontSize,
+                                                                        fontStyle:
+                                                                            FontStyle.italic,
+                                                                      ),
+                                                                      textAlign:
+                                                                          TextAlign
+                                                                              .center,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis,
+                                                                      maxLines:
+                                                                          2,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            );
+                                                          },
+                                                        )
+                                                      : SingleChildScrollView(
+                                                          child: Column(
+                                                            children:
+                                                                (_showTomorrowImportantOnly
+                                                                        ? tomorrowTasks.where(
+                                                                            (
+                                                                              task,
+                                                                            ) =>
+                                                                                task.isImportant,
+                                                                          )
+                                                                        : tomorrowTasks)
+                                                                    .take(
+                                                                      maxTasks,
+                                                                    )
+                                                                    .map(
+                                                                      (
+                                                                        task,
+                                                                      ) => Container(
+                                                                        margin: EdgeInsets.only(
+                                                                          bottom:
+                                                                              12 *
+                                                                              scaleFactor,
+                                                                        ),
+                                                                        child: Container(
+                                                                          padding: EdgeInsets.symmetric(
+                                                                            horizontal:
+                                                                                16 *
+                                                                                scaleFactor,
+                                                                            vertical:
                                                                                 12 *
                                                                                 scaleFactor,
                                                                           ),
-                                                                          child: Container(
-                                                                            padding: EdgeInsets.symmetric(
-                                                                              horizontal:
-                                                                                  16 *
-                                                                                  scaleFactor,
-                                                                              vertical:
-                                                                                  12 *
-                                                                                  scaleFactor,
+                                                                          decoration: BoxDecoration(
+                                                                            color:
+                                                                                task.isCompleted
+                                                                                ? const Color(
+                                                                                    0xFFdcfce7,
+                                                                                  )
+                                                                                : const Color(
+                                                                                    0xFFfef2f2,
+                                                                                  ),
+                                                                            borderRadius: BorderRadius.circular(
+                                                                              16,
                                                                             ),
-                                                                            decoration: BoxDecoration(
+                                                                            border: Border.all(
                                                                               color: task.isCompleted
                                                                                   ? const Color(
-                                                                                      0xFFdcfce7,
+                                                                                      0xFF22c55e,
                                                                                     )
                                                                                   : const Color(
-                                                                                      0xFFfef2f2,
+                                                                                      0xFFef4444,
                                                                                     ),
-                                                                              borderRadius: BorderRadius.circular(
-                                                                                16,
-                                                                              ),
-                                                                              border: Border.all(
-                                                                                color: task.isCompleted
-                                                                                    ? const Color(
-                                                                                        0xFF22c55e,
-                                                                                      )
-                                                                                    : const Color(
-                                                                                        0xFFef4444,
-                                                                                      ),
-                                                                                width: 1,
-                                                                              ),
+                                                                              width: 1,
                                                                             ),
-                                                                            child: Row(
-                                                                              children: [
-                                                                                // 상태 아이콘
-                                                                                Container(
-                                                                                  padding: EdgeInsets.all(
-                                                                                    6 *
+                                                                          ),
+                                                                          child: Row(
+                                                                            children: [
+                                                                              // 상태 아이콘
+                                                                              Container(
+                                                                                padding: EdgeInsets.all(
+                                                                                  6 *
+                                                                                      scaleFactor,
+                                                                                ),
+                                                                                decoration: BoxDecoration(
+                                                                                  color: task.isRecurring
+                                                                                      ? const Color(
+                                                                                          0xFF6366F1,
+                                                                                        )
+                                                                                      : Color(
+                                                                                          TaskCategories.getCategoryColor(
+                                                                                            task.category,
+                                                                                          ),
+                                                                                        ),
+                                                                                  borderRadius: BorderRadius.circular(
+                                                                                    8 *
                                                                                         scaleFactor,
                                                                                   ),
-                                                                                  decoration: BoxDecoration(
-                                                                                    color: Color(
-                                                                                      TaskCategories.getCategoryColor(
-                                                                                        task.category,
-                                                                                      ),
-                                                                                    ),
-                                                                                    borderRadius: BorderRadius.circular(
-                                                                                      8 *
-                                                                                          scaleFactor,
-                                                                                    ),
-                                                                                  ),
-                                                                                  child: Center(
-                                                                                    child: Row(
-                                                                                      mainAxisSize: MainAxisSize.min,
-                                                                                      children: [
-                                                                                        // 반복 일정 아이콘 (반복 일정인 경우)
-                                                                                        if (task.isRecurring) ...[
-                                                                                          Text(
-                                                                                            '🔄',
-                                                                                            style: TextStyle(
-                                                                                              fontSize:
-                                                                                                  16 *
-                                                                                                  scaleFactor,
-                                                                                            ),
-                                                                                          ),
-                                                                                          SizedBox(
-                                                                                            width:
-                                                                                                4 *
-                                                                                                scaleFactor,
-                                                                                          ),
-                                                                                          Text(
-                                                                                            '반복',
-                                                                                            style: TextStyle(
-                                                                                              fontSize:
-                                                                                                  12 *
-                                                                                                  scaleFactor,
-                                                                                              color: Colors.white,
-                                                                                              fontWeight: FontWeight.bold,
-                                                                                            ),
-                                                                                          ),
-                                                                                        ] else ...[
-                                                                                          Text(
-                                                                                            TaskCategories.getCategoryIcon(
-                                                                                              task.category,
-                                                                                            ),
-                                                                                            style: TextStyle(
-                                                                                              fontSize:
-                                                                                                  16 *
-                                                                                                  scaleFactor,
-                                                                                            ),
-                                                                                          ),
-                                                                                          SizedBox(
-                                                                                            width:
-                                                                                                4 *
-                                                                                                scaleFactor,
-                                                                                          ),
-                                                                                          Text(
-                                                                                            TaskCategories.getCategoryInfo(
-                                                                                                  task.category,
-                                                                                                )?['name'] ??
-                                                                                                task.category,
-                                                                                            style: TextStyle(
-                                                                                              fontSize:
-                                                                                                  12 *
-                                                                                                  scaleFactor,
-                                                                                              color: Colors.white,
-                                                                                              fontWeight: FontWeight.bold,
-                                                                                            ),
-                                                                                          ),
-                                                                                        ],
-                                                                                      ],
-                                                                                    ),
-                                                                                  ),
                                                                                 ),
-                                                                                const SizedBox(
-                                                                                  width: 12,
-                                                                                ),
-                                                                                // 일정 제목
-                                                                                Expanded(
+                                                                                child: Center(
                                                                                   child: Row(
+                                                                                    mainAxisSize: MainAxisSize.min,
                                                                                     children: [
-                                                                                      // 별 아이콘 또는 빈 공간 (일관된 레이아웃을 위해)
-                                                                                      if (task.isImportant)
-                                                                                        Icon(
-                                                                                          Icons.star,
-                                                                                          color: const Color(
-                                                                                            0xFFfbbf24,
-                                                                                          ),
-                                                                                          size: 16,
-                                                                                        )
-                                                                                      else
-                                                                                        const SizedBox(
-                                                                                          width: 20, // 별 아이콘 + 간격과 동일한 공간
-                                                                                        ),
-                                                                                      const SizedBox(
-                                                                                        width: 4,
-                                                                                      ),
-                                                                                      Expanded(
-                                                                                        child: Text(
-                                                                                          task.title,
+                                                                                      // 반복 일정 아이콘 (반복 일정인 경우)
+                                                                                      if (task.isRecurring) ...[
+                                                                                        Text(
+                                                                                          '🔄',
                                                                                           style: TextStyle(
-                                                                                            color: const Color(
-                                                                                              0xFF1f2937,
-                                                                                            ),
-                                                                                            fontSize: taskFontSize,
-                                                                                            fontWeight: FontWeight.w600,
+                                                                                            fontSize:
+                                                                                                16 *
+                                                                                                scaleFactor,
                                                                                           ),
-                                                                                          overflow: TextOverflow.ellipsis,
                                                                                         ),
-                                                                                      ),
+                                                                                        SizedBox(
+                                                                                          width:
+                                                                                              4 *
+                                                                                              scaleFactor,
+                                                                                        ),
+                                                                                        Text(
+                                                                                          '반복',
+                                                                                          style: TextStyle(
+                                                                                            fontSize:
+                                                                                                12 *
+                                                                                                scaleFactor,
+                                                                                            color: Colors.white,
+                                                                                            fontWeight: FontWeight.bold,
+                                                                                          ),
+                                                                                        ),
+                                                                                      ] else ...[
+                                                                                        Text(
+                                                                                          TaskCategories.getCategoryIcon(
+                                                                                            task.category,
+                                                                                          ),
+                                                                                          style: TextStyle(
+                                                                                            fontSize:
+                                                                                                16 *
+                                                                                                scaleFactor,
+                                                                                          ),
+                                                                                        ),
+                                                                                        SizedBox(
+                                                                                          width:
+                                                                                              4 *
+                                                                                              scaleFactor,
+                                                                                        ),
+                                                                                        Text(
+                                                                                          TaskCategories.getCategoryInfo(
+                                                                                                task.category,
+                                                                                              )?['name'] ??
+                                                                                              task.category,
+                                                                                          style: TextStyle(
+                                                                                            fontSize:
+                                                                                                12 *
+                                                                                                scaleFactor,
+                                                                                            color: Colors.white,
+                                                                                            fontWeight: FontWeight.bold,
+                                                                                          ),
+                                                                                        ),
+                                                                                      ],
                                                                                     ],
                                                                                   ),
                                                                                 ),
-                                                                                const SizedBox(
-                                                                                  width: 8,
-                                                                                ),
-                                                                                // 시간 표시 (오른쪽으로 이동)
-                                                                                Text(
-                                                                                  _formatTime(
-                                                                                    task.date,
-                                                                                  ),
-                                                                                  style: TextStyle(
-                                                                                    color: const Color(
-                                                                                      0xFF6b7280,
+                                                                              ),
+                                                                              const SizedBox(
+                                                                                width: 12,
+                                                                              ),
+                                                                              // 일정 제목
+                                                                              Expanded(
+                                                                                child: Row(
+                                                                                  children: [
+                                                                                    // 별 아이콘 또는 빈 공간 (반복 일정은 숨김)
+                                                                                    if (!task.isRecurring &&
+                                                                                        task.isImportant)
+                                                                                      Icon(
+                                                                                        Icons.star,
+                                                                                        color: const Color(
+                                                                                          0xFFfbbf24,
+                                                                                        ),
+                                                                                        size: 16,
+                                                                                      )
+                                                                                    else
+                                                                                      const SizedBox(
+                                                                                        width: 20, // 별 아이콘 + 간격과 동일한 공간
+                                                                                      ),
+                                                                                    const SizedBox(
+                                                                                      width: 4,
                                                                                     ),
-                                                                                    fontSize:
-                                                                                        taskFontSize -
-                                                                                        2,
-                                                                                  ),
+                                                                                    Expanded(
+                                                                                      child: Text(
+                                                                                        task.title,
+                                                                                        style: TextStyle(
+                                                                                          color: const Color(
+                                                                                            0xFF1f2937,
+                                                                                          ),
+                                                                                          fontSize: taskFontSize,
+                                                                                          fontWeight: FontWeight.w600,
+                                                                                        ),
+                                                                                        overflow: TextOverflow.ellipsis,
+                                                                                      ),
+                                                                                    ),
+                                                                                  ],
                                                                                 ),
-                                                                              ],
-                                                                            ),
+                                                                              ),
+                                                                              const SizedBox(
+                                                                                width: 8,
+                                                                              ),
+                                                                              // 시간 표시 (오른쪽으로 이동)
+                                                                              Text(
+                                                                                _formatTime(
+                                                                                  task.date,
+                                                                                ),
+                                                                                style: TextStyle(
+                                                                                  color: const Color(
+                                                                                    0xFF6b7280,
+                                                                                  ),
+                                                                                  fontSize:
+                                                                                      taskFontSize -
+                                                                                      2,
+                                                                                ),
+                                                                              ),
+                                                                            ],
                                                                           ),
                                                                         ),
-                                                                      )
-                                                                      .toList(),
-                                                            ),
+                                                                      ),
+                                                                    )
+                                                                    .toList(),
                                                           ),
-                                                  ),
-                                                ],
-                                              );
-                                            },
-                                          ),
+                                                        ),
+                                                ),
+                                              ],
+                                            );
+                                          },
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 20),
-                              // 일정 더보기 섹션
-                              SizedBox(
-                                height: 80,
-                                child: GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const CalendarScreen(),
-                                      ),
-                                    );
-                                  },
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Color(0xFF6366f1),
-                                          Color(0xFF8b5cf6),
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(
-                                            0xFF6366f1,
-                                          ).withValues(alpha: 0.3),
-                                          blurRadius: 12,
-                                          offset: const Offset(0, 4),
-                                        ),
+                            ),
+                            const SizedBox(height: 20),
+                            // 일정 더보기 섹션
+                            SizedBox(
+                              height: 80,
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const CalendarScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Color(0xFF6366f1),
+                                        Color(0xFF8b5cf6),
                                       ],
                                     ),
-                                    padding: const EdgeInsets.all(20),
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(
+                                          0xFF6366f1,
+                                        ).withValues(alpha: 0.3),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  padding: const EdgeInsets.all(20),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.2,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.calendar_today,
+                                          color: Colors.white,
+                                          size: 24,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Text(
+                                        '일정 더보기',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize:
+                                              (20 + 5) *
+                                              (0.75 + (fontSize * 0.5)),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // 하단 버튼들
+                      SizedBox(
+                        height: 70,
+                        child: Row(
+                          children: [
+                            // 좌측: 반복일정 버튼 (원래 카드 스타일)
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const RecurringTasksScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  height: 70,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
                                     child: Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withValues(
-                                              alpha: 0.2,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          child: const Icon(
-                                            Icons.calendar_today,
-                                            color: Colors.white,
-                                            size: 24,
-                                          ),
+                                        const Icon(
+                                          Icons.repeat,
+                                          color: Color(0xFF6366f1),
+                                          size: 24,
                                         ),
-                                        const SizedBox(width: 16),
+                                        const SizedBox(width: 8),
                                         Text(
-                                          '일정 더보기',
+                                          '반복일정',
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: const Color(0xFF1f2937),
                                             fontSize:
-                                                (20 + 5) *
-                                                (0.75 + (fontSize * 0.5)),
-                                            fontWeight: FontWeight.bold,
+                                                22 * (0.75 + (fontSize * 0.5)),
+                                            fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                       ],
@@ -1623,138 +1702,75 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 16),
+                            // 중앙: 빈 공간 (전역 음성 버튼으로 대체됨)
+                            const SizedBox(width: 72),
+                            const SizedBox(width: 16),
+                            // 우측: 설정 버튼 (원래 카드 스타일)
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const SettingsScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  height: 70,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(
+                                          Icons.settings,
+                                          color: Color(0xFF6366f1),
+                                          size: 24,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '설정',
+                                          style: TextStyle(
+                                            color: const Color(0xFF1f2937),
+                                            fontSize:
+                                                22 * (0.75 + (fontSize * 0.5)),
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 20),
-                        // 하단 버튼들
-                        SizedBox(
-                          height: 70,
-                          child: Row(
-                            children: [
-                              // 좌측: 반복일정 버튼 (원래 카드 스타일)
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const RecurringTasksScreen(),
-                                      ),
-                                    );
-                                  },
-                                  child: Container(
-                                    height: 70,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.08,
-                                          ),
-                                          blurRadius: 20,
-                                          offset: const Offset(0, 8),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Center(
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(
-                                            Icons.repeat,
-                                            color: Color(0xFF6366f1),
-                                            size: 24,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '반복일정',
-                                            style: TextStyle(
-                                              color: const Color(0xFF1f2937),
-                                              fontSize:
-                                                  22 *
-                                                  (0.75 + (fontSize * 0.5)),
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              // 중앙: 빈 공간 (전역 음성 버튼으로 대체됨)
-                              const SizedBox(width: 72),
-                              const SizedBox(width: 16),
-                              // 우측: 설정 버튼 (원래 카드 스타일)
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const SettingsScreen(),
-                                      ),
-                                    );
-                                  },
-                                  child: Container(
-                                    height: 70,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.08,
-                                          ),
-                                          blurRadius: 20,
-                                          offset: const Offset(0, 8),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Center(
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(
-                                            Icons.settings,
-                                            color: Color(0xFF6366f1),
-                                            size: 24,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '설정',
-                                            style: TextStyle(
-                                              color: const Color(0xFF1f2937),
-                                              fontSize:
-                                                  22 *
-                                                  (0.75 + (fontSize * 0.5)),
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         ),
+      ),
     );
   }
 

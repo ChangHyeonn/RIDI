@@ -19,6 +19,7 @@ class AddScheduleResult:
     success: bool
     schedule_data: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
+    error_type: Optional[str] = None
 
 
 class AddScheduleUseCase:
@@ -69,11 +70,24 @@ class AddScheduleUseCase:
                         label=time_info.get('label')
                     ))
                 
+                # 반복 일정 검증: days_of_week가 null인 경우 확인
+                recurrence_type = recurrence_data.get('type', 'daily')
+                days_of_week = recurrence_data.get('days_of_week')
+                
+                # 주간 반복인데 days_of_week가 null이거나 비어있는 경우
+                if recurrence_type in ['weekly', 'weekdays'] and (not days_of_week or len(days_of_week) == 0):
+                    self.logger.warning(f"Recurring schedule missing days_of_week: type={recurrence_type}")
+                    return AddScheduleResult(
+                        False, 
+                        error_message="반복 일정의 요일 정보가 필요합니다. 언제 반복할지 요일을 말씀해주세요.",
+                        error_type="recurrence_days_missing"
+                    )
+                
                 recurrence_pattern = RecurrencePattern(
-                    type=recurrence_data.get('type', 'daily'),
+                    type=recurrence_type,
                     times=times,
                     end_date=recurrence_data.get('end_date'),
-                    days_of_week=recurrence_data.get('days_of_week')
+                    days_of_week=days_of_week
                 )
             
             schedule = Schedule(
