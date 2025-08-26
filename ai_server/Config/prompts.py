@@ -46,6 +46,11 @@ class PromptManager:
 - "치과 예약해야 해" → schedule_add
 - "약 복용해야 해" → schedule_add
 
+**지난 일정 거부 예시:**
+- "어제 오후 3시에 병원 진료" → 거부 (과거 시간)
+- "오늘 아침 7시에 약 복용" (현재 오후인 경우) → 거부 (과거 시간)
+- "지난주 월요일에 회의" → 거부 (과거 날짜)
+
 **일정 조회 요청 감지 규칙:**
 - "~일정 보여줘", "~일정 알려줘", "~일정 언제" → schedule_read (키워드 검색)
 - "~관련 일정", "~일정이 언제" → schedule_read (키워드 검색)
@@ -84,11 +89,24 @@ JSON 형식으로만 응답:
 2. **날짜 정보가 있으면 반드시 날짜 기반 조회로 분류하세요!**
 3. 날짜 정보가 없는 경우에만 키워드 검색으로 분류하세요.
 4. "이번 주", "다음 주", "내일", "모레" 등의 날짜 표현을 우선적으로 인식하세요.
+5. **지난 시간의 일정은 등록할 수 없습니다!** 현재 시간보다 과거인 일정은 거부하고 미래 시간을 요청하세요.
+6. **description은 일정의 상세한 맥락과 세부 정보를 포함하세요.** 예: "내용(장소, 함께하는 사람, 구체적인 활동 등)" - 일자와 시간 정보는 제외
 
 추가 요청 예시:
-- "내일 오후 3시에 병원 진료 일정을 추가해 줘" → title: "병원 진료"
-- "다음주 월요일 오전 9시에 회사 회의 일정을 넣어줘" → title: "회사 회의"
-- "매일 아침 7시에 약 복용 일정을 등록해 줘" → title: "약 복용"
+- "내일 오후 3시에 병원 진료 일정을 추가해 줘" → title: "병원 진료", description: "병원 진료 예약"
+- "다음주 월요일 오전 9시에 회사 회의 일정을 넣어줘" → title: "회사 회의", description: "회사 업무 회의"
+- "매일 아침 7시에 약 복용 일정을 등록해 줘" → title: "약 복용", description: "정기 약물 복용"
+- "친구랑 영화 보기 약속 있어" → title: "영화 보기", description: "친구와 영화 관람"
+- "치과 예약해야 해" → title: "치과 예약", description: "치과 진료 예약"
+- "약 복용해야 해" → title: "약 복용", description: "정기 약물 복용"
+- "다음 주 토요일에 친구랑 같이 영화를 보러 롯데시네마에 갈 거야" → title: "영화 보기", description: "롯데시네마에서 친구와 영화 관람"
+- "내일 오후 2시에 강남역에서 친구 만나서 커피 마실 거야" → title: "친구 만남", description: "강남역에서 친구와 커피"
+- "다음주 월요일 오전 10시에 회사에서 고객 미팅 있어" → title: "고객 미팅", description: "회사에서 고객 미팅"
+- "다음 주 토요일에 친구랑 같이 영화를 보러 롯데시네마에 갈 거야, 아침 7시에 기상 알람 맞춰 줘" → title: "영화 보기", description: "롯데시네마에서 친구와 영화 관람"
+- "내일 오후 3시에 강남역 근처 치과에서 정기 검진 받을 거야" → title: "치과 검진", description: "강남역 근처 치과에서 정기 검진"
+- "다음주 월요일 오전 9시에 회사에서 팀 회의 있어" → title: "팀 회의", description: "회사에서 팀 회의"
+- "매일 아침 7시에 집에서 요가 운동할 거야" → title: "요가", description: "집에서 요가 운동"
+- "평일마다 오후 6시에 헬스장에서 운동할 거야" → title: "헬스 운동", description: "헬스장에서 운동"
 
 조회 요청 예시:
 **키워드 검색:**
@@ -200,6 +218,12 @@ JSON 형식으로만 응답:
 
 중요: JSON 형식으로만 응답하세요. 마크다운 코드 블록(```json)을 사용하지 마세요.
 
+**description 추출 규칙:**
+1. **장소 정보 포함**: 언급된 장소가 있으면 포함 (예: "롯데시네마", "강남역", "회사", "집")
+2. **함께하는 사람 포함**: 언급된 사람이 있으면 포함 (예: "친구와", "팀과")
+3. **구체적인 활동 포함**: 단순한 제목이 아닌 구체적인 활동 내용 포함
+4. **형식**: "구체적인 활동 내용(장소, 사람 등)" - 일자와 시간 정보는 제외
+
 **일정 추가/삭제용:**
 {{
     "title": "일정 제목 (구체적인 내용만, '일정', '예약' 등의 일반적 단어 제외)",
@@ -237,17 +261,17 @@ JSON 형식으로만 응답:
 
 예시:
 **일정 추가:**
-- "내일 오후 3시에 병원 진료" → title: "병원 진료", date: "2025-08-22", time: "15:00", is_recurring: false
-- "다음 주 수요일 오전 9시에 친구랑 아침 식사" → title: "아침 식사", date: "2025-08-27", time: "09:00", is_recurring: false
-- "매일 아침 7시, 저녁 6시에 약 복용" → title: "약 복용", date: "2025-08-22", time: "07:00", is_recurring: true, type: "daily"
-- "매일 아침 7시마다 약 복용" → title: "약 복용", date: "2025-08-22", time: "07:00", is_recurring: true, type: "daily"
-- "매일 아침 7시에 약을 먹어야 돼" → title: "약 복용", date: "2025-08-22", time: "07:00", is_recurring: true, type: "daily"
-- "아침 7시마다 약 복용" → title: "약 복용", date: "2025-08-22", time: "07:00", is_recurring: true, type: "daily"
-- "7시마다 약 복용" → title: "약 복용", date: "2025-08-22", time: "07:00", is_recurring: true, type: "daily"
-- "매일 아침 7시에 약 복용, 다음주 금요일까지" → title: "약 복용", date: "2025-08-22", time: "07:00", is_recurring: true, type: "daily", end_date: "2025-09-05"
-- "평일마다 오후 6시에 축구, 다다음주 금요일까지" → title: "축구", date: "2025-08-22", time: "18:00", is_recurring: true, type: "weekdays", end_date: "2025-09-12"
-- "매일 아침 7시에 약 복용, 30일 뒤까지" → title: "약 복용", date: "2025-08-22", time: "07:00", is_recurring: true, type: "daily", end_date: "2025-09-21"
-- "평일마다 오후 6시에 운동, 3개월 뒤까지" → title: "운동", date: "2025-08-22", time: "18:00", is_recurring: true, type: "weekdays", end_date: "2025-11-22"
+- "내일 오후 3시에 병원 진료" → title: "병원 진료", date: "2025-08-22", time: "15:00", description: "병원 진료 예약", is_recurring: false
+- "다음 주 수요일 오전 9시에 친구랑 아침 식사" → title: "아침 식사", date: "2025-08-27", time: "09:00", description: "친구와 아침 식사", is_recurring: false
+- "매일 아침 7시, 저녁 6시에 약 복용" → title: "약 복용", date: "2025-08-22", time: "07:00", description: "정기 약물 복용", is_recurring: true, type: "daily"
+- "매일 아침 7시마다 약 복용" → title: "약 복용", date: "2025-08-22", time: "07:00", description: "정기 약물 복용", is_recurring: true, type: "daily"
+- "매일 아침 7시에 약을 먹어야 돼" → title: "약 복용", date: "2025-08-22", time: "07:00", description: "정기 약물 복용", is_recurring: true, type: "daily"
+- "아침 7시마다 약 복용" → title: "약 복용", date: "2025-08-22", time: "07:00", description: "정기 약물 복용", is_recurring: true, type: "daily"
+- "7시마다 약 복용" → title: "약 복용", date: "2025-08-22", time: "07:00", description: "정기 약물 복용", is_recurring: true, type: "daily"
+- "매일 아침 7시에 약 복용, 다음주 금요일까지" → title: "약 복용", date: "2025-08-22", time: "07:00", description: "정기 약물 복용, 다음주 금요일까지", is_recurring: true, type: "daily", end_date: "2025-09-05"
+- "평일마다 오후 6시에 축구, 다다음주 금요일까지" → title: "축구", date: "2025-08-22", time: "18:00", description: "축구 운동, 다다음주 금요일까지", is_recurring: true, type: "weekdays", end_date: "2025-09-12"
+- "매일 아침 7시에 약 복용, 30일 뒤까지" → title: "약 복용", date: "2025-08-22", time: "07:00", description: "정기 약물 복용, 30일 뒤까지", is_recurring: true, type: "daily", end_date: "2025-09-21"
+- "평일마다 오후 6시에 운동, 3개월 뒤까지" → title: "운동", date: "2025-08-22", time: "18:00", description: "운동, 3개월 뒤까지", is_recurring: true, type: "weekdays", end_date: "2025-11-22"
 
 **일정 조회 (키워드 검색):**
 - "치과 일정 언제 있어?" → type: "keyword", keyword: "치과"

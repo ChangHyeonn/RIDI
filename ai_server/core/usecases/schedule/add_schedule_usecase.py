@@ -54,6 +54,16 @@ class AddScheduleUseCase:
                 self.logger.error(f"DateTime parsing failed: {e}")
                 return AddScheduleResult(False, error_message="날짜 형식이 올바르지 않습니다.")
             
+            # 3. 지난 일정 검증 (과거 시간 체크)
+            current_datetime = datetime.now()
+            if start_datetime < current_datetime:
+                self.logger.warning(f"Past schedule attempt: {start_datetime} < {current_datetime}")
+                return AddScheduleResult(
+                    False, 
+                    error_message="지난 시간의 일정은 등록할 수 없습니다. 미래의 시간을 말씀해주세요.",
+                    error_type="past_schedule"
+                )
+            
             # 3. 일정 엔티티 생성 (반복 일정 지원)
             is_recurring = schedule_info.get('is_recurring', False)
             recurrence_pattern = None
@@ -81,6 +91,15 @@ class AddScheduleUseCase:
                         False, 
                         error_message="반복 일정의 요일 정보가 필요합니다. 언제 반복할지 요일을 말씀해주세요.",
                         error_type="recurrence_days_missing"
+                    )
+                
+                # 반복 일정의 시작일도 과거인지 검증
+                if start_datetime < current_datetime:
+                    self.logger.warning(f"Past recurring schedule attempt: {start_datetime} < {current_datetime}")
+                    return AddScheduleResult(
+                        False, 
+                        error_message="반복 일정의 시작일이 지난 시간입니다. 미래의 시작일을 말씀해주세요.",
+                        error_type="past_recurring_schedule"
                     )
                 
                 recurrence_pattern = RecurrencePattern(
