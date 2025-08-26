@@ -76,7 +76,7 @@ class DeleteScheduleUseCase:
             return DeleteScheduleResult(False, error_message=f"일정 삭제 실패: {str(e)}")
     
     def _find_similar_schedules(self, user_id: str, search_title: str, date_str: str = None) -> List[Dict[str, Any]]:
-        """유사한 일정들을 찾는 함수 (스펙트럼 검색)"""
+        """유사한 일정들을 찾는 함수 (스펙트럼 검색) - description 포함"""
         try:
             # 1. 일정 조회
             if date_str:
@@ -86,20 +86,32 @@ class DeleteScheduleUseCase:
             else:
                 user_schedules = self.schedule_repository.find_by_user_id(user_id)
             
-            # 2. 유사도 계산 및 필터링
+            # 2. 유사도 계산 및 필터링 (title + description 고려)
             similar_schedules = []
             for schedule in user_schedules:
                 # title이 None인 경우 건너뛰기
                 if schedule.title is None:
                     self.logger.warning(f"Schedule {schedule.id} has None title, skipping")
                     continue
-                    
-                similarity = self._calculate_similarity(search_title, schedule.title)
-                self.logger.info(f"Similarity between '{search_title}' and '{schedule.title}': {similarity}")
-                if similarity >= 0.15:  # 유사도 임계값을 더 낮춤
+                
+                # title과 description 모두 고려한 유사도 계산
+                title_similarity = self._calculate_similarity(search_title, schedule.title)
+                description_similarity = 0.0
+                
+                # description이 있는 경우 description 유사도도 계산
+                if schedule.description:
+                    description_similarity = self._calculate_similarity(search_title, schedule.description)
+                
+                # title과 description 중 더 높은 유사도 사용 (description에 가중치 부여)
+                similarity = max(title_similarity, description_similarity * 0.8)
+                
+                self.logger.info(f"Similarity for '{search_title}' vs '{schedule.title}': title={title_similarity:.3f}, desc={description_similarity:.3f}, final={similarity:.3f}")
+                
+                if similarity >= 0.15:  # 유사도 임계값
                     similar_schedules.append({
                         'id': schedule.id,
                         'title': schedule.title,
+                        'description': schedule.description,  # description 추가
                         'datetime': schedule.start_datetime.isoformat() if schedule.start_datetime else None,
                         'category': schedule.category,
                         'similarity': similarity,

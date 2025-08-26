@@ -30,15 +30,15 @@ class GetScheduleUseCase:
         self.logger = LoggerFactory.get_logger(__name__)
     
     def execute(self, user_id: str, query_info: Dict[str, Any]) -> GetScheduleResult:
-        """일정 조회 실행"""
+        """일정 조회 실행 (description 포함 검색 지원)"""
         try:
             query_type = query_info.get('type', 'all')
             
             if query_type == 'keyword' and query_info.get('keyword'):
-                # 키워드 기반 검색
+                # 키워드 기반 검색 (title + description + category에서 검색)
                 keyword = query_info['keyword']
                 schedules = self.schedule_repository.find_by_user_and_keyword(user_id, keyword)
-                self.logger.info(f"Keyword search for '{keyword}': found {len(schedules)} schedules")
+                self.logger.info(f"Keyword search for '{keyword}' (including description): found {len(schedules)} schedules")
             elif query_type == 'important':
                 schedules = self.schedule_repository.find_important_by_user(user_id)
             elif query_type == 'date' and query_info.get('date'):

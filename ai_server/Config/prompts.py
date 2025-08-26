@@ -59,6 +59,11 @@ class PromptManager:
 - "중요한 일정", "중요 일정" → schedule_read (중요 일정 조회)
 - "~일정이 언제 있어?" (존재 여부만 묻는 경우) → schedule_read
 
+**일정 조회/삭제 시 description 활용:**
+- 일정 조회/삭제 시 제목뿐만 아니라 description의 상세 내용도 고려하여 검색
+- 예: "롯데시네마에서 영화 본 일정" → "영화 보기" 제목 + "롯데시네마에서 친구와 영화 관람" description에서 검색
+- 예: "친구랑 커피 마신 일정" → "친구 만남" 제목 + "강남역에서 친구와 커피" description에서 검색
+
 **일정 조회 예시:**
 - "다음 주에 뭐 있어?" → schedule_read
 - "내일 일정 뭐야?" → schedule_read
@@ -278,6 +283,9 @@ JSON 형식으로만 응답:
 - "병원 관련 일정이 언제 있는지 알려줘" → type: "keyword", keyword: "병원"
 - "정기 검진 일정 보여줘" → type: "keyword", keyword: "정기 검진"
 - "회의 일정 알려줘" → type: "keyword", keyword: "회의"
+- "롯데시네마에서 영화 본 일정" → type: "keyword", keyword: "롯데시네마" (description에서 검색)
+- "친구랑 커피 마신 일정" → type: "keyword", keyword: "친구" (description에서 검색)
+- "강남역에서 만난 일정" → type: "keyword", keyword: "강남역" (description에서 검색)
 
 **일정 조회 (날짜별):**
 - "내일 일정 보여줘" → type: "date", date: "2025-08-22"
@@ -293,6 +301,9 @@ JSON 형식으로만 응답:
 - "병원 일정 삭제해 줘" → title: "병원"
 - "병원 진료 일정 삭제해 줘" → title: "병원 진료"
 - "내일 병원 진료 일정 삭제해 줘" → title: "병원 진료", date: "2025-08-22"
+- "롯데시네마에서 영화 본 일정 삭제해 줘" → title: "영화 보기" (description에서 "롯데시네마" 검색)
+- "친구랑 커피 마신 일정 삭제해 줘" → title: "친구 만남" (description에서 "친구" 검색)
+- "강남역에서 만난 일정 삭제해 줘" → title: "친구 만남" (description에서 "강남역" 검색)
 """
 
     # ===== 3단계: 응답 생성 프롬프트 =====
