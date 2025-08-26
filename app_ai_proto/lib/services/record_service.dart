@@ -1163,6 +1163,11 @@ class RecordService {
 
     try {
       print('=== 음성 인식 취소 ===');
+      // 진행 중인 TTS가 있으면 즉시 중지 (다음 녹음을 위해 경합 방지)
+      if (_ttsService.isSpeaking) {
+        print('🔇 취소 시 TTS 중지');
+        await _ttsService.stop();
+      }
       await _sttService.cancelListening();
       _recognizedText = '';
       _aiResponseText = '';

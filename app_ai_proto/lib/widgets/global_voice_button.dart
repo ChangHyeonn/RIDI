@@ -130,6 +130,11 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
         _isOverlayOpen = true;
       });
 
+      // 기존 TTS가 재생 중이라면 강제 중단 (새 녹음 대비)
+      try {
+        await _recordService.stopPlaying();
+      } catch (_) {}
+
       final success = await _recordService.startRecording();
       if (success) {
         setState(() {
@@ -167,6 +172,10 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
       if (_isRecording) {
         await _recordService.cancelRecording();
       }
+      // 오버레이를 닫을 때 진행 중인 TTS가 있다면 항상 중단
+      try {
+        await _recordService.stopPlaying();
+      } catch (_) {}
     } catch (e) {
       print('❌ 오버레이 닫기 중 취소 실패: $e');
     } finally {

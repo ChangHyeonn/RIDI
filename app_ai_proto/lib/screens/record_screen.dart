@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:provider/provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../providers/task_provider.dart';
 import '../services/record_service.dart';
 import '../services/ai_service.dart';
@@ -140,6 +139,10 @@ class _RecordScreenState extends State<RecordScreen> {
 
   @override
   void dispose() {
+    // 화면이 닫힐 때 진행 중인 TTS가 있다면 중단
+    try {
+      _recordService.stopPlaying();
+    } catch (_) {}
     _recordService.dispose();
     super.dispose();
   }
