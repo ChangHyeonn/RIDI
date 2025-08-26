@@ -128,7 +128,7 @@ class UnifiedVoiceService {
       }
 
       final success = await _sttService.startListening(
-        localeId: 'ko_KR',
+        // localeId 강제 지정 제거: 서비스 내부에서 기기 지원 로케일 자동 선택
         partialResults: true,
         onDevice: false,
         assumePermissionGranted: false,

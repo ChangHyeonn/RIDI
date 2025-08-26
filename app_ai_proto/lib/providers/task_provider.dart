@@ -47,18 +47,18 @@ class TaskProvider with ChangeNotifier {
     try {
       final isSyncEnabled = await _syncManager.isSyncEnabled();
       print('🔍 동기화 활성화 상태: $isSyncEnabled');
-      
+
       if (isSyncEnabled) {
         print('🔄 백그라운드 동기화 시작...');
         print('📊 동기화 전 일정 개수: ${_tasks.length}');
-        
+
         await _syncManager.syncIncremental();
         _taskService.invalidateCache(); // 캐시 무효화
         await loadTasks(); // 동기화 후 데이터 새로고침
-        
+
         print('📊 동기화 후 일정 개수: ${_tasks.length}');
         print('✅ 백그라운드 동기화 완료');
-        
+
         // 동기화 결과를 UI에 반영
         notifyListeners();
       } else {
@@ -96,18 +96,7 @@ class TaskProvider with ChangeNotifier {
   Future<void> loadTasks() async {
     print('📥 일정 로드 시작...');
     _tasks = await _taskService.getTasks();
-<<<<<<< HEAD
     _dedupeRecurringTasksInMemory();
-=======
-    print('📊 로드된 일정 개수: ${_tasks.length}');
-    
-    // 일정 목록 출력 (디버깅용)
-    for (int i = 0; i < _tasks.length; i++) {
-      final task = _tasks[i];
-      print('  ${i + 1}. ${task.title} (${task.date}) - 반복: ${task.isRecurring}');
-    }
-    
->>>>>>> app_ai
     notifyListeners();
     print('✅ 일정 로드 완료');
   }
@@ -228,7 +217,7 @@ class TaskProvider with ChangeNotifier {
     _processDeletionInBackground([taskId]);
   }
 
-  // 백그라운드에서 일정 저장
+  // 백그라운드에서 저장
   Future<void> _saveTasksInBackground() async {
     try {
       await _taskService.saveTasks(_tasks);

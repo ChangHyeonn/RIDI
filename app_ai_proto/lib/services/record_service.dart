@@ -229,7 +229,7 @@ class RecordService {
 
       // 음성 인식 시작 (권한은 이미 RecordScreen에서 확인됨)
       final success = await _sttService.startListening(
-        localeId: 'ko_KR',
+        // localeId를 강제하지 않고 기기 지원 로케일을 서비스 내부에서 선택
         partialResults: true,
         onDevice: false,
         assumePermissionGranted: true,
