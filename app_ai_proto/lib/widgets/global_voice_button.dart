@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/record_service.dart';
 import '../providers/task_provider.dart';
-import '../main.dart';
 
 class GlobalVoiceButton extends StatefulWidget {
   const GlobalVoiceButton({Key? key}) : super(key: key);
@@ -16,6 +15,7 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
   final RecordService _recordService = RecordService();
   bool _isRecording = false;
   bool _isProcessing = false;
+  bool _isSpeaking = false;
   bool _isOverlayOpen = false;
   String _recognizedText = '';
   String _aiResponseText = '';
@@ -23,7 +23,6 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
   late AnimationController _pulseController;
   late AnimationController _fadeController;
   late Animation<double> _pulseAnimation;
-  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
@@ -45,9 +44,7 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
-    );
+    // 페이드 애니메이션 값은 현재 사용하지 않지만 유지 (디자인 여지)
 
     _initializeRecordService();
   }
@@ -77,16 +74,30 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
 
         // AI 응답 스트림 구독
         _recordService.aiResponseStream.listen((response) {
-          if (mounted) {
+          if (!mounted) return;
+          // 분석 중 텍스트나 빈 응답은 화면 응답으로 취급하지 않음(지우지 않음)
+          final isAnalysisMsg = response.contains('AI가 텍스트를 분석하고 있습니다');
+          if (response.isNotEmpty && !isAnalysisMsg) {
             setState(() {
-              _aiResponseText = response;
-              if (response.isNotEmpty) {
-                _isProcessing = false;
-                _isRecording = false;
-                _stopAnimations();
-              }
+              _aiResponseText = response; // 응답 고정
+              _isProcessing = false; // 실제 응답 수신 → 처리중 해제
+              _isRecording = false;
+              _stopAnimations();
             });
           }
+        });
+
+        // TTS 재생 상태 구독: 재생 시작/종료에 맞춰 오버레이 제어
+        _recordService.playingStateStream.listen((isSpeaking) {
+          if (!mounted) return;
+          setState(() {
+            _isSpeaking = isSpeaking;
+            if (isSpeaking) {
+              // TTS 중에는 상태 문구 숨기기 위해 처리중 플래그 해제
+              _isProcessing = false;
+            }
+            // TTS 종료 후에는 오버레이를 자동으로 닫지 않음(사용자 조작까지 유지)
+          });
         });
       }
     } catch (e) {
@@ -125,6 +136,7 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
           _isRecording = true;
           _recognizedText = '';
           _aiResponseText = '';
+          _isSpeaking = false;
         });
         _startAnimations();
       }
@@ -135,7 +147,7 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
 
   Future<void> _stopRecording() async {
     try {
-      final recognizedText = await _recordService.stopRecording();
+      await _recordService.stopRecording();
       setState(() {
         _isRecording = false;
         _isProcessing = true;
@@ -171,7 +183,7 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
 
   @override
   Widget build(BuildContext context) {
-    final bool isActive = _isRecording || _isProcessing;
+    // final bool isActive = _isRecording || _isProcessing; // 미사용 변수 제거
 
     // 오버레이가 열리지 않았을 때는 작은 버튼만 노출
     if (!_isOverlayOpen) {
@@ -317,7 +329,9 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
                 const SizedBox(height: 40),
 
                 Text(
-                  _isRecording ? '말씀해주세요...' : '처리 중...',
+                  _isRecording
+                      ? '말씀해주세요...'
+                      : (_isProcessing ? '처리 중...' : (_isSpeaking ? '' : '')),
                   style: const TextStyle(
                     fontSize: 16,
                     color: Colors.white,

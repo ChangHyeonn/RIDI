@@ -24,6 +24,7 @@ class _RecurrenceSettingWidgetState extends State<RecurrenceSettingWidget> {
   late List<bool> _selectedDays;
   late DateTime? _endDate;
   late List<RecurrenceTime> _times;
+  bool get _isDailyActive => _selectedDays.every((d) => d);
 
   @override
   void initState() {
@@ -71,6 +72,19 @@ class _RecurrenceSettingWidgetState extends State<RecurrenceSettingWidget> {
       );
     }
     widget.onChanged(_isRecurring, _recurrence);
+  }
+
+  void _toggleDaily() {
+    setState(() {
+      if (_isDailyActive) {
+        // 매일 해제: 전부 해제 상태로 전환
+        _selectedDays = List.filled(7, false);
+      } else {
+        // 매일 설정: 전부 선택
+        _selectedDays = List.filled(7, true);
+      }
+    });
+    _updateRecurrence();
   }
 
   String _getRecurrenceType() {
@@ -138,7 +152,7 @@ class _RecurrenceSettingWidgetState extends State<RecurrenceSettingWidget> {
                 });
                 _updateRecurrence();
               },
-              activeColor: Colors.green,
+              activeThumbColor: Colors.green,
             ),
           ],
         ),
@@ -183,43 +197,89 @@ class _RecurrenceSettingWidgetState extends State<RecurrenceSettingWidget> {
           ),
           const SizedBox(height: 16),
 
-          // 요일 선택
+          // 요일 선택 + 매일 토글
           Row(
-            children: ['월', '화', '수', '목', '금', '토', '일'].asMap().entries.map((
-              entry,
-            ) {
-              int index = entry.key;
-              String day = entry.value;
-              bool isSelected = _selectedDays[index];
-
-              return Expanded(
+            children: [
+              // 매일 칩 (맨 왼쪽)
+              Expanded(
                 child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedDays[index] = !isSelected;
-                    });
-                    _updateRecurrence();
-                  },
+                  onTap: _toggleDaily,
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.blue : Colors.grey[200],
+                      color: _isDailyActive ? Colors.blue : Colors.grey[200],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      day,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? Colors.white : Colors.grey[700],
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.repeat,
+                          size: 14,
+                          color: _isDailyActive
+                              ? Colors.white
+                              : Colors.grey[700],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '매일',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _isDailyActive
+                                ? Colors.white
+                                : Colors.grey[700],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              );
-            }).toList(),
+              ),
+              // 요일 칩들
+              ...['월', '화', '수', '목', '금', '토', '일'].asMap().entries.map((
+                entry,
+              ) {
+                int index = entry.key;
+                String day = entry.value;
+                bool isSelected = _selectedDays[index];
+
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (_isDailyActive) {
+                          // 매일 활성 상태에서 개별 요일을 탭하면 매일 해제 후 해당 요일만 선택
+                          _selectedDays = List.filled(7, false);
+                          _selectedDays[index] = true;
+                        } else {
+                          _selectedDays[index] = !isSelected;
+                        }
+                      });
+                      _updateRecurrence();
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.blue : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        day,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected ? Colors.white : Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ],
           ),
           const SizedBox(height: 24),
 
@@ -273,7 +333,7 @@ class _RecurrenceSettingWidgetState extends State<RecurrenceSettingWidget> {
                 ],
               ),
             );
-          }).toList(),
+          }),
 
           // 시간 추가 버튼
           GestureDetector(
@@ -371,5 +431,3 @@ class _RecurrenceSettingWidgetState extends State<RecurrenceSettingWidget> {
     }
   }
 }
-
-
