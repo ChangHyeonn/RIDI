@@ -116,8 +116,11 @@ class DeleteScheduleUseCase:
                 if schedule.description:
                     description_similarity = self._calculate_similarity(search_title, schedule.description)
                 
-                # title과 description 중 더 높은 유사도 사용 (description에 가중치 부여)
-                similarity = max(title_similarity, description_similarity * 0.8)
+                # 복합 검색어인 경우 (예: "친구랑 롯데시네마에서 영화 보기") description에 더 높은 가중치
+                if len(search_title.split()) > 2:  # 3개 이상의 단어가 있는 경우
+                    similarity = max(title_similarity, description_similarity * 1.2)  # description에 더 높은 가중치
+                else:
+                    similarity = max(title_similarity, description_similarity * 0.8)  # 기존 가중치
                 
                 self.logger.info(f"Similarity for '{search_title}' vs '{schedule.title}': title={title_similarity:.3f}, desc={description_similarity:.3f}, final={similarity:.3f}")
                 
