@@ -80,9 +80,9 @@ class DeleteScheduleUseCase:
         try:
             # 1. 일정 조회
             if date_str:
-                from datetime import datetime
-                target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                user_schedules = self.schedule_repository.find_by_user_and_date(user_id, target_date)
+                    from datetime import datetime
+                    target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    user_schedules = self.schedule_repository.find_by_user_and_date(user_id, target_date)
             else:
                 user_schedules = self.schedule_repository.find_by_user_id(user_id)
             
