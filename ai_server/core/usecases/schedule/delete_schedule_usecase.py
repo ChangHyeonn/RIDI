@@ -31,21 +31,31 @@ class DeleteScheduleUseCase:
         self.logger = LoggerFactory.get_logger(__name__)
     
     def execute(self, user_id: str, delete_info: Dict[str, Any]) -> DeleteScheduleResult:
-        """일정 삭제 실행 (스펙트럼 검색 지원)"""
+        """일정 삭제 실행 (스펙트럼 검색 + 시간대 지원)"""
         try:
             title = (delete_info.get('title') or '').strip()
             date_str = (delete_info.get('date') or '').strip()
+            time_period = delete_info.get('time_period', '').strip()
+            specific_time = delete_info.get('time', '').strip()
             
             if not title:
                 return DeleteScheduleResult(False, error_message="삭제할 일정의 제목을 알려주세요.")
             
-            # 1. 스펙트럼 검색으로 유사한 일정들 찾기
-            similar_schedules = self._find_similar_schedules(user_id, title, date_str)
+            # 1. 스펙트럼 검색으로 유사한 일정들 찾기 (시간대 필터링 포함)
+            similar_schedules = self._find_similar_schedules(user_id, title, date_str, time_period, specific_time)
             
             # 2. 일치하는 일정이 없는 경우
             if not similar_schedules:
-                if date_str:
-                    return DeleteScheduleResult(False, error_message=f"{date_str}에 '{title}'과 관련된 일정을 찾을 수 없습니다.")
+                time_info = ""
+                if date_str and time_period:
+                    time_info = f"{date_str} {time_period}에"
+                elif date_str:
+                    time_info = f"{date_str}에"
+                elif time_period:
+                    time_info = f"{time_period}에"
+                
+                if time_info:
+                    return DeleteScheduleResult(False, error_message=f"{time_info} '{title}'과 관련된 일정을 찾을 수 없습니다.")
                 else:
                     return DeleteScheduleResult(False, error_message=f"'{title}'과 관련된 일정을 찾을 수 없습니다.")
             
@@ -75,8 +85,8 @@ class DeleteScheduleUseCase:
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             return DeleteScheduleResult(False, error_message=f"일정 삭제 실패: {str(e)}")
     
-    def _find_similar_schedules(self, user_id: str, search_title: str, date_str: str = None) -> List[Dict[str, Any]]:
-        """유사한 일정들을 찾는 함수 (스펙트럼 검색) - description 포함"""
+    def _find_similar_schedules(self, user_id: str, search_title: str, date_str: str = None, time_period: str = None, specific_time: str = None) -> List[Dict[str, Any]]:
+        """유사한 일정들을 찾는 함수 (스펙트럼 검색) - description + 시간대 포함"""
         try:
             # 1. 일정 조회
             if date_str:
@@ -86,12 +96,16 @@ class DeleteScheduleUseCase:
             else:
                 user_schedules = self.schedule_repository.find_by_user_id(user_id)
             
-            # 2. 유사도 계산 및 필터링 (title + description 고려)
+            # 2. 유사도 계산 및 필터링 (title + description + 시간대 고려)
             similar_schedules = []
             for schedule in user_schedules:
                 # title이 None인 경우 건너뛰기
                 if schedule.title is None:
                     self.logger.warning(f"Schedule {schedule.id} has None title, skipping")
+                    continue
+                
+                # 시간대 필터링
+                if not self._matches_time_filter(schedule, time_period, specific_time):
                     continue
                 
                 # title과 description 모두 고려한 유사도 계산
@@ -130,6 +144,36 @@ class DeleteScheduleUseCase:
             import traceback
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             return []
+    
+    def _matches_time_filter(self, schedule, time_period: str = None, specific_time: str = None) -> bool:
+        """시간대 필터링 함수"""
+        if not schedule.start_datetime:
+            return True  # 시간 정보가 없으면 통과
+        
+        hour = schedule.start_datetime.hour
+        
+        if time_period:
+            if time_period == 'morning' and 6 <= hour < 12:
+                return True
+            elif time_period == 'afternoon' and 12 <= hour < 18:
+                return True
+            elif time_period == 'evening' and 18 <= hour < 22:
+                return True
+            elif time_period == 'night' and (hour >= 22 or hour < 6):
+                return True
+            else:
+                return False
+        
+        elif specific_time:
+            # 구체적 시간 검색 (30분 범위)
+            target_hour, target_minute = map(int, specific_time.split(':'))
+            target_datetime = schedule.start_datetime.replace(hour=target_hour, minute=target_minute)
+            
+            # 30분 범위 내 일정 찾기
+            time_diff = abs((schedule.start_datetime - target_datetime).total_seconds() / 60)
+            return time_diff <= 30
+        
+        return True  # 시간 필터가 없으면 통과
     
     def _calculate_similarity(self, text1: str, text2: str) -> float:
         """텍스트 유사도 계산 (의료 키워드 매칭 지원)"""

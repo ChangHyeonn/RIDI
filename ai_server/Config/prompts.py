@@ -64,6 +64,12 @@ class PromptManager:
 - 예: "롯데시네마에서 영화 본 일정" → "영화 보기" 제목 + "롯데시네마에서 친구와 영화 관람" description에서 검색
 - 예: "친구랑 커피 마신 일정" → "친구 만남" 제목 + "강남역에서 친구와 커피" description에서 검색
 
+**일정 조회/삭제 시 시간대 활용:**
+- 시간대만으로도 검색 가능: "오후 일정", "아침 일정", "저녁 일정"
+- 일자+시간대 결합 검색: "내일 오후 일정", "다음주 월요일 아침 일정"
+- 구체적 시간 검색: "오후 3시 일정", "아침 7시 일정"
+- **일정 주제+일자/시간대 결합 검색**: "다음주 수요일에 있는 친구랑 영화 보러가는 일정", "내일 오후 병원 일정"
+
 **일정 조회 예시:**
 - "다음 주에 뭐 있어?" → schedule_read
 - "내일 일정 뭐야?" → schedule_read
@@ -252,9 +258,11 @@ JSON 형식으로만 응답:
 
 **일정 조회용 (키워드 검색 우선):**
 {{
-    "type": "keyword/date/important/all",
+    "type": "keyword/date/time/important/all",
     "keyword": "검색 키워드 (type이 keyword인 경우만, 구체적인 키워드만 추출)",
-    "date": "YYYY-MM-DD (type이 date인 경우만)"
+    "date": "YYYY-MM-DD (type이 date인 경우만)",
+    "time": "HH:MM (type이 time인 경우만, 구체적 시간)",
+    "time_period": "morning/afternoon/evening/night (type이 time인 경우만, 시간대)"
 }}
 
 **키워드 추출 규칙:**
@@ -293,6 +301,27 @@ JSON 형식으로만 응답:
 - "다음 주 수요일 일정" → type: "date", date: "2025-08-27"
 - "이번 주 토요일 일정" → type: "date", date: "2025-08-23"
 
+**일정 조회 (시간대별):**
+- "오후 일정 보여줘" → type: "time", time_period: "afternoon"
+- "아침 일정 알려줘" → type: "time", time_period: "morning"
+- "저녁 일정 뭐야?" → type: "time", time_period: "evening"
+- "오후 3시 일정" → type: "time", time: "15:00"
+- "아침 7시 일정" → type: "time", time: "07:00"
+
+**일정 조회 (날짜+시간대 결합):**
+- "내일 오후 일정" → type: "date", date: "2025-08-22", time_period: "afternoon"
+- "다음주 월요일 아침 일정" → type: "date", date: "2025-08-25", time_period: "morning"
+- "이번 주 토요일 저녁 일정" → type: "date", date: "2025-08-23", time_period: "evening"
+- "내일 오후 3시 일정" → type: "date", date: "2025-08-22", time: "15:00"
+- "다음주 월요일 아침 9시 일정" → type: "date", date: "2025-08-25", time: "09:00"
+
+**일정 조회 (주제+날짜/시간대 결합):**
+- "다음주 수요일에 있는 친구랑 영화 보러가는 일정" → type: "keyword", keyword: "영화", date: "다음주 수요일 날짜"
+- "내일 오후 병원 일정" → type: "keyword", keyword: "병원", date: "2025-08-22", time_period: "afternoon"
+- "다음주 월요일 아침 회의 일정" → type: "keyword", keyword: "회의", date: "2025-08-25", time_period: "morning"
+- "내일 오후 3시 치과 일정" → type: "keyword", keyword: "치과", date: "2025-08-22", time: "15:00"
+- "이번 주 토요일 저녁 친구 만남 일정" → type: "keyword", keyword: "친구", date: "2025-08-23", time_period: "evening"
+
 **일정 조회 (기타):**
 - "중요한 일정만 보여줘" → type: "important"
 - "모든 일정 보여줘" → type: "all"
@@ -304,6 +333,20 @@ JSON 형식으로만 응답:
 - "롯데시네마에서 영화 본 일정 삭제해 줘" → title: "영화 보기" (description에서 "롯데시네마" 검색)
 - "친구랑 커피 마신 일정 삭제해 줘" → title: "친구 만남" (description에서 "친구" 검색)
 - "강남역에서 만난 일정 삭제해 줘" → title: "친구 만남" (description에서 "강남역" 검색)
+
+**일정 삭제 (시간대 포함):**
+- "오후 병원 일정 삭제해 줘" → title: "병원", time_period: "afternoon"
+- "내일 오후 병원 일정 삭제해 줘" → title: "병원", date: "2025-08-22", time_period: "afternoon"
+- "다음주 월요일 아침 회의 일정 삭제해 줘" → title: "회의", date: "2025-08-25", time_period: "morning"
+- "오후 3시 병원 일정 삭제해 줘" → title: "병원", time: "15:00"
+- "내일 오후 3시 병원 일정 삭제해 줘" → title: "병원", date: "2025-08-22", time: "15:00"
+
+**일정 삭제 (주제+날짜/시간대 결합):**
+- "다음주 수요일에 있는 친구랑 영화 보러가는 일정 삭제해 줘" → title: "영화 보기", date: "다음주 수요일 날짜"
+- "내일 오후 병원 일정 삭제해 줘" → title: "병원", date: "2025-08-22", time_period: "afternoon"
+- "다음주 월요일 아침 회의 일정 삭제해 줘" → title: "회의", date: "2025-08-25", time_period: "morning"
+- "내일 오후 3시 치과 일정 삭제해 줘" → title: "치과", date: "2025-08-22", time: "15:00"
+- "이번 주 토요일 저녁 친구 만남 일정 삭제해 줘" → title: "친구 만남", date: "2025-08-23", time_period: "evening"
 """
 
     # ===== 3단계: 응답 생성 프롬프트 =====
