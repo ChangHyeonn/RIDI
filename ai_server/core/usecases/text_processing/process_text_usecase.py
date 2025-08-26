@@ -66,7 +66,22 @@ class ProcessTextUseCase:
             
             # 3. 일정 관련 요청의 경우 정보 추출
             if intent.category == "schedule_add":
-                schedule_info = self.llm_service.extract_schedule_info(request.text)
+                # 시간 정보만 제공하는 경우 세션에서 이전 정보 가져오기
+                if self._is_time_only_response(request.text):
+                    self.logger.info(f"Time-only response detected: {request.text}")
+                    pending_schedule = self._get_pending_schedule(request.user_id)
+                    self.logger.info(f"Pending schedule for user {request.user_id}: {pending_schedule}")
+                    if pending_schedule:
+                        # 이전 일정 정보에 시간 정보 추가 (AI 추출 건너뛰기)
+                        schedule_info = self._merge_time_with_pending_schedule(request.text, pending_schedule)
+                        self.logger.info(f"Merged schedule info: {schedule_info}")
+                    else:
+                        # 세션에 이전 정보가 없으면 AI 추출
+                        schedule_info = self.llm_service.extract_schedule_info(request.text)
+                        self.logger.info(f"No pending schedule, using AI extraction: {schedule_info}")
+                else:
+                    # 일반적인 일정 추가 요청
+                    schedule_info = self.llm_service.extract_schedule_info(request.text)
                 
                 # AI_02 스타일 로그: Information Extraction
                 self.logger.info(f"Information extracted: {schedule_info}")
@@ -76,14 +91,31 @@ class ProcessTextUseCase:
                 if validation_result['valid']:
                     # AI_02 스타일 로그: Request Analysis
                     self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
+                    # 성공 시 세션 정리
+                    self._clear_pending_schedule(request.user_id)
                     return self._handle_schedule_add_with_info(request, schedule_info, start_time)
                 else:
+                    # 시간 누락된 경우 세션에 저장
+                    error_type = validation_result.get('error_type')
+                    if error_type in [ErrorTypes.SCHEDULE_VALIDATION_ERROR, ErrorTypes.MISSING_SCHEDULE_TIME, ErrorTypes.MISSING_SCHEDULE_TITLE, ErrorTypes.MISSING_SCHEDULE_DATE]:
+                        self.logger.info(f"Saving pending schedule for error type: {error_type}")
+                        self._save_pending_schedule(request.user_id, schedule_info)
+                    
                     return self._create_error_result(
                         validation_result['error_message'], 
                         time.time() - start_time,
                         validation_result.get('error_type', ErrorTypes.SCHEDULE_VALIDATION_ERROR)
                     )
             elif intent.category == "schedule_read":
+                # 일정 조회 정보 추출
+                schedule_info = self.llm_service.extract_schedule_info(request.text)
+                
+                # AI_02 스타일 로그: Information Extraction
+                self.logger.info(f"Information extracted: {schedule_info}")
+                
+                # intent.extracted_info 업데이트
+                intent.extracted_info = schedule_info
+                
                 # AI_02 스타일 로그: Request Analysis
                 self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
                 return self._handle_schedule_read(request, intent, start_time)
@@ -175,9 +207,18 @@ class ProcessTextUseCase:
                 search_info = intent.extracted_info
                 title = (search_info.get('title') or '').strip()
                 date_str = (search_info.get('date') or '').strip()
+                keyword = (search_info.get('keyword') or '').strip()
                 
                 # 시각적 조회 인터페이스 응답 생성
-                search_criteria = title if title else (date_str if date_str else '일정')
+                if title:
+                    search_criteria = title
+                elif date_str:
+                    search_criteria = date_str
+                elif keyword:
+                    search_criteria = keyword
+                else:
+                    search_criteria = '검색 조건'
+                
                 response_text = f"'{search_criteria}'과 관련된 일정 {len(result.schedules)}개를 찾았습니다."
                 
                 return TextProcessingResult(
@@ -186,7 +227,8 @@ class ProcessTextUseCase:
                     action_data={
                         "search_criteria": {
                             "title": title,
-                            "date": date_str
+                            "date": date_str,
+                            "keyword": keyword
                         },
                         "found_schedules": [s.to_dict() for s in result.schedules],
                         "total_count": len(result.schedules),
@@ -996,7 +1038,38 @@ class ProcessTextUseCase:
         try:
             text_lower = text.lower()
             
-            # 1. 간접적인 일정 추가 요청 감지 및 보정
+            # 1. 시간 정보 제공 감지 (연속 대화 맥락)
+            time_only_patterns = [
+                r"^\s*\d+시\s*$",  # "5시", "3시"
+                r"^\s*오후\s*\d+시\s*$",  # "오후 5시"
+                r"^\s*오전\s*\d+시\s*$",  # "오전 9시"
+                r"^\s*\d+시\s*야\s*$",  # "5시야", "3시야"
+                r"^\s*\d+시\s*에\s*$",  # "5시에", "3시에"
+                r"^\s*오후\s*\d+시\s*야\s*$",  # "오후 5시야"
+                r"^\s*오전\s*\d+시\s*야\s*$",  # "오전 9시야"
+                r"^\s*\d+시\s*란다\s*$",  # "5시란다", "3시란다"
+                r"^\s*오후\s*\d+시\s*란다\s*$",  # "오후 5시란다"
+                r"^\s*오전\s*\d+시\s*란다\s*$",  # "오전 9시란다"
+                r"^\s*\d+시\s*다\s*$",  # "5시다", "3시다"
+                r"^\s*오후\s*\d+시\s*다\s*$",  # "오후 5시다"
+                r"^\s*오전\s*\d+시\s*다\s*$",  # "오전 9시다"
+            ]
+            
+            is_time_only_response = any(re.search(pattern, text_lower) for pattern in time_only_patterns)
+            
+            # 디버깅 로그 추가
+            self.logger.info(f"Time response check: text='{text}', is_time_only={is_time_only_response}, intent={intent.category}")
+            
+            # 시간 정보만 제공하는 경우 일정 추가로 보정
+            if is_time_only_response and intent.category == "general_conversation":
+                self.logger.info(f"Intent correction: general_conversation -> schedule_add (time response: {text})")
+                return IntentAnalysis(
+                    category="schedule_add",
+                    confidence=0.9,
+                    extracted_info={}
+                )
+            
+            # 2. 간접적인 일정 추가 요청 감지 및 보정
             add_indicators = [
                 "약속 있어", "해야 해", "있어", "예약해야", "잡아야",
                 "친구랑", "랑", "와", "과"
@@ -1035,7 +1108,7 @@ class ProcessTextUseCase:
                     extracted_info={}
                 )
             
-            # 2. 명확한 조회 요청 감지
+            # 3. 명확한 조회 요청 감지
             read_indicators = [
                 "뭐 있어", "일정 뭐야", "알려줘", "보여줘", "언제 있어",
                 "일정이 언제", "일정 보여줘", "일정 알려줘"
@@ -1062,3 +1135,84 @@ class ProcessTextUseCase:
         except Exception as e:
             self.logger.error(f"Intent correction failed: {e}")
             return intent
+    
+    def _save_pending_schedule(self, user_id: str, schedule_info: dict):
+        """시간 누락된 일정 정보를 세션에 저장"""
+        try:
+            self._user_sessions[user_id] = {
+                "pending_schedule": schedule_info,
+                "last_intent": "schedule_add",
+                "timestamp": time.time()
+            }
+            self.logger.info(f"Pending schedule saved for user {user_id}: {schedule_info}")
+        except Exception as e:
+            self.logger.error(f"Failed to save pending schedule: {e}")
+    
+    def _get_pending_schedule(self, user_id: str) -> dict:
+        """세션에서 대기 중인 일정 정보 가져오기"""
+        try:
+            session = self._user_sessions.get(user_id)
+            if session and time.time() - session["timestamp"] < 300:  # 5분 이내
+                return session.get("pending_schedule", {})
+            return {}
+        except Exception as e:
+            self.logger.error(f"Failed to get pending schedule: {e}")
+            return {}
+    
+    def _clear_pending_schedule(self, user_id: str):
+        """세션에서 대기 중인 일정 정보 삭제"""
+        try:
+            if user_id in self._user_sessions:
+                del self._user_sessions[user_id]
+                self.logger.info(f"Pending schedule cleared for user {user_id}")
+        except Exception as e:
+            self.logger.error(f"Failed to clear pending schedule: {e}")
+    
+    def _is_time_only_response(self, text: str) -> bool:
+        """시간 정보만 제공하는 응답인지 확인"""
+        time_only_patterns = [
+            r"^\s*\d+시\s*$",  # "5시", "3시"
+            r"^\s*오후\s*\d+시\s*$",  # "오후 5시"
+            r"^\s*오전\s*\d+시\s*$",  # "오전 9시"
+            r"^\s*\d+시\s*야\s*$",  # "5시야", "3시야"
+            r"^\s*\d+시\s*에\s*$",  # "5시에", "3시에"
+            r"^\s*오후\s*\d+시\s*야\s*$",  # "오후 5시야"
+            r"^\s*오전\s*\d+시\s*야\s*$",  # "오전 9시야"
+            r"^\s*\d+시\s*란다\s*$",  # "5시란다", "3시란다"
+            r"^\s*오후\s*\d+시\s*란다\s*$",  # "오후 5시란다"
+            r"^\s*오전\s*\d+시\s*란다\s*$",  # "오전 9시란다"
+            r"^\s*\d+시\s*다\s*$",  # "5시다", "3시다"
+            r"^\s*오후\s*\d+시\s*다\s*$",  # "오후 5시다"
+            r"^\s*오전\s*\d+시\s*다\s*$",  # "오전 9시다"
+        ]
+        return any(re.search(pattern, text.lower()) for pattern in time_only_patterns)
+    
+    def _merge_time_with_pending_schedule(self, time_text: str, pending_schedule: dict) -> dict:
+        """시간 정보를 대기 중인 일정 정보와 병합"""
+        try:
+            # 시간 정보 파싱
+            time_match = re.search(r'(\d+)시', time_text)
+            if not time_match:
+                return pending_schedule
+            
+            hour = int(time_match.group(1))
+            
+            # 오전/오후 정보 확인
+            if '오후' in time_text and hour < 12:
+                hour += 12
+            elif '오전' in time_text and hour == 12:
+                hour = 0
+            
+            # 24시간 형식으로 변환
+            time_str = f"{hour:02d}:00"
+            
+            # 병합된 일정 정보 생성
+            merged_schedule = pending_schedule.copy()
+            merged_schedule['time'] = time_str
+            
+            self.logger.info(f"Time merged: {time_text} -> {time_str}")
+            return merged_schedule
+            
+        except Exception as e:
+            self.logger.error(f"Failed to merge time: {e}")
+            return pending_schedule
