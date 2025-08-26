@@ -114,8 +114,23 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                     builder: (context, taskProvider, child) {
                       final tasks = taskProvider.getTasksForDate(widget.date);
 
-                      // 시간이 임박한 순서대로 정렬
-                      tasks.sort((a, b) => a.date.compareTo(b.date));
+                      // 미완료 먼저(시간 오름차순) → 완료(시간 오름차순)
+                      tasks.sort((a, b) {
+                        final aDone = a.isRecurring
+                            ? taskProvider.isOccurrenceCompleted(
+                                a.id,
+                                widget.date,
+                              )
+                            : a.isCompleted;
+                        final bDone = b.isRecurring
+                            ? taskProvider.isOccurrenceCompleted(
+                                b.id,
+                                widget.date,
+                              )
+                            : b.isCompleted;
+                        if (aDone != bDone) return aDone ? 1 : -1;
+                        return a.date.compareTo(b.date);
+                      });
 
                       if (tasks.isEmpty) {
                         return Center(
@@ -257,7 +272,7 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.08),
+                                    color: Colors.black.withOpacity(0.08),
                                     blurRadius: 20,
                                     offset: const Offset(0, 8),
                                   ),
