@@ -3,7 +3,11 @@ import 'package:http/http.dart' as http;
 import '../models/task.dart';
 
 class NetworkService {
+<<<<<<< HEAD
   static const String baseUrl = 'http://172.30.1.98:8080'; // AI 서버 URL
+=======
+  static const String baseUrl = 'http://172.20.150.91:8080'; // AI 서버 URL
+>>>>>>> app_ai
   
   // 서버에서 일정 가져오기
   static Future<List<Task>> fetchSchedulesFromServer(String userId, DateTime? lastSync) async {

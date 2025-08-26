@@ -102,6 +102,7 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
                 ],
               ),
             ),
+<<<<<<< HEAD
             // 일정 목록
             Expanded(
               child: Padding(
@@ -114,6 +115,40 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
                   },
                 ),
               ),
+=======
+
+            // 일정 목록
+            Expanded(
+              child: widget.schedules.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            '삭제할 일정이 없습니다',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: widget.schedules.length,
+                      itemBuilder: (context, index) {
+                        final task = widget.schedules[index];
+                        return _buildTaskCard(task);
+                      },
+                    ),
+>>>>>>> app_ai
             ),
           ],
         ),
@@ -123,7 +158,11 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
     );
   }
 
+<<<<<<< HEAD
   Widget _buildScheduleCard(Task task) {
+=======
+  Widget _buildTaskCard(Task task) {
+>>>>>>> app_ai
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -132,20 +171,31 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
+<<<<<<< HEAD
             blurRadius: 20,
             offset: const Offset(0, 8),
+=======
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+>>>>>>> app_ai
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+<<<<<<< HEAD
           borderRadius: BorderRadius.circular(16),
           onTap: () => _showDeleteConfirmation(task),
+=======
+          onTap: () => _showDeleteConfirmation(task),
+          borderRadius: BorderRadius.circular(16),
+>>>>>>> app_ai
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
+<<<<<<< HEAD
                 // 아이콘 영역
                 Container(
                   padding: const EdgeInsets.all(10),
@@ -165,10 +215,14 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
                 ),
                 const SizedBox(width: 16),
                 // 텍스트 영역
+=======
+                // 일정 정보
+>>>>>>> app_ai
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+<<<<<<< HEAD
                       Text(
                         task.title,
                         style: const TextStyle(
@@ -206,6 +260,82 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
                           ),
                         ),
                       ],
+=======
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (task.isImportant)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFef4444).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                '중요',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFFef4444),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.access_time,
+                            size: 16,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatTaskDateTime(task),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          if (task.isRecurring) ...[
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFf97316).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                '반복 일정',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFFf97316),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+>>>>>>> app_ai
                     ],
                   ),
                 ),

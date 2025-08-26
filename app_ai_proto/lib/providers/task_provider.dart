@@ -46,15 +46,27 @@ class TaskProvider with ChangeNotifier {
   Future<void> _initializeSyncInBackground() async {
     try {
       final isSyncEnabled = await _syncManager.isSyncEnabled();
+      print('🔍 동기화 활성화 상태: $isSyncEnabled');
+      
       if (isSyncEnabled) {
         print('🔄 백그라운드 동기화 시작...');
+        print('📊 동기화 전 일정 개수: ${_tasks.length}');
+        
         await _syncManager.syncIncremental();
         _taskService.invalidateCache(); // 캐시 무효화
         await loadTasks(); // 동기화 후 데이터 새로고침
+        
+        print('📊 동기화 후 일정 개수: ${_tasks.length}');
         print('✅ 백그라운드 동기화 완료');
+        
+        // 동기화 결과를 UI에 반영
+        notifyListeners();
+      } else {
+        print('⚠️ 동기화가 비활성화되어 있습니다');
       }
     } catch (e) {
-      print('⚠️ 백그라운드 동기화 실패, 로컬 데이터 사용: $e');
+      print('❌ 백그라운드 동기화 실패: $e');
+      print('📋 상세 오류: ${e.toString()}');
     }
   }
 
@@ -82,9 +94,22 @@ class TaskProvider with ChangeNotifier {
 
   // 일정 로드
   Future<void> loadTasks() async {
+    print('📥 일정 로드 시작...');
     _tasks = await _taskService.getTasks();
+<<<<<<< HEAD
     _dedupeRecurringTasksInMemory();
+=======
+    print('📊 로드된 일정 개수: ${_tasks.length}');
+    
+    // 일정 목록 출력 (디버깅용)
+    for (int i = 0; i < _tasks.length; i++) {
+      final task = _tasks[i];
+      print('  ${i + 1}. ${task.title} (${task.date}) - 반복: ${task.isRecurring}');
+    }
+    
+>>>>>>> app_ai
     notifyListeners();
+    print('✅ 일정 로드 완료');
   }
 
   // 설정 로드

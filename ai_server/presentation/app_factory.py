@@ -11,7 +11,11 @@ from shared.logging.logger import LoggerFactory
 from shared.config.settings import AppSettings
 from shared.container import container
 from presentation.api.v1.text_controller import text_bp
+<<<<<<< HEAD
 from presentation.api.v1.sync_controller import sync_bp, init_sync_controller
+=======
+from presentation.api.v1.sync_controller import sync_bp
+>>>>>>> app_ai
 from presentation.middleware.request_logging import RequestLoggingMiddleware
 
 
@@ -45,7 +49,11 @@ def create_app(settings: AppSettings = None) -> Flask:
     
     # 블루프린트 등록
     app.register_blueprint(text_bp, url_prefix='/api/v1')
+<<<<<<< HEAD
     app.register_blueprint(sync_bp, url_prefix='/api/v1')
+=======
+    app.register_blueprint(sync_bp, url_prefix='/api/v1/sync')
+>>>>>>> app_ai
     
     # 글로벌 에러 핸들러
     @app.errorhandler(Exception)
