@@ -41,51 +41,66 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (context) => TaskProvider(),
-      child: MaterialApp(
-        navigatorKey: navigatorKey, // 전역 NavigatorKey 설정
-        title: '메모알림앱',
-        theme: ThemeData(
-          primarySwatch: Colors.purple,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-        ),
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [Locale('ko', 'KR')],
-        home: const LoginScreen(),
-        routes: {
-          '/delete-schedule': (context) {
-            final arguments = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-            if (arguments != null) {
-              return DeleteScheduleScreen(
-                schedules: arguments['schedules'] as List<Task>,
-                searchCriteria: arguments['searchCriteria'] as String,
-              );
-            } else {
-              // arguments가 없는 경우 빈 화면 반환
-              return const Scaffold(
-                body: Center(child: Text('삭제할 일정이 없습니다.')),
-              );
-            }
-          },
-          '/schedule-list': (context) {
-            final arguments = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-            if (arguments != null) {
-              return ScheduleListScreen(
-                schedules: arguments['schedules'] as List<Task>,
-                searchCriteria: arguments['searchCriteria'] as String,
-              );
-            } else {
-              // arguments가 없는 경우 빈 화면 반환
-              return const Scaffold(
-                body: Center(child: Text('조회할 일정이 없습니다.')),
-              );
-            }
-          },
+      child: Consumer<TaskProvider>(
+        builder: (context, taskProvider, _) {
+          // 0.75~1.5 범위에서 전역 텍스트 스케일 적용 (기본 1.0)
+          final textScale = 0.75 + taskProvider.fontSize * 0.75;
+          return MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(textScale)),
+            child: MaterialApp(
+              navigatorKey: navigatorKey, // 전역 NavigatorKey 설정
+              title: '메모알림앱',
+              theme: ThemeData(
+                primarySwatch: Colors.purple,
+                visualDensity: VisualDensity.adaptivePlatformDensity,
+              ),
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: const [Locale('ko', 'KR')],
+              home: const LoginScreen(),
+              routes: {
+                '/delete-schedule': (context) {
+                  final arguments =
+                      ModalRoute.of(context)?.settings.arguments
+                          as Map<String, dynamic>?;
+                  if (arguments != null) {
+                    return DeleteScheduleScreen(
+                      schedules: arguments['schedules'] as List<Task>,
+                      searchCriteria: arguments['searchCriteria'] as String,
+                    );
+                  } else {
+                    // arguments가 없는 경우 빈 화면 반환
+                    return const Scaffold(
+                      body: Center(child: Text('삭제할 일정이 없습니다.')),
+                    );
+                  }
+                },
+                '/schedule-list': (context) {
+                  final arguments =
+                      ModalRoute.of(context)?.settings.arguments
+                          as Map<String, dynamic>?;
+                  if (arguments != null) {
+                    return ScheduleListScreen(
+                      schedules: arguments['schedules'] as List<Task>,
+                      searchCriteria: arguments['searchCriteria'] as String,
+                    );
+                  } else {
+                    // arguments가 없는 경우 빈 화면 반환
+                    return const Scaffold(
+                      body: Center(child: Text('조회할 일정이 없습니다.')),
+                    );
+                  }
+                },
+              },
+              debugShowCheckedModeBanner: false,
+            ),
+          );
         },
-        debugShowCheckedModeBanner: false,
       ),
     );
   }

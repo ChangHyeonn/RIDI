@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.memo_notification_app"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
     
     // record 플러그인 네임스페이스 문제 해결
@@ -50,5 +50,5 @@ flutter {
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
