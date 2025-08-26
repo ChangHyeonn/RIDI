@@ -386,7 +386,7 @@ class AlarmService {
   // 알람 소리 재생 (진동 + 음성 파일) - 반복 재생
   void _playAlarmSound(Task task, [BuildContext? context]) async {
     try {
-      print('=== 알람 소리 재생 시작 (반복 재생) ===');
+      print('=== 알람 소리 재생 시작 (무한 루프) ===');
 
       // 기존 반복 재생 타이머가 있으면 취소
       if (_alarmSoundTimers.containsKey(task.id)) {
@@ -437,81 +437,18 @@ class AlarmService {
         return;
       }
 
-      // 첫 번째 알람 소리 재생
-      await _playSingleAlarmSound(task, volume);
-
-      // 반복 재생 타이머 설정 (알람 소리 길이 + 1초 간격으로 반복)
-      final repeatTimer = Timer.periodic(const Duration(seconds: 6), (
-        timer,
-      ) async {
-        // 알람이 더 이상 활성 상태가 아니면 반복 중단
-        if (!_activeAlarmTaskIds.contains(task.id)) {
-          print('⏹️ 알람 비활성화 감지 — 반복 재생 종료: ${task.id}');
-          timer.cancel();
-          _alarmSoundTimers.remove(task.id);
-          return;
-        }
-
-        // 알람 창(유효 시간)을 벗어난 경우 자동 중지 (안전장치)
-        final nowCheck = DateTime.now();
-        final scheduled = DateTime(
-          task.date.year,
-          task.date.month,
-          task.date.day,
-          task.date.hour,
-          task.date.minute,
-        );
-        if (nowCheck.difference(scheduled).inMinutes >= 1) {
-          print('⏹️ 알람 유효 시간 경과 — 반복 재생 자동 종료: ${task.title}');
-          timer.cancel();
-          _alarmSoundTimers.remove(task.id);
-          _activeAlarmTaskIds.remove(task.id);
-          // 소리/진동 정지 (await 생략)
-          stopAlarmSound(task.id);
-          return;
-        }
-
-        print('🔄 알람 소리 반복 재생: ${task.title}');
-
-        // 진동 추가
-        HapticFeedback.heavyImpact();
-
-        // 알람 소리 재생
-        await _playSingleAlarmSound(task, volume);
-      });
-
-      // 반복 재생 타이머 저장
-      _alarmSoundTimers[task.id] = repeatTimer;
-      print('✅ 반복 재생 타이머 설정 완료 (6초마다 반복)');
-    } catch (e) {
-      print('알람 소리/진동 실패: $e');
-      print('에러 상세 정보: ${e.toString()}');
-      // 소리/진동에 실패해도 알람은 계속 작동
-    }
-  }
-
-  // 단일 알람 소리 재생 (반복 재생에서 사용)
-  Future<void> _playSingleAlarmSound(Task task, double volume) async {
-    try {
-      // 음성 파일 재생 (assets/sounds/alarm.mp3)
-      print('🔊 음성 파일 재생: alarm.mp3 (볼륨: ${(volume * 100).toInt()}%)');
+      // 플레이어 자체 루프 설정으로 무한 반복 재생
       try {
-        // 기존 재생 중지
         await _audioPlayer.stop();
-
-        // 볼륨 설정
         await _audioPlayer.setVolume(volume);
-
-        // 음성 파일 재생
+        await _audioPlayer.setReleaseMode(ReleaseMode.loop);
         await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
-
-        // 재생 완료 대기 (알람 소리 길이만큼)
-        await Future.delayed(const Duration(seconds: 5));
-
-        print('✅ 음성 파일 재생 완료');
+        // 최초 진입 시 한 번 강한 햅틱
+        HapticFeedback.heavyImpact();
+        print('✅ 알람 소리 루프 재생 시작');
       } catch (e) {
-        print('❌ 음성 파일 재생 실패: $e');
-        // 음성 파일 재생 실패 시 TTS로 폴백
+        print('❌ 루프 재생 시작 실패: $e');
+        // 음원 실패 시 TTS로 폴백 (TTS는 루프 불가, 주기적 루프는 생략)
         print('🔄 TTS로 폴백 시도');
         await _ttsService.setVoiceSettings(
           speechRate: 0.8,
@@ -521,9 +458,13 @@ class AlarmService {
         await _ttsService.speak('알람입니다. ${task.title} 일정이 시작되었습니다.');
       }
     } catch (e) {
-      print('단일 알람 소리 재생 실패: $e');
+      print('알람 소리/진동 실패: $e');
+      print('에러 상세 정보: ${e.toString()}');
+      // 소리/진동에 실패해도 알람은 계속 작동
     }
   }
+
+  // 단일 재생 로직은 루프 재생으로 대체되어 미사용
 
   // 알람 소리 정지 (반복 재생 포함)
   void stopAlarmSound([String? taskId]) async {

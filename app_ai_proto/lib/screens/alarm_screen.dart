@@ -46,7 +46,12 @@ class _AlarmScreenState extends State<AlarmScreen>
     _introController = AnimationController(
       duration: const Duration(milliseconds: 320),
       vsync: this,
-    )..forward();
+    );
+    _introController.addListener(() {
+      if (!mounted) return;
+      setState(() {});
+    });
+    _introController.forward();
 
     // (자동 종료 카운트다운 제거)
   }
@@ -62,6 +67,7 @@ class _AlarmScreenState extends State<AlarmScreen>
   @override
   Widget build(BuildContext context) {
     final fontSize = context.read<TaskProvider>().fontSize;
+    final categoryColor = _categoryMainColor();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -112,7 +118,11 @@ class _AlarmScreenState extends State<AlarmScreen>
                               width: double.infinity,
                               padding: const EdgeInsets.all(32),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).cardColor,
+                                color: _blendOnSurface(
+                                  Theme.of(context).cardColor,
+                                  categoryColor,
+                                  0.10,
+                                ),
                                 borderRadius: BorderRadius.circular(24),
                                 boxShadow: [
                                   BoxShadow(
@@ -122,7 +132,7 @@ class _AlarmScreenState extends State<AlarmScreen>
                                   ),
                                 ],
                                 border: Border.all(
-                                  color: Colors.black.withOpacity(0.06),
+                                  color: categoryColor.withOpacity(0.14),
                                   width: 1,
                                 ),
                               ),
@@ -130,174 +140,118 @@ class _AlarmScreenState extends State<AlarmScreen>
                               transform: (Matrix4.identity()
                                 ..translate(_dragX, 0.0)
                                 ..rotateZ(_dragX / 800)),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                              child: Stack(
                                 children: [
-                                  // 상단 메타 배지
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildChip(
-                                        _categoryLabel(),
-                                        _categoryColor(),
-                                      ),
-                                      if (widget.task.isRecurring &&
-                                          widget.task.recurrence != null) ...[
-                                        const SizedBox(width: 8),
-                                        _buildChip(
-                                          '🔄 ${_nextOccurrenceLabel()}',
-                                          const Color(0xFF6366F1),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  // 액션 힌트 오버레이 아이콘
-                                  if (_dragX.abs() > 8)
-                                    Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 12,
-                                      ),
-                                      child: Transform.scale(
-                                        scale:
-                                            1.0 +
-                                            (_dragX.abs() / _swipeThreshold)
-                                                    .clamp(0.0, 1.0) *
-                                                0.25,
+                                  // 옵션 B: 배경 실루엣
+                                  Positioned.fill(
+                                    child: IgnorePointer(
+                                      ignoring: true,
+                                      child: Align(
+                                        alignment: Alignment.center,
                                         child: Icon(
-                                          Icons.check_circle,
-                                          color: Colors.green.shade500,
-                                          size: 28,
+                                          _categoryIllustrationIcon(),
+                                          size: 220,
+                                          color: categoryColor.withOpacity(
+                                            0.08,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  // 깜빡이는 효과를 위한 AnimatedBuilder
-                                  AnimatedBuilder(
-                                    animation: _blinkAnimation,
-                                    builder: (context, child) {
-                                      return Opacity(
-                                        opacity: widget.task.isImportant
-                                            ? _blinkAnimation.value
-                                            : 1.0,
-                                        child: Column(
-                                          children: [
-                                            // AM/PM indicator
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 16,
-                                                    vertical: 8,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.surface,
-                                                borderRadius:
-                                                    BorderRadius.circular(20),
-                                                border: Border.all(
-                                                  color: Theme.of(
-                                                    context,
-                                                  ).dividerColor,
-                                                  width: 1,
-                                                ),
-                                              ),
-                                              child: Text(
-                                                widget.task.date.hour < 12
-                                                    ? '오전'
-                                                    : '오후',
-                                                style: TextStyle(
-                                                  color: widget.task.isImportant
-                                                      ? Colors.red.shade600
-                                                      : const Color(0xFF6b7280),
-                                                  fontSize:
-                                                      (widget.task.isImportant
-                                                          ? 20
-                                                          : 18) *
-                                                      (0.75 + fontSize * 0.5),
-                                                  fontWeight:
-                                                      widget.task.isImportant
-                                                      ? FontWeight.w700
-                                                      : FontWeight.w600,
-                                                ),
-                                              ),
+                                  ),
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      // 상단 메타 배지
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          _buildChip(
+                                            _categoryLabel(),
+                                            categoryColor,
+                                          ),
+                                          if (widget.task.isRecurring &&
+                                              widget.task.recurrence !=
+                                                  null) ...[
+                                            const SizedBox(width: 8),
+                                            _buildChip(
+                                              '🔄 ${_nextOccurrenceLabel()}',
+                                              categoryColor,
                                             ),
-                                            const SizedBox(height: 32),
-
-                                            // Large time display
-                                            Text(
-                                              '${widget.task.date.hour.toString().padLeft(2, '0')}:${widget.task.date.minute.toString().padLeft(2, '0')}',
-                                              style: TextStyle(
-                                                color:
-                                                    Theme.of(context)
-                                                        .textTheme
-                                                        .headlineMedium
-                                                        ?.color ??
-                                                    const Color(0xFF1f2937),
-                                                fontSize:
-                                                    (widget.task.isImportant
-                                                        ? 72
-                                                        : 64) *
-                                                    (0.75 + fontSize * 0.5),
-                                                fontWeight:
-                                                    widget.task.isImportant
-                                                    ? FontWeight.w900
-                                                    : FontWeight.w300,
-                                                shadows: widget.task.isImportant
-                                                    ? [
-                                                        Shadow(
-                                                          offset: const Offset(
-                                                            2,
-                                                            2,
-                                                          ),
-                                                          blurRadius: 4,
-                                                          color: Colors.black
-                                                              .withOpacity(0.1),
+                                          ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      // 액션 힌트 오버레이 아이콘
+                                      if (_dragX.abs() > 8)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 12,
+                                          ),
+                                          child: Transform.scale(
+                                            scale:
+                                                1.0 +
+                                                (_dragX.abs() / _swipeThreshold)
+                                                        .clamp(0.0, 1.0) *
+                                                    0.25,
+                                            child: Icon(
+                                              Icons.check_circle,
+                                              color: categoryColor,
+                                              size: 28,
+                                            ),
+                                          ),
+                                        ),
+                                      // 깜빡이는 효과를 위한 AnimatedBuilder
+                                      AnimatedBuilder(
+                                        animation: _blinkAnimation,
+                                        builder: (context, child) {
+                                          return Opacity(
+                                            opacity: widget.task.isImportant
+                                                ? _blinkAnimation.value
+                                                : 1.0,
+                                            child: Column(
+                                              children: [
+                                                // AM/PM indicator
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 16,
+                                                        vertical: 8,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.surface,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          20,
                                                         ),
-                                                      ]
-                                                    : null,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 40),
-
-                                            // Task title
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 20,
-                                                    vertical: 16,
+                                                    border: Border.all(
+                                                      color: Theme.of(
+                                                        context,
+                                                      ).dividerColor,
+                                                      width: 1,
+                                                    ),
                                                   ),
-                                              decoration: BoxDecoration(
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.surface,
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                                border: Border.all(
-                                                  color: Theme.of(
-                                                    context,
-                                                  ).dividerColor,
-                                                  width: 1,
-                                                ),
-                                              ),
-                                              child: Column(
-                                                children: [
-                                                  Text(
-                                                    widget.task.title,
+                                                  child: Text(
+                                                    widget.task.date.hour < 12
+                                                        ? '오전'
+                                                        : '오후',
                                                     style: TextStyle(
                                                       color:
                                                           widget
                                                               .task
                                                               .isImportant
-                                                          ? Colors.red.shade700
+                                                          ? Colors.red.shade600
                                                           : const Color(
-                                                              0xFF1f2937,
+                                                              0xFF6b7280,
                                                             ),
                                                       fontSize:
                                                           (widget
                                                                   .task
                                                                   .isImportant
-                                                              ? 28
-                                                              : 24) *
+                                                              ? 20
+                                                              : 18) *
                                                           (0.75 +
                                                               fontSize * 0.5),
                                                       fontWeight:
@@ -307,20 +261,121 @@ class _AlarmScreenState extends State<AlarmScreen>
                                                           ? FontWeight.w700
                                                           : FontWeight.w600,
                                                     ),
-                                                    textAlign: TextAlign.center,
                                                   ),
-                                                  // (무음 모드 배지 제거)
-                                                ],
-                                              ),
+                                                ),
+                                                const SizedBox(height: 32),
+
+                                                // Large time display
+                                                Text(
+                                                  '${widget.task.date.hour.toString().padLeft(2, '0')}:${widget.task.date.minute.toString().padLeft(2, '0')}',
+                                                  style: TextStyle(
+                                                    color:
+                                                        Theme.of(context)
+                                                            .textTheme
+                                                            .headlineMedium
+                                                            ?.color ??
+                                                        const Color(0xFF1f2937),
+                                                    fontSize:
+                                                        (widget.task.isImportant
+                                                            ? 72
+                                                            : 64) *
+                                                        (0.75 + fontSize * 0.5),
+                                                    fontWeight:
+                                                        widget.task.isImportant
+                                                        ? FontWeight.w900
+                                                        : FontWeight.w300,
+                                                    shadows:
+                                                        widget.task.isImportant
+                                                        ? [
+                                                            Shadow(
+                                                              offset:
+                                                                  const Offset(
+                                                                    2,
+                                                                    2,
+                                                                  ),
+                                                              blurRadius: 4,
+                                                              color: Colors
+                                                                  .black
+                                                                  .withOpacity(
+                                                                    0.1,
+                                                                  ),
+                                                            ),
+                                                          ]
+                                                        : null,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 40),
+
+                                                // Task title
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 20,
+                                                        vertical: 16,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.surface,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          16,
+                                                        ),
+                                                    border: Border.all(
+                                                      color: Theme.of(
+                                                        context,
+                                                      ).dividerColor,
+                                                      width: 1,
+                                                    ),
+                                                  ),
+                                                  child: Column(
+                                                    children: [
+                                                      Text(
+                                                        widget.task.title,
+                                                        style: TextStyle(
+                                                          color:
+                                                              widget
+                                                                  .task
+                                                                  .isImportant
+                                                              ? Colors
+                                                                    .red
+                                                                    .shade700
+                                                              : const Color(
+                                                                  0xFF1f2937,
+                                                                ),
+                                                          fontSize:
+                                                              (widget
+                                                                      .task
+                                                                      .isImportant
+                                                                  ? 28
+                                                                  : 24) *
+                                                              (0.75 +
+                                                                  fontSize *
+                                                                      0.5),
+                                                          fontWeight:
+                                                              widget
+                                                                  .task
+                                                                  .isImportant
+                                                              ? FontWeight.w700
+                                                              : FontWeight.w600,
+                                                        ),
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                      ),
+                                                      // (무음 모드 배지 제거)
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                          ],
-                                        ),
-                                      );
-                                    },
+                                          );
+                                        },
+                                      ),
+                                      // (자동 종료 문구 제거)
+                                      // 미니 타임라인
+                                      _buildMiniTimeline(context),
+                                    ],
                                   ),
-                                  // (자동 종료 문구 제거)
-                                  // 미니 타임라인
-                                  _buildMiniTimeline(context),
                                 ],
                               ),
                             ),
@@ -376,7 +431,7 @@ class _AlarmScreenState extends State<AlarmScreen>
         label,
         style: TextStyle(
           fontSize: 12,
-          color: Colors.white,
+          color: Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -387,13 +442,31 @@ class _AlarmScreenState extends State<AlarmScreen>
     return widget.task.category.isNotEmpty ? widget.task.category : '일정';
   }
 
-  Color _categoryColor() {
+  Color _categoryMainColor() {
+    // 옵션 색 매핑
     final c = widget.task.category;
-    if (c.contains('업무') || c.contains('회의')) return const Color(0xFF6366F1);
-    if (c.contains('건강') || c.contains('약')) return const Color(0xFF10B981);
-    if (c.contains('개인') || c.contains('가정')) return const Color(0xFF8B5CF6);
-    if (widget.task.isImportant) return const Color(0xFFEF4444);
-    return const Color(0xFF6366F1);
+    if (widget.task.isImportant) return const Color(0xFFEF4444); // 중요
+    if (c.contains('업무') || c.contains('회의'))
+      return const Color(0xFF4F46E5); // Indigo
+    if (c.contains('건강') || c.contains('약'))
+      return const Color(0xFF10B981); // Emerald
+    if (c.contains('개인') || c.contains('가정'))
+      return const Color(0xFF8B5CF6); // Purple
+    return Theme.of(context).colorScheme.secondary;
+  }
+
+  IconData _categoryIllustrationIcon() {
+    final c = widget.task.category;
+    if (widget.task.isImportant) return Icons.priority_high_rounded;
+    if (c.contains('업무') || c.contains('회의')) return Icons.work_rounded;
+    if (c.contains('건강') || c.contains('약'))
+      return Icons.medical_services_rounded;
+    if (c.contains('개인') || c.contains('가정')) return Icons.person_rounded;
+    return Icons.event_rounded;
+  }
+
+  Color _blendOnSurface(Color base, Color tint, double opacity) {
+    return Color.alphaBlend(tint.withOpacity(opacity), base);
   }
 
   String _nextOccurrenceLabel() {
@@ -403,20 +476,63 @@ class _AlarmScreenState extends State<AlarmScreen>
 
   // 미니 타임라인: 다음 2~3개(더미, 실제 연동은 TaskProvider에서 가져와 확장 가능)
   Widget _buildMiniTimeline(BuildContext context) {
-    final color = _categoryColor();
+    final taskProvider = context.read<TaskProvider>();
+    final base = widget.task.date;
+
+    List<Task> upcoming = [];
+    for (int d = 0; d < 2; d++) {
+      final day = DateTime(
+        base.year,
+        base.month,
+        base.day,
+      ).add(Duration(days: d));
+      final tasksOfDay = taskProvider.getTasksForDate(day);
+      for (final t in tasksOfDay) {
+        if (t.id == widget.task.id) continue; // 자기 자신 제외
+        final isDone = t.isRecurring
+            ? taskProvider.isOccurrenceCompleted(t.id, day)
+            : t.isCompleted;
+        if (isDone) continue; // 완료 제외
+        // 기준 시각 이후만
+        if (d == 0 && !t.date.isAfter(base)) continue;
+        upcoming.add(t);
+      }
+    }
+
+    if (upcoming.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    upcoming.sort((a, b) => a.date.compareTo(b.date));
+    if (upcoming.length > 3) {
+      upcoming = upcoming.sublist(0, 3);
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(3, (i) {
+      children: List.generate(upcoming.length, (i) {
+        final t = upcoming[i];
+        final color = _categoryMainColorFor(t);
+        final size = 14 - (i * 2); // 가장 가까운 일정이 가장 크게
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 8),
-          width: 10 + i * 2,
-          height: 10 + i * 2,
+          width: size.toDouble(),
+          height: size.toDouble(),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.9 - i * 0.25),
+            color: color.withOpacity(0.85),
             shape: BoxShape.circle,
           ),
         );
       }),
     );
+  }
+
+  Color _categoryMainColorFor(Task t) {
+    if (t.isImportant) return const Color(0xFFEF4444);
+    final c = t.category;
+    if (c.contains('업무') || c.contains('회의')) return const Color(0xFF4F46E5);
+    if (c.contains('건강') || c.contains('약')) return const Color(0xFF10B981);
+    if (c.contains('개인') || c.contains('가정')) return const Color(0xFF8B5CF6);
+    return Theme.of(context).colorScheme.secondary;
   }
 }
