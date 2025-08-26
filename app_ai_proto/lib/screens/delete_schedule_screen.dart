@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/task.dart';
-import '../services/task_service.dart';
 import '../services/network_service.dart';
 import '../providers/task_provider.dart';
 import '../widgets/global_voice_button.dart';
@@ -21,8 +20,6 @@ class DeleteScheduleScreen extends StatefulWidget {
 }
 
 class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
-  final TaskService _taskService = TaskService();
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -102,7 +99,6 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
                 ],
               ),
             ),
-<<<<<<< HEAD
             // 일정 목록
             Expanded(
               child: Padding(
@@ -115,40 +111,6 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
                   },
                 ),
               ),
-=======
-
-            // 일정 목록
-            Expanded(
-              child: widget.schedules.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.check_circle_outline,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            '삭제할 일정이 없습니다',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: widget.schedules.length,
-                      itemBuilder: (context, index) {
-                        final task = widget.schedules[index];
-                        return _buildTaskCard(task);
-                      },
-                    ),
->>>>>>> app_ai
             ),
           ],
         ),
@@ -158,11 +120,7 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
     );
   }
 
-<<<<<<< HEAD
   Widget _buildScheduleCard(Task task) {
-=======
-  Widget _buildTaskCard(Task task) {
->>>>>>> app_ai
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -171,43 +129,32 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
-<<<<<<< HEAD
             blurRadius: 20,
             offset: const Offset(0, 8),
-=======
-            blurRadius: 12,
-            offset: const Offset(0, 4),
->>>>>>> app_ai
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-<<<<<<< HEAD
           borderRadius: BorderRadius.circular(16),
           onTap: () => _showDeleteConfirmation(task),
-=======
-          onTap: () => _showDeleteConfirmation(task),
-          borderRadius: BorderRadius.circular(16),
->>>>>>> app_ai
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-<<<<<<< HEAD
                 // 아이콘 영역
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: task.isRecurring 
+                    color: task.isRecurring
                         ? const Color(0xFFf97316).withOpacity(0.1)
                         : const Color(0xFF6366f1).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     task.isRecurring ? Icons.repeat : Icons.event,
-                    color: task.isRecurring 
+                    color: task.isRecurring
                         ? const Color(0xFFf97316)
                         : const Color(0xFF6366f1),
                     size: 20,
@@ -215,86 +162,18 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
                 ),
                 const SizedBox(width: 16),
                 // 텍스트 영역
-=======
-                // 일정 정보
->>>>>>> app_ai
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-<<<<<<< HEAD
                       Text(
                         task.title,
                         style: const TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1f2937),
+                          fontWeight: FontWeight.w600,
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatTaskDateTime(task),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF6b7280),
-                        ),
-                      ),
-                      if (task.isRecurring) ...[
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFf97316).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            '반복 일정',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFFf97316),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-=======
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              task.title,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (task.isImportant)
-                            Container(
-                              margin: const EdgeInsets.only(left: 8),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFef4444).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                '중요',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFFef4444),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                        ],
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -335,7 +214,6 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
                           ],
                         ],
                       ),
->>>>>>> app_ai
                     ],
                   ),
                 ),
@@ -364,10 +242,10 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final taskDate = DateTime(task.date.year, task.date.month, task.date.day);
-    
+
     // 시간이 기본값(정오)인지 확인
     final isDefaultTime = task.date.hour == 12 && task.date.minute == 0;
-    
+
     // 날짜 표시
     String dateText;
     if (taskDate == today) {
@@ -379,7 +257,7 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
     } else {
       dateText = '${task.date.month}월 ${task.date.day}일';
     }
-    
+
     // 시간 표시 (기본값이 아닌 경우에만)
     if (isDefaultTime) {
       return dateText;
@@ -413,10 +291,7 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
               const SizedBox(width: 12),
               const Text(
                 '일정 삭제',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -429,10 +304,7 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text(
                 '취소',
-                style: TextStyle(
-                  color: Color(0xFF6b7280),
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Color(0xFF6b7280), fontSize: 16),
               ),
             ),
             ElevatedButton(
@@ -447,10 +319,7 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text(
-                '삭제',
-                style: TextStyle(fontSize: 16),
-              ),
+              child: const Text('삭제', style: TextStyle(fontSize: 16)),
             ),
           ],
         );
@@ -499,7 +368,7 @@ class _DeleteScheduleScreenState extends State<DeleteScheduleScreen> {
       _syncWithServerInBackground(task.id);
     } catch (e) {
       print('❌ 일정 삭제 실패: $e');
-      
+
       // 실패 시 목록에 다시 추가
       setState(() {
         if (!widget.schedules.contains(task)) {
