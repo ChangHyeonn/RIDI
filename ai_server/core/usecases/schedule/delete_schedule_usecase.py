@@ -85,6 +85,54 @@ class DeleteScheduleUseCase:
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             return DeleteScheduleResult(False, error_message=f"일정 삭제 실패: {str(e)}")
     
+    def execute_direct(self, user_id: str, schedule_id: str) -> DeleteScheduleResult:
+        """일정 직접 삭제 (ID로)"""
+        try:
+            # 일정 존재 확인
+            schedule = self.schedule_repository.find_by_id(schedule_id)
+            if not schedule:
+                return DeleteScheduleResult(False, error_message="일정을 찾을 수 없습니다.")
+            
+            # 사용자 소유 확인
+            if schedule.user_id != user_id:
+                return DeleteScheduleResult(False, error_message="삭제 권한이 없습니다.")
+            
+            # 삭제 실행
+            success = self.schedule_repository.delete(schedule_id)
+            if success:
+                self.logger.info(f"Schedule deleted directly: {schedule.title} ({schedule_id})")
+                return DeleteScheduleResult(True, deleted_title=schedule.title)
+            else:
+                return DeleteScheduleResult(False, error_message="일정 삭제에 실패했습니다.")
+                
+        except Exception as e:
+            self.logger.error(f"Direct delete schedule failed: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            return DeleteScheduleResult(False, error_message=f"일정 삭제 실패: {str(e)}")
+    
+    def execute_search(self, user_id: str, search_info: Dict[str, Any]) -> DeleteScheduleResult:
+        """일정 검색 (삭제용)"""
+        try:
+            title = (search_info.get('title') or '').strip()
+            date_str = (search_info.get('date') or '').strip()
+            time_period = (search_info.get('time_period') or '').strip()
+            specific_time = (search_info.get('time') or '').strip()
+            
+            # 유사한 일정들 찾기
+            similar_schedules = self._find_similar_schedules(user_id, title, date_str, time_period, specific_time)
+            
+            return DeleteScheduleResult(
+                success=True,
+                found_schedules=similar_schedules
+            )
+                
+        except Exception as e:
+            self.logger.error(f"Search schedules failed: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            return DeleteScheduleResult(False, error_message=f"일정 검색 실패: {str(e)}")
+    
     def _find_similar_schedules(self, user_id: str, search_title: str, date_str: str = None, time_period: str = None, specific_time: str = None) -> List[Dict[str, Any]]:
         """유사한 일정들을 찾는 함수 (스펙트럼 검색) - description + 시간대 포함"""
         try:
@@ -124,7 +172,13 @@ class DeleteScheduleUseCase:
                 
                 self.logger.info(f"Similarity for '{search_title}' vs '{schedule.title}': title={title_similarity:.3f}, desc={description_similarity:.3f}, final={similarity:.3f}")
                 
-                if similarity >= 0.15:  # 유사도 임계값
+                # 정확한 제목 매칭 우선 확인
+                exact_title_match = search_title.lower().strip() == schedule.title.lower().strip()
+                
+                # 유사도 임계값 (정확한 매칭이면 더 낮은 임계값도 허용)
+                similarity_threshold = 0.1 if exact_title_match else 0.3
+                
+                if similarity >= similarity_threshold or exact_title_match:
                     similar_schedules.append({
                         'id': schedule.id,
                         'title': schedule.title,
@@ -132,11 +186,12 @@ class DeleteScheduleUseCase:
                         'datetime': schedule.start_datetime.isoformat() if schedule.start_datetime else None,
                         'category': schedule.category,
                         'similarity': similarity,
-                        'is_recurring': schedule.is_recurring
+                        'is_recurring': schedule.is_recurring,
+                        'exact_match': exact_title_match
                     })
             
-            # 3. 유사도 순으로 정렬
-            similar_schedules.sort(key=lambda x: x['similarity'], reverse=True)
+            # 3. 정확한 매칭 우선, 그 다음 유사도 순으로 정렬
+            similar_schedules.sort(key=lambda x: (not x.get('exact_match', False), -x['similarity']))
             
             # 4. 상위 5개만 반환 (너무 많으면 선택이 어려움)
             self.logger.info(f"Found {len(similar_schedules)} similar schedules for '{search_title}': {[s['title'] for s in similar_schedules[:5]]}")
@@ -314,54 +369,6 @@ class DeleteScheduleUseCase:
         except Exception as e:
             self.logger.error(f"Execute selection failed: {e}")
             return DeleteScheduleResult(False, error_message=f"일정 삭제 실패: {str(e)}")
-    
-    def execute_search(self, user_id: str, search_info: Dict[str, Any]) -> DeleteScheduleResult:
-        """일정 검색 실행 (시각적 삭제 인터페이스용)"""
-        try:
-            title = (search_info.get('title') or '').strip()
-            date_str = (search_info.get('date') or '').strip()
-            
-            # 1. 검색 조건에 따른 일정 조회
-            if date_str:
-                from datetime import datetime
-                target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                user_schedules = self.schedule_repository.find_by_user_and_date(user_id, target_date)
-            else:
-                user_schedules = self.schedule_repository.find_by_user_id(user_id)
-            
-            # 2. 제목 필터링 (제목이 있는 경우)
-            found_schedules = []
-            if title:
-                for schedule in user_schedules:
-                    if schedule.title and self._calculate_similarity(title, schedule.title) >= 0.15:
-                        found_schedules.append({
-                            'id': schedule.id,
-                            'title': schedule.title,
-                            'datetime': schedule.start_datetime.isoformat() if schedule.start_datetime else None,
-                            'is_recurring': schedule.is_recurring,
-                            'recurrence': schedule.recurrence_pattern.to_dict() if schedule.recurrence_pattern else None,
-                            'category': schedule.category or '일반'
-                        })
-            else:
-                # 제목이 없는 경우 모든 일정 반환
-                for schedule in user_schedules:
-                    found_schedules.append({
-                        'id': schedule.id,
-                        'title': schedule.title,
-                        'datetime': schedule.start_datetime.isoformat() if schedule.start_datetime else None,
-                        'is_recurring': schedule.is_recurring,
-                        'recurrence': schedule.recurrence_pattern.to_dict() if schedule.recurrence_pattern else None,
-                        'category': schedule.category or '일반'
-                    })
-            
-            return DeleteScheduleResult(
-                success=True,
-                found_schedules=found_schedules
-            )
-                
-        except Exception as e:
-            self.logger.error(f"Execute search failed: {e}")
-            return DeleteScheduleResult(False, error_message=f"일정 검색 실패: {str(e)}")
     
     def execute_delete_by_id(self, user_id: str, schedule_id: str) -> DeleteScheduleResult:
         """특정 ID의 일정 삭제"""

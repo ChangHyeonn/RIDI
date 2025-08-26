@@ -120,13 +120,14 @@ class ProcessTextUseCase:
                 self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
                 return self._handle_schedule_read(request, intent, start_time)
             elif intent.category == "schedule_delete":
-                # 일정 정보 추출
+                # 삭제 확인 응답인지 확인
+                session = self._user_sessions.get(request.user_id)
+                if session and session.get('last_intent') == 'schedule_delete_confirmation':
+                    return self._handle_delete_confirmation(request, start_time)
+                
+                # 일반 삭제 요청 처리
                 schedule_info = self.llm_service.extract_schedule_info(request.text)
-                
-                # AI_02 스타일 로그: Information Extraction
                 self.logger.info(f"Information extracted: {schedule_info}")
-                
-                # AI_02 스타일 로그: Request Analysis
                 self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
                 return self._handle_schedule_delete(request, schedule_info, start_time)
             else:
@@ -257,54 +258,89 @@ class ProcessTextUseCase:
             )
     
     def _handle_schedule_delete(self, request: TextRequest, schedule_info: dict, start_time: float) -> TextProcessingResult:
-        """일정 삭제 처리 (새로운 시각적 인터페이스 방식)"""
+        """일정 삭제 처리 (대화형 방식)"""
         try:
+            # 1. 시간 정보만 제공하는 경우 세션에서 이전 정보 가져오기
+            if self._is_time_only_response(request.text):
+                pending_delete = self._get_pending_delete(request.user_id)
+                if pending_delete:
+                    # 이전 삭제 정보에 시간 정보 추가
+                    schedule_info = self._merge_time_with_pending_delete(request.text, pending_delete)
+                    self.logger.info(f"Merged delete info: {schedule_info}")
+                else:
+                    schedule_info = self.llm_service.extract_schedule_info(request.text)
+            else:
+                schedule_info = self.llm_service.extract_schedule_info(request.text)
+            
+            # 2. 삭제 정보 검증
             title = (schedule_info.get('title') or '').strip()
             date_str = (schedule_info.get('date') or '').strip()
+            time_str = (schedule_info.get('time') or '').strip()
+            time_period = (schedule_info.get('time_period') or '').strip()
             
-            # 1. 삭제 요청 검증: 제목이나 날짜 중 하나라도 있어야 함
-            if not title and not date_str:
-                return self._create_error_result(
-                    "삭제할 일정의 제목이나 날짜를 알려주세요.", 
-                    time.time() - start_time,
-                    ErrorTypes.SCHEDULE_VALIDATION_ERROR
-                )
-            
-            # 2. 관련 일정 검색
+            # 3. 일정 검색
             result = self.delete_schedule_usecase.execute_search(request.user_id, schedule_info)
             
             if not result.success:
                 return self._create_error_result(result.error_message, time.time() - start_time)
             
-            # 3. 검색된 일정들을 시각적 인터페이스로 표시
             found_schedules = result.found_schedules
-            if not found_schedules:
+            
+            # 4. 검색 결과에 따른 처리
+            if len(found_schedules) == 0:
+                # 일치하는 일정이 없음
                 return self._create_error_result(
-                    "삭제할 일정을 찾을 수 없습니다.", 
+                    "일치하는 일정을 찾을 수 없습니다.", 
                     time.time() - start_time,
                     ErrorTypes.SCHEDULE_NOT_FOUND
                 )
             
-            # 4. 시각적 삭제 인터페이스 응답 생성
-            search_criteria = title if title else date_str
-            response_text = f"'{search_criteria}'과 관련된 일정 {len(found_schedules)}개를 찾았습니다. 삭제하고 싶은 일정을 선택해주세요."
-            
-            return TextProcessingResult(
-                success=True,
-                action_type="schedule_delete_visual",
-                action_data={
-                    "search_criteria": {
-                        "title": title,
-                        "date": date_str
-                    },
-                    "found_schedules": found_schedules,
-                    "total_count": len(found_schedules),
-                    "show_delete_interface": True
-                },
-                response_text=response_text,
-                processing_time=time.time() - start_time
-            )
+            elif len(found_schedules) == 1:
+                # 정확히 하나의 일정을 찾음 - 삭제 확인
+                schedule = found_schedules[0]
+                schedule_title = schedule.get('title', '일정')
                 
+                # 세션에 삭제 대기 정보 저장
+                self._save_pending_delete_confirmation(request.user_id, schedule)
+                
+                response_text = f"'{schedule_title}' 일정을 삭제하시겠습니까? (예/아니오)"
+                
+                return TextProcessingResult(
+                    success=True,
+                    action_type="schedule_delete_confirmation",
+                    action_data={
+                        "schedule": schedule,
+                        "requires_confirmation": True
+                    },
+                    response_text=response_text,
+                    processing_time=time.time() - start_time
+                )
+            
+            else:
+                # 여러 일정을 찾음 - 추가 정보 요청
+                missing_info = []
+                if not title:
+                    missing_info.append('일정 내용')
+                if not date_str:
+                    missing_info.append('일자')
+                if not time_str and not time_period:
+                    missing_info.append('시간')
+                
+                # 세션에 삭제 대기 정보 저장
+                self._save_pending_delete(request.user_id, schedule_info)
+                
+                if len(missing_info) == 1:
+                    error_message = f"상세한 {missing_info[0]}을 말씀해 주시겠어요?"
+                else:
+                    missing_str = ', '.join(missing_info[:-1]) + f'와 {missing_info[-1]}'
+                    error_message = f"상세한 {missing_str}을 말씀해 주시겠어요?"
+                
+                return self._create_error_result(
+                    error_message, 
+                    time.time() - start_time,
+                    ErrorTypes.SCHEDULE_VALIDATION_ERROR
+                )
+        
         except Exception as e:
             self.logger.error(f"Schedule delete failed: {e}")
             return self._create_error_result(
@@ -1216,3 +1252,206 @@ class ProcessTextUseCase:
         except Exception as e:
             self.logger.error(f"Failed to merge time: {e}")
             return pending_schedule
+
+    # ===== 삭제 관련 세션 관리 함수들 =====
+    
+    def _save_pending_delete(self, user_id: str, delete_info: dict):
+        """삭제 대기 정보를 세션에 저장"""
+        try:
+            self._user_sessions[user_id] = {
+                "pending_delete": delete_info,
+                "last_intent": "schedule_delete",
+                "timestamp": time.time()
+            }
+            self.logger.info(f"Pending delete saved for user {user_id}: {delete_info}")
+        except Exception as e:
+            self.logger.error(f"Failed to save pending delete: {e}")
+    
+    def _get_pending_delete(self, user_id: str) -> dict:
+        """세션에서 대기 중인 삭제 정보 가져오기"""
+        try:
+            session = self._user_sessions.get(user_id)
+            if session and time.time() - session["timestamp"] < 300:  # 5분 이내
+                return session.get("pending_delete", {})
+            return {}
+        except Exception as e:
+            self.logger.error(f"Failed to get pending delete: {e}")
+            return {}
+    
+    def _save_pending_delete_confirmation(self, user_id: str, schedule: dict):
+        """삭제 확인 대기 정보를 세션에 저장"""
+        try:
+            self._user_sessions[user_id] = {
+                "pending_delete_confirmation": schedule,
+                "last_intent": "schedule_delete_confirmation",
+                "timestamp": time.time()
+            }
+            self.logger.info(f"Pending delete confirmation saved for user {user_id}: {schedule}")
+        except Exception as e:
+            self.logger.error(f"Failed to save pending delete confirmation: {e}")
+    
+    def _clear_pending_delete_confirmation(self, user_id: str):
+        """세션에서 삭제 확인 대기 정보 삭제"""
+        try:
+            if user_id in self._user_sessions:
+                del self._user_sessions[user_id]
+                self.logger.info(f"Pending delete confirmation cleared for user {user_id}")
+        except Exception as e:
+            self.logger.error(f"Failed to clear pending delete confirmation: {e}")
+    
+    def _merge_time_with_pending_delete(self, time_text: str, pending_delete: dict) -> dict:
+        """시간 정보를 대기 중인 삭제 정보와 병합"""
+        try:
+            # 시간 정보 파싱
+            time_match = re.search(r'(\d+)시', time_text)
+            if not time_match:
+                return pending_delete
+            
+            hour = int(time_match.group(1))
+            
+            # 오전/오후 정보 확인
+            if '오후' in time_text and hour < 12:
+                hour += 12
+            elif '오전' in time_text and hour == 12:
+                hour = 0
+            
+            # 24시간 형식으로 변환
+            time_str = f"{hour:02d}:00"
+            
+            # 병합된 삭제 정보 생성
+            merged_delete = pending_delete.copy()
+            merged_delete['time'] = time_str
+            
+            self.logger.info(f"Time merged for delete: {time_text} -> {time_str}")
+            return merged_delete
+            
+        except Exception as e:
+            self.logger.error(f"Failed to merge time for delete: {e}")
+            return pending_delete
+
+    def _handle_delete_confirmation(self, request: TextRequest, start_time: float) -> TextProcessingResult:
+        """삭제 확인 응답 처리"""
+        try:
+            # 세션에서 삭제 대기 정보 가져오기
+            session = self._user_sessions.get(request.user_id)
+            if not session or 'pending_delete_confirmation' not in session:
+                return self._create_error_result(
+                    "삭제할 일정 정보를 찾을 수 없습니다.", 
+                    time.time() - start_time,
+                    ErrorTypes.SCHEDULE_NOT_FOUND
+                )
+            
+            schedule = session['pending_delete_confirmation']
+            
+            # LLM을 사용한 문맥적 의도 파악
+            user_intent = self._analyze_delete_confirmation_intent(request.text, schedule)
+            
+            if user_intent == "confirm":
+                # 삭제 실행
+                result = self.delete_schedule_usecase.execute_direct(request.user_id, schedule['id'])
+                
+                if result.success:
+                    # 세션 정리
+                    self._clear_pending_delete_confirmation(request.user_id)
+                    
+                    schedule_title = schedule.get('title', '일정')
+                    response_text = f"'{schedule_title}' 일정을 삭제했습니다."
+                    
+                    return TextProcessingResult(
+                        success=True,
+                        action_type="schedule_delete",
+                        action_data={"deleted_schedule": schedule},
+                        response_text=response_text,
+                        processing_time=time.time() - start_time
+                    )
+                else:
+                    return self._create_error_result(
+                        result.error_message, 
+                        time.time() - start_time,
+                        ErrorTypes.SCHEDULE_DELETE_ERROR
+                    )
+            
+            elif user_intent == "cancel":
+                # 삭제 취소
+                self._clear_pending_delete_confirmation(request.user_id)
+                
+                return TextProcessingResult(
+                    success=True,
+                    action_type="schedule_delete_cancelled",
+                    action_data={"message": "삭제가 취소되었습니다."},
+                    response_text="삭제를 취소했습니다.",
+                    processing_time=time.time() - start_time
+                )
+            
+            else:
+                # 명확하지 않은 응답
+                return self._create_error_result(
+                    "삭제하시겠습니까? '예' 또는 '아니오'로 답변해주세요.", 
+                    time.time() - start_time,
+                    ErrorTypes.SCHEDULE_VALIDATION_ERROR
+                )
+        
+        except Exception as e:
+            self.logger.error(f"Delete confirmation failed: {e}")
+            return self._create_error_result(
+                "삭제 확인 처리 중 오류가 발생했습니다.", 
+                time.time() - start_time,
+                ErrorTypes.AI_PROCESSING_ERROR
+            )
+
+    def _analyze_delete_confirmation_intent(self, user_response: str, schedule: dict) -> str:
+        """LLM을 사용한 삭제 확인 의도 분석"""
+        try:
+            schedule_title = schedule.get('title', '일정')
+            
+            prompt = f"""
+사용자가 일정 삭제 확인에 대한 응답을 했습니다.
+
+삭제할 일정: "{schedule_title}"
+사용자 응답: "{user_response}"
+
+이 응답이 삭제를 확인하는 것인지, 취소하는 것인지, 아니면 명확하지 않은 것인지 판단해주세요.
+
+응답 형식:
+- "confirm": 삭제를 확인하는 경우 (예: "응 삭제해 줘", "그래", "삭제하라니까", "네", "예" 등)
+- "cancel": 삭제를 취소하는 경우 (예: "아니 삭제하지 마", "싫어 하지마", "아니오", "취소" 등)
+- "unclear": 의도가 명확하지 않은 경우
+
+판단 결과만 출력해주세요.
+"""
+            
+            response = self.llm_service.generate_response(prompt)
+            response = response.strip().lower()
+            
+            self.logger.info(f"Delete confirmation intent analysis: '{user_response}' -> {response}")
+            
+            if response in ['confirm', '확인', '삭제확인']:
+                return "confirm"
+            elif response in ['cancel', '취소', '삭제취소']:
+                return "cancel"
+            else:
+                return "unclear"
+                
+        except Exception as e:
+            self.logger.error(f"Intent analysis failed: {e}")
+            # LLM 분석 실패 시 기존 키워드 매칭으로 폴백
+            return self._fallback_keyword_analysis(user_response)
+    
+    def _fallback_keyword_analysis(self, user_response: str) -> str:
+        """LLM 분석 실패 시 키워드 기반 폴백 분석"""
+        user_response = user_response.lower().strip()
+        
+        # 삭제 확인 키워드들
+        confirm_keywords = ['예', '네', 'yes', 'y', '응', '그래', '삭제', '삭제해', '삭제해줘', '삭제하라', '삭제하라고', '삭제하라니까']
+        cancel_keywords = ['아니오', '아니요', 'no', 'n', '아니', '싫어', '하지마', '취소', '취소해']
+        
+        # 키워드 포함 여부 확인
+        is_confirm = any(keyword in user_response for keyword in confirm_keywords)
+        is_cancel = any(keyword in user_response for keyword in cancel_keywords)
+        
+        if is_confirm and not is_cancel:
+            return "confirm"
+        elif is_cancel:
+            return "cancel"
+        else:
+            return "unclear"
