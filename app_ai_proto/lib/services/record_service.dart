@@ -31,8 +31,11 @@ class RecordService {
   // 최근 시각적 조회에서 서버가 내려준 일정 ID 캐시 (삭제 확인/명령에 사용)
   List<String> _lastFoundScheduleIds = <String>[];
   static const String _lastFoundIdsPrefsKey = 'last_found_schedule_ids';
-  // 직전 즉시 삭제된 ID들 (새로고침 레이스 방지용 힌트)
-  List<String> _justDeletedLocally = <String>[];
+  Map<String, dynamic>? _lastSearchCriteria; // 일정 조회 화면 갱신용
+  bool _isScheduleListOpen = false;
+  // 최근 추가된 Task ID들 (최대 10개 유지)
+  final List<String> _recentAddedIds = <String>[];
+  // 예약 필드 제거됨: 삭제 확인 문구 캐시는 사용하지 않음
 
   Future<void> _persistLastFoundIds() async {
     try {
@@ -475,6 +478,9 @@ class RecordService {
       print('중요도(is_important): ${action.isImportant}');
 
       switch (action.type) {
+        case 'text_response':
+          // UI-only 응답은 별도 처리 필요 없음
+          break;
         case 'schedule_add':
           await _handleScheduleAdd(action);
           break;
@@ -520,12 +526,22 @@ class RecordService {
         if (ui.removeItem != null && ui.removeItem!.isNotEmpty) {
           print('🗑️ UI 지시사항 단일 삭제: ${ui.removeItem}');
           await taskProvider.deleteTask(ui.removeItem!);
-          await taskProvider.loadTasks();
+          // 즉시 UI 반영은 in-memory notifyListeners로 충분
+          // 저장 완료 후 정합을 위해 지연 새로고침만 예약
+          Future.delayed(const Duration(milliseconds: 800), () async {
+            try {
+              await taskProvider.loadTasks();
+            } catch (_) {}
+          });
         }
         if (ui.removeItems != null && ui.removeItems!.isNotEmpty) {
           print('🗑️ UI 지시사항 다중 삭제: ${ui.removeItems}');
           await taskProvider.deleteTasks(ui.removeItems!);
-          await taskProvider.loadTasks();
+          Future.delayed(const Duration(milliseconds: 800), () async {
+            try {
+              await taskProvider.loadTasks();
+            } catch (_) {}
+          });
         }
       }
 
@@ -781,7 +797,14 @@ class RecordService {
       // TaskProvider를 통해 일정 추가
       final taskProvider = _getTaskProvider();
       if (taskProvider != null) {
-        taskProvider.addTask(task);
+        await taskProvider.addTask(task);
+        // 최근 추가 ID 캐시 (최대 10개 유지)
+        try {
+          _recentAddedIds.add(task.id);
+          if (_recentAddedIds.length > 10) {
+            _recentAddedIds.removeAt(0);
+          }
+        } catch (_) {}
         print('✅ TaskProvider를 통해 일정 추가 완료');
       } else {
         print('❌ TaskProvider를 찾을 수 없습니다');
@@ -923,6 +946,13 @@ class RecordService {
           final taskProvider = _getTaskProvider();
           if (taskProvider != null) {
             await taskProvider.addTask(task);
+            // 최근 추가 ID 캐시
+            try {
+              _recentAddedIds.add(task.id);
+              if (_recentAddedIds.length > 10) {
+                _recentAddedIds.removeAt(0);
+              }
+            } catch (_) {}
             print('✅ TaskProvider를 통해 일정 추가 완료 (알람은 TaskProvider에서 자동 설정됨)');
             print('✅ 일정 시간 처리 완료: $parsedDateTime');
           } else {
@@ -1153,6 +1183,31 @@ class RecordService {
     }
   }
 
+  // 일정 조회 화면 갱신 (열려있다면 pop→push로 재생성)
+  void _refreshScheduleListScreen() {
+    try {
+      if (!_isScheduleListOpen) return;
+      if (navigatorKey.currentContext == null) return;
+      print('🔄 일정 조회 화면 갱신 시도');
+      // pop 후 동일 라우트로 재진입
+      Navigator.popUntil(
+        navigatorKey.currentContext!,
+        (route) => route.settings.name != '/schedule-list',
+      );
+      Navigator.pushNamed(
+        navigatorKey.currentContext!,
+        '/schedule-list',
+        arguments: {
+          'schedules': const <Task>[], // 화면에서 Provider를 구독하게 된다면 무시됨
+          'searchCriteria': _lastSearchCriteria ?? const <String, dynamic>{},
+        },
+      );
+      print('✅ 일정 조회 화면 갱신 완료');
+    } catch (e) {
+      print('⚠️ 일정 조회 화면 갱신 실패: $e');
+    }
+  }
+
   // 일정 삭제 처리
   Future<void> _handleScheduleDelete(AIAction action) async {
     try {
@@ -1171,7 +1226,15 @@ class RecordService {
         if (taskId != null && taskId.isNotEmpty) {
           await taskProvider.deleteTask(taskId);
           print('✅ 일정 삭제 완료: $taskId (알람은 TaskProvider에서 자동 취소됨)');
-          await taskProvider.loadTasks();
+          // 즉시 반영은 notifyListeners로 충분, 저장 정합은 지연 새로고침으로 처리
+          Future.delayed(const Duration(milliseconds: 500), () async {
+            try {
+              await taskProvider.loadTasks();
+            } catch (_) {}
+          });
+
+          // 일정 조회 화면이 열려 있으면 갱신
+          _refreshScheduleListScreen();
           return;
         }
       }
@@ -1186,13 +1249,60 @@ class RecordService {
         // 캐시 초기화 (중복 삭제 방지)
         _lastFoundScheduleIds = <String>[];
         await _persistLastFoundIds();
-        await taskProvider.loadTasks();
+        Future.delayed(const Duration(milliseconds: 500), () async {
+          try {
+            await taskProvider.loadTasks();
+          } catch (_) {}
+        });
+        _refreshScheduleListScreen();
         return;
       }
 
       print('⚠️ 삭제할 일정 ID가 없고 캐시도 비어 있습니다');
+      // 보조 삭제: 최근 추가 목록 + 제목/시간 매칭
+      try {
+        final titleFromText = _aiResponseText;
+        await _deleteByTitleHeuristic(titleFromText);
+      } catch (e) {
+        print('⚠️ 보조 삭제 중 오류: $e');
+      }
     } catch (e) {
       print('❌ 일정 삭제 처리 중 오류: $e');
+    }
+  }
+
+  // 제목(+최근 생성) 기반 보조 삭제 휴리스틱
+  Future<void> _deleteByTitleHeuristic(String? title) async {
+    if (title == null || title.isEmpty) return;
+    final taskProvider = _getTaskProvider();
+    if (taskProvider == null) return;
+
+    final now = DateTime.now();
+    // 최근 1시간 내 생성된 항목 + 제목 일치 우선
+    final candidates = taskProvider.tasks.where((t) {
+      final within1h = now.difference(t.date).inMinutes.abs() <= 60;
+      final titleMatch = t.title == title || t.title.contains(title);
+      return titleMatch || (titleMatch && within1h);
+    }).toList();
+
+    if (candidates.isEmpty && _recentAddedIds.isNotEmpty) {
+      // 최근 추가 목록에 포함된 항목 우선 제거
+      final byRecent = taskProvider.tasks
+          .where(
+            (t) =>
+                _recentAddedIds.contains(t.id) &&
+                (t.title == title || t.title.contains(title)),
+          )
+          .toList();
+      candidates.addAll(byRecent);
+    }
+
+    if (candidates.isNotEmpty) {
+      final ids = candidates.map((e) => e.id).toList();
+      print('🧹 보조 삭제 실행 IDs: $ids');
+      await taskProvider.deleteTasks(ids);
+      await taskProvider.loadTasks();
+      _refreshScheduleListScreen();
     }
   }
 
@@ -1219,6 +1329,10 @@ class RecordService {
       } catch (e) {
         print('⚠️ 조회 결과 ID 캐시 실패: $e');
       }
+
+      // 조회 화면 상태 기록
+      _lastSearchCriteria = searchCriteria;
+      _isScheduleListOpen = true;
 
       // Task 객체로 변환
       final tasks = foundSchedules.map((schedule) {
@@ -1727,6 +1841,22 @@ class RecordService {
         await _applyUiInstructions(aiResponse.action!.uiInstructions);
       } else {
         print('⚠️ 구형 action이 없습니다');
+      }
+
+      // 삭제 성공 문구 기반 보조 삭제: "'제목' 일정을 삭제했습니다."
+      try {
+        final txt = aiResponse.textResponse?.text ?? '';
+        final successReg = RegExp(r"'([^']+)'\s*일정을\s*삭제했습니다\.");
+        final m2 = successReg.firstMatch(txt);
+        if (m2 != null && m2.groupCount >= 1) {
+          final title = m2.group(1);
+          if (title != null && title.isNotEmpty) {
+            print('🧹 보조 삭제 시도(제목 매칭): $title');
+            await _deleteByTitleHeuristic(title);
+          }
+        }
+      } catch (e) {
+        print('⚠️ 보조 삭제 처리 실패: $e');
       }
 
       print('✅ 구형 응답 구조 처리 완료');

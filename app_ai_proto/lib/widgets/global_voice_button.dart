@@ -196,6 +196,16 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
         _isOverlayOpen = false;
       });
       _stopAnimations();
+
+      // 오버레이 종료 직후 전역 리스트 강제 새로고침 (메인/날짜별/조회 화면 동기화)
+      try {
+        // 짧은 지연으로 상태 정리 후 로드 (레이스 방지)
+        await Future.delayed(const Duration(milliseconds: 60));
+        final taskProvider = context.read<TaskProvider>();
+        await taskProvider.loadTasks();
+      } catch (e) {
+        print('⚠️ 오버레이 종료 후 강제 새로고침 실패: $e');
+      }
     }
   }
 
