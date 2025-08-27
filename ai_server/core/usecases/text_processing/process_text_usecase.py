@@ -35,96 +35,74 @@ class ProcessTextUseCase:
         self._user_sessions = {}
     
     def execute(self, request: TextRequest) -> TextProcessingResult:
-        """텍스트 요청 처리 (AI_02 호환 방식)"""
+        """텍스트 처리 실행"""
         start_time = time.time()
         
         try:
-            # 1. 입력 검증
-            if not request.is_valid():
-                return self._create_error_result(
-                    "유효하지 않은 요청입니다.", 
-                    time.time() - start_time,
-                    ErrorTypes.INVALID_REQUEST
-                )
+            # 1. 삭제 확인 세션 상태 먼저 확인 (인텐트 분류 전에)
+            session = self._user_sessions.get(request.user_id)
+            if session and session.get('last_intent') == 'schedule_delete_confirmation':
+                self.logger.info(f"Pending delete confirmation detected for user {request.user_id}")
+                return self._handle_delete_confirmation(request, start_time)
             
-            # 2. 의도 분석
+            # (중요) 삭제 진행 컨텍스트는 무조건 강제하지 않는다. 확인 단계만 선처리한다.
+            
+            # 2. 인텐트 분류
             intent = self.llm_service.analyze_intent(request.text)
-            
-            # 의도 분류 후처리 (LLM 분류 결과 보정)
-            corrected_intent = self._correct_intent_classification(request.text, intent)
-            if corrected_intent.category != intent.category:
-                self.logger.info(f"Intent corrected: {intent.category} -> {corrected_intent.category}")
-                intent = corrected_intent
-            
-            # AI_02 스타일 로그: Intent Classification
             self.logger.info(f"Intent classified: {request.text} -> {intent.category}")
+            
+            # 3. 시간만 응답하는지 확인
+            is_time_only = self._is_time_only_response(request.text)
+            self.logger.info(f"Time response check: text='{request.text}', is_time_only={is_time_only}, intent={intent.category}")
+            
+            # 4. 인텐트 분류 결과 로깅
             self.logger.info(f"Intent analyzed: {intent.category} (confidence: {intent.confidence})")
             
-            # 2.5. 일정 선택 응답 감지 (스펙트럼 삭제 후 사용자 선택)
+            # 5. 선택 응답인지 확인
             if self._is_schedule_selection_response(request.text):
+                self.logger.info(f"Selection response detected: {request.text}")
                 return self._handle_schedule_selection_response(request, start_time)
             
-            # 3. 일정 관련 요청의 경우 정보 추출
-            if intent.category == "schedule_add":
-                # 시간 정보만 제공하는 경우 세션에서 이전 정보 가져오기
-                if self._is_time_only_response(request.text):
-                    self.logger.info(f"Time-only response detected: {request.text}")
-                    pending_schedule = self._get_pending_schedule(request.user_id)
-                    self.logger.info(f"Pending schedule for user {request.user_id}: {pending_schedule}")
-                    if pending_schedule:
-                        # 이전 일정 정보에 시간 정보 추가 (AI 추출 건너뛰기)
-                        schedule_info = self._merge_time_with_pending_schedule(request.text, pending_schedule)
-                        self.logger.info(f"Merged schedule info: {schedule_info}")
-                    else:
-                        # 세션에 이전 정보가 없으면 AI 추출
-                        schedule_info = self.llm_service.extract_schedule_info(request.text)
-                        self.logger.info(f"No pending schedule, using AI extraction: {schedule_info}")
-                else:
-                    # 일반적인 일정 추가 요청
+            self.logger.info(f"Not a selection response: '{request.text}'")
+            
+            # 6. 삭제 진행 컨텍스트가 있을 때의 분기(의도와 조합)
+            session = self._user_sessions.get(request.user_id)
+            if session and session.get('pending_delete'):
+                text_lower = request.text.lower()
+                is_delete_like = ('삭제' in text_lower) or ('지워' in text_lower)
+                is_partial = False
+                try:
+                    is_partial = self._is_partial_info_response(request.text)
+                except Exception:
+                    is_partial = False
+
+                if intent.category == "schedule_delete" or is_delete_like or is_partial:
+                    self.logger.info(f"Pending delete context continues for user {request.user_id}")
                     schedule_info = self.llm_service.extract_schedule_info(request.text)
-                
-                # AI_02 스타일 로그: Information Extraction
-                self.logger.info(f"Information extracted: {schedule_info}")
-                
-                # 엄격한 일정 정보 검증
-                validation_result = self._validate_schedule_info(schedule_info, request)
-                if validation_result['valid']:
-                    # AI_02 스타일 로그: Request Analysis
-                    self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
-                    # 성공 시 세션 정리
-                    self._clear_pending_schedule(request.user_id)
-                    return self._handle_schedule_add_with_info(request, schedule_info, start_time)
-                else:
-                    # 시간 누락된 경우 세션에 저장
-                    error_type = validation_result.get('error_type')
-                    if error_type in [ErrorTypes.SCHEDULE_VALIDATION_ERROR, ErrorTypes.MISSING_SCHEDULE_TIME, ErrorTypes.MISSING_SCHEDULE_TITLE, ErrorTypes.MISSING_SCHEDULE_DATE]:
-                        self.logger.info(f"Saving pending schedule for error type: {error_type}")
-                        self._save_pending_schedule(request.user_id, schedule_info)
-                    
-                    return self._create_error_result(
-                        validation_result['error_message'], 
-                        time.time() - start_time,
-                        validation_result.get('error_type', ErrorTypes.SCHEDULE_VALIDATION_ERROR)
-                    )
+                    return self._handle_schedule_delete(request, schedule_info, start_time)
+                elif intent.category == "schedule_add":
+                    # 추가 의도더라도 시간/날짜 보강 응답이라면 삭제 컨텍스트 유지
+                    try:
+                        if (
+                            self._is_time_only_response(request.text)
+                            or self._is_date_only_response(request.text)
+                            or self._has_datetime_components(request.text)
+                        ):
+                            self.logger.info("Keep pending delete despite schedule_add intent due to time/date-only response")
+                        else:
+                            self._clear_pending_delete(request.user_id)
+                    except Exception:
+                        self._clear_pending_delete(request.user_id)
+
+            # 7. 인텐트별 처리
+            if intent.category == "schedule_add":
+                # 일정 추가 처리
+                return self._handle_schedule_add(request, intent, start_time)
             elif intent.category == "schedule_read":
-                # 일정 조회 정보 추출
-                schedule_info = self.llm_service.extract_schedule_info(request.text)
-                
-                # AI_02 스타일 로그: Information Extraction
-                self.logger.info(f"Information extracted: {schedule_info}")
-                
-                # intent.extracted_info 업데이트
-                intent.extracted_info = schedule_info
-                
-                # AI_02 스타일 로그: Request Analysis
+                # 일정 조회 처리
                 self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
                 return self._handle_schedule_read(request, intent, start_time)
             elif intent.category == "schedule_delete":
-                # 삭제 확인 응답인지 확인
-                session = self._user_sessions.get(request.user_id)
-                if session and session.get('last_intent') == 'schedule_delete_confirmation':
-                    return self._handle_delete_confirmation(request, start_time)
-                
                 # 일반 삭제 요청 처리
                 schedule_info = self.llm_service.extract_schedule_info(request.text)
                 self.logger.info(f"Information extracted: {schedule_info}")
@@ -173,27 +151,47 @@ class ProcessTextUseCase:
             )
     
     def _handle_schedule_add(self, request: TextRequest, intent: IntentAnalysis, start_time: float) -> TextProcessingResult:
-        """일정 추가 처리"""
+        """일정 추가 처리 (부분 정보 병합 지원)"""
         try:
-            result = self.add_schedule_usecase.execute(request.user_id, intent.extracted_info)
-            
-            if result.success:
-                response_text = self._generate_add_response(result.schedule_data)
-                return TextProcessingResult(
-                    success=True,
-                    action_type="schedule_add",
-                    action_data={"schedule_data": result.schedule_data},
-                    response_text=response_text,
-                    processing_time=time.time() - start_time
-                )
+            pending_schedule = self._get_pending_schedule(request.user_id)
+
+            # 부분 정보(시간/일자/내용)만 응답한 경우 → 기존 대기 정보와 병합 시도
+            if self._is_partial_info_response(request.text) and pending_schedule:
+                self.logger.info(f"Partial info response detected: {request.text}")
+                schedule_info = self._merge_info_with_pending_schedule(request.text, pending_schedule)
+                self.logger.info(f"Merged schedule info: {schedule_info}")
             else:
-                return self._create_error_result(result.error_message, time.time() - start_time)
+                # 일반적인 일정 추가 요청 → LLM 추출
+                schedule_info = self.llm_service.extract_schedule_info(request.text)
+
+            # 정보 추출 로그
+            self.logger.info(f"Information extracted: {schedule_info}")
+
+            # 일정 정보 검증 및 처리
+            validation_result = self._validate_schedule_info(schedule_info, request)
+            if validation_result['valid']:
+                self.logger.info(f"Request analyzed: {request.text} -> {intent.category}")
+                self._clear_pending_schedule(request.user_id)
+                return self._handle_schedule_add_with_info(request, schedule_info, start_time)
+            else:
+                # 불완전하면 대기 스케줄로 저장해 연속 대화 유도
+                error_type = validation_result.get('error_type')
+                if error_type in [ErrorTypes.SCHEDULE_VALIDATION_ERROR, ErrorTypes.MISSING_SCHEDULE_TIME, ErrorTypes.MISSING_SCHEDULE_TITLE, ErrorTypes.MISSING_SCHEDULE_DATE]:
+                    self.logger.info(f"Saving pending schedule for error type: {error_type}")
+                    self._save_pending_schedule(request.user_id, schedule_info)
+
+                return self._create_error_result(
+                    validation_result['error_message'],
+                    time.time() - start_time,
+                    validation_result.get('error_type', ErrorTypes.SCHEDULE_VALIDATION_ERROR)
+                )
                 
         except Exception as e:
             self.logger.error(f"Schedule add failed: {e}")
             return self._create_error_result(
                 "일정 추가 중 오류가 발생했습니다.", 
-                time.time() - start_time
+                time.time() - start_time,
+                ErrorTypes.AI_PROCESSING_ERROR
             )
     
     def _handle_schedule_read(self, request: TextRequest, intent: IntentAnalysis, start_time: float) -> TextProcessingResult:
@@ -260,17 +258,26 @@ class ProcessTextUseCase:
     def _handle_schedule_delete(self, request: TextRequest, schedule_info: dict, start_time: float) -> TextProcessingResult:
         """일정 삭제 처리 (대화형 방식)"""
         try:
-            # 1. 시간 정보만 제공하는 경우 세션에서 이전 정보 가져오기
-            if self._is_time_only_response(request.text):
+            # 1. 시간/날짜만 제공하거나(예: "오후 5시야", "오늘"), 날짜+시간 조합을 제공하는 경우 세션에서 이전 정보 병합
+            if self._is_time_only_response(request.text) or self._is_date_only_response(request.text) or self._has_datetime_components(request.text):
                 pending_delete = self._get_pending_delete(request.user_id)
                 if pending_delete:
-                    # 이전 삭제 정보에 시간 정보 추가
-                    schedule_info = self._merge_time_with_pending_delete(request.text, pending_delete)
+                    # 이전 삭제 정보에 시간/날짜 정보 추가
+                    if self._is_time_only_response(request.text) or self._has_datetime_components(request.text):
+                        schedule_info = self._merge_time_with_pending_delete(request.text, pending_delete)
+                    if self._is_date_only_response(request.text):
+                        schedule_info = self._merge_date_with_pending_delete(request.text, schedule_info)
                     self.logger.info(f"Merged delete info: {schedule_info}")
                 else:
                     schedule_info = self.llm_service.extract_schedule_info(request.text)
             else:
                 schedule_info = self.llm_service.extract_schedule_info(request.text)
+
+            # 1.5 기존 삭제 컨텍스트가 있다면 신규 추출 정보와 병합 (제목/설명 보존)
+            pending_for_delete = self._get_pending_delete(request.user_id)
+            if pending_for_delete:
+                schedule_info = self._merge_info_with_pending_delete(schedule_info, pending_for_delete)
+                self.logger.info(f"Delete info merged with pending: {schedule_info}")
             
             # 2. 삭제 정보 검증
             title = (schedule_info.get('title') or '').strip()
@@ -303,7 +310,7 @@ class ProcessTextUseCase:
                 # 세션에 삭제 대기 정보 저장
                 self._save_pending_delete_confirmation(request.user_id, schedule)
                 
-                response_text = f"'{schedule_title}' 일정을 삭제하시겠습니까? (예/아니오)"
+                response_text = f"'{schedule_title}' 일정을 삭제하시겠습니까?"
                 
                 return TextProcessingResult(
                     success=True,
@@ -330,10 +337,25 @@ class ProcessTextUseCase:
                 self._save_pending_delete(request.user_id, schedule_info)
                 
                 if len(missing_info) == 1:
-                    error_message = f"상세한 {missing_info[0]}을 말씀해 주시겠어요?"
+                    # 조사 교정: '일자'는 '일자를'
+                    item = missing_info[0]
+                    if item == '일자':
+                        item = '일자를'
+                    else:
+                        item = item + '을'
+                    error_message = f"상세한 {item} 말씀해 주시겠어요?"
                 else:
-                    missing_str = ', '.join(missing_info[:-1]) + f'와 {missing_info[-1]}'
-                    error_message = f"상세한 {missing_str}을 말씀해 주시겠어요?"
+                    # 복수 항목: 마지막 항목 조사 교정
+                    items = missing_info[:]
+                    if items[-1] == '일자':
+                        items[-1] = '일자'
+                        joiner_last = '와 '
+                        tail = '을'
+                    else:
+                        joiner_last = '와 '
+                        tail = '을'
+                    missing_str = ', '.join(items[:-1]) + f'{joiner_last}{items[-1]}'
+                    error_message = f"상세한 {missing_str}{tail} 말씀해 주시겠어요?"
                 
                 return self._create_error_result(
                     error_message, 
@@ -378,7 +400,7 @@ class ProcessTextUseCase:
                 "search_title": search_title,
                 "timestamp": time.time()
             }
-            
+
             return TextProcessingResult(
                 success=False,
                 action_type="schedule_selection",
@@ -453,11 +475,11 @@ class ProcessTextUseCase:
             if delete_result.success:
                 # 세션 정리
                 del self._user_sessions[request.user_id]
-                
+
                 # 삭제 성공 응답 생성
                 deleted_titles = [schedule["title"] for schedule in similar_schedules if schedule["id"] in selected_schedule_ids]
                 response_text = self._generate_delete_multiple_response(deleted_titles, len(selected_schedule_ids))
-                
+
                 return TextProcessingResult(
                     success=True,
                     action_type="schedule_delete_multiple",
@@ -470,11 +492,11 @@ class ProcessTextUseCase:
                 )
             else:
                 return self._create_error_result(
-                    delete_result.error_message, 
+                    delete_result.error_message,
                     time.time() - start_time,
                     ErrorTypes.SCHEDULE_DELETE_ERROR
                 )
-            
+                
         except Exception as e:
             self.logger.error(f"Schedule selection response failed: {e}")
             return self._create_error_result(
@@ -1057,7 +1079,7 @@ class ProcessTextUseCase:
             "is_valid": False,
             "error_message": "번호로 선택하거나 '모두', '취소'를 말씀해주세요."
         }
-
+    
     def _create_error_result(self, error_message: str, processing_time: float, error_type: str = ErrorTypes.SYSTEM_ERROR) -> TextProcessingResult:
         """에러 결과 생성"""
         return TextProcessingResult(
@@ -1207,21 +1229,81 @@ class ProcessTextUseCase:
     def _is_time_only_response(self, text: str) -> bool:
         """시간 정보만 제공하는 응답인지 확인"""
         time_only_patterns = [
-            r"^\s*\d+시\s*$",  # "5시", "3시"
-            r"^\s*오후\s*\d+시\s*$",  # "오후 5시"
-            r"^\s*오전\s*\d+시\s*$",  # "오전 9시"
-            r"^\s*\d+시\s*야\s*$",  # "5시야", "3시야"
-            r"^\s*\d+시\s*에\s*$",  # "5시에", "3시에"
-            r"^\s*오후\s*\d+시\s*야\s*$",  # "오후 5시야"
-            r"^\s*오전\s*\d+시\s*야\s*$",  # "오전 9시야"
-            r"^\s*\d+시\s*란다\s*$",  # "5시란다", "3시란다"
-            r"^\s*오후\s*\d+시\s*란다\s*$",  # "오후 5시란다"
-            r"^\s*오전\s*\d+시\s*란다\s*$",  # "오전 9시란다"
-            r"^\s*\d+시\s*다\s*$",  # "5시다", "3시다"
-            r"^\s*오후\s*\d+시\s*다\s*$",  # "오후 5시다"
-            r"^\s*오전\s*\d+시\s*다\s*$",  # "오전 9시다"
+            r"^\s*\d+시\s*$",  # 5시, 3시
+            r"^\s*오후\s*\d+시\s*$",  # 오후 5시
+            r"^\s*오전\s*\d+시\s*$",  # 오전 9시
+            r"^\s*\d+시\s*야\s*$",
+            r"^\s*\d+시\s*에\s*$",
+            r"^\s*오후\s*\d+시\s*야\s*$",
+            r"^\s*오전\s*\d+시\s*야\s*$",
+            r"^\s*\d+시\s*란다\s*$",
+            r"^\s*오후\s*\d+시\s*란다\s*$",
+            r"^\s*오전\s*\d+시\s*란다\s*$",
+            r"^\s*\d+시\s*다\s*$",
+            r"^\s*오후\s*\d+시\s*다\s*$",
+            r"^\s*오전\s*\d+시\s*다\s*$",
+            # 보다 자연스러운 변형들
+            r"^\s*오후\s*\d+시\s*라니깐?\s*$",
+            r"^\s*오후\s*\d+시\s*라니까\s*$",
+            r"^\s*오전\s*\d+시\s*라니까\s*$",
+            r"^\s*\d+시\s*라니까\s*$",
+            r"^\s*\d+시\s*맞아\s*$",
+            r"^\s*오후\s*\d+시\s*맞아\s*$",
+            r"^\s*오전\s*\d+시\s*맞아\s*$",
+            # 상대적 시간
+            r"^\s*\d+\s*분\s*뒤\s*$",
+            r"^\s*\d+\s*분\s*후\s*$",
+            r"^\s*\d+\s*시간\s*뒤\s*$",
+            r"^\s*\d+\s*시간\s*후\s*$",
         ]
         return any(re.search(pattern, text.lower()) for pattern in time_only_patterns)
+
+    def _is_date_only_response(self, text: str) -> bool:
+        """일자 정보만 제공하는 응답인지 확인"""
+        date_only_patterns = [
+            r"^\s*오늘\s*$",
+            r"^\s*오늘이야\s*$",
+            r"^\s*오늘이라니까\s*$",
+            r"^\s*내일\s*$",
+            r"^\s*모레\s*$",
+            r"^\s*이번주\s*$",
+            r"^\s*다음주\s*$",
+            r"^\s*(월|화|수|목|금|토|일)요일\s*$",
+        ]
+        return any(re.search(pattern, text.lower()) for pattern in date_only_patterns)
+
+    def _is_content_only_response(self, text: str) -> bool:
+        """일정 내용(제목)만 제공하는 응답인지 확인"""
+        content_keywords = [
+            "약속", "회의", "미팅", "식사", "영화", "진료", "검진", "운동", "학원", "모임", "약 복용"
+        ]
+        tl = text.lower()
+        return any(k in tl for k in content_keywords) and not (self._is_time_only_response(text) or self._is_date_only_response(text))
+
+    def _has_datetime_components(self, text: str) -> bool:
+        """문장 안에 '일자 표현 + 시간 표현' 조합이 포함되어 있는지 간단 탐지"""
+        try:
+            import re
+            tl = text.lower().strip()
+            date_tokens = [
+                r"내일", r"모레", r"오늘", r"이번주", r"다음주",
+                r"\d{4}-\d{1,2}-\d{1,2}", r"\d{1,2}월\s*\d{1,2}일"
+            ]
+            time_tokens = [r"오전\s*\d+\s*시(\s*\d+\s*분)?", r"오후\s*\d+\s*시(\s*\d+\s*분)?", r"\b\d+\s*시(\s*\d+\s*분)?"]
+            has_date = any(re.search(p, tl) for p in date_tokens)
+            has_time = any(re.search(p, tl) for p in time_tokens)
+            return has_date and has_time
+        except Exception:
+            return False
+
+    def _is_partial_info_response(self, text: str) -> bool:
+        """시간/일자/내용 중 일부만 포함된 응답인지 확인"""
+        return (
+            self._is_time_only_response(text)
+            or self._is_date_only_response(text)
+            or self._is_content_only_response(text)
+            or self._has_datetime_components(text)
+        )
     
     def _merge_time_with_pending_schedule(self, time_text: str, pending_schedule: dict) -> dict:
         """시간 정보를 대기 중인 일정 정보와 병합"""
@@ -1251,6 +1333,67 @@ class ProcessTextUseCase:
             
         except Exception as e:
             self.logger.error(f"Failed to merge time: {e}")
+            return pending_schedule
+
+    def _merge_info_with_pending_schedule(self, text: str, pending_schedule: dict) -> dict:
+        """부분 정보(시간/일자/내용)를 대기 중인 일정 정보와 병합"""
+        try:
+            import re
+            from datetime import datetime, timedelta
+
+            merged = pending_schedule.copy()
+            tl = text.lower().strip()
+
+            # 1) 구체 시간 병합 (오전/오후 N시)
+            time_m = re.search(r"(오전|오후)?\s*(\d+)\s*시", tl)
+            if time_m:
+                hour = int(time_m.group(2))
+                ampm = time_m.group(1) or ''
+                if '오후' in ampm and hour < 12:
+                    hour += 12
+                if '오전' in ampm and hour == 12:
+                    hour = 0
+                merged['time'] = f"{hour:02d}:00"
+
+            # 2) 상대적 시간 병합 (N분/시간/일 뒤/후)
+            rel_specs = [
+                (r"(\d+)\s*분\s*(뒤|후)", 'minutes'),
+                (r"(\d+)\s*시간\s*(뒤|후)", 'hours'),
+                (r"(\d+)\s*일\s*(뒤|후)", 'days'),
+            ]
+            for pat, unit in rel_specs:
+                m = re.search(pat, tl)
+                if m:
+                    delta = int(m.group(1))
+                    now = datetime.now()
+                    if unit == 'minutes':
+                        tgt = now + timedelta(minutes=delta)
+                    elif unit == 'hours':
+                        tgt = now + timedelta(hours=delta)
+                    else:
+                        tgt = now + timedelta(days=delta)
+                    merged['date'] = tgt.strftime('%Y-%m-%d')
+                    merged['time'] = tgt.strftime('%H:%M')
+                    break
+
+            # 3) 일자 병합 (내일/모레/다음주 등 간단 규칙)
+            if '내일' in tl:
+                tgt = (datetime.now() + timedelta(days=1))
+                merged['date'] = tgt.strftime('%Y-%m-%d')
+            elif '모레' in tl:
+                tgt = (datetime.now() + timedelta(days=2))
+                merged['date'] = tgt.strftime('%Y-%m-%d')
+
+            # 4) 내용(제목) 병합: 제목이 비어있고 자연어 활동 단서가 있으면 그대로 제목으로 사용
+            if not (merged.get('title') or '').strip():
+                activity_cues = ['약속', '회의', '미팅', '식사', '영화', '진료', '검진', '운동', '학원', '모임']
+                if any(cue in tl for cue in activity_cues):
+                    merged['title'] = text.strip()
+
+            self.logger.info(f"Info merged: src='{text}' -> {merged}")
+            return merged
+        except Exception as e:
+            self.logger.error(f"Failed to merge info: {e}")
             return pending_schedule
 
     # ===== 삭제 관련 세션 관리 함수들 =====
@@ -1298,6 +1441,21 @@ class ProcessTextUseCase:
                 self.logger.info(f"Pending delete confirmation cleared for user {user_id}")
         except Exception as e:
             self.logger.error(f"Failed to clear pending delete confirmation: {e}")
+
+    def _clear_pending_delete(self, user_id: str):
+        """세션에서 삭제 진행 컨텍스트(pending_delete)만 제거"""
+        try:
+            session = self._user_sessions.get(user_id)
+            if session:
+                session.pop('pending_delete', None)
+                session['timestamp'] = time.time()
+                # 다른 키가 하나도 없으면 세션 제거
+                if not session.get('pending_delete_confirmation') and len(session.keys()) <= 2:
+                    # keys may be last_intent, timestamp
+                    del self._user_sessions[user_id]
+            self.logger.info(f"Pending delete cleared for user {user_id}")
+        except Exception as e:
+            self.logger.error(f"Failed to clear pending delete: {e}")
     
     def _merge_time_with_pending_delete(self, time_text: str, pending_delete: dict) -> dict:
         """시간 정보를 대기 중인 삭제 정보와 병합"""
@@ -1328,6 +1486,40 @@ class ProcessTextUseCase:
         except Exception as e:
             self.logger.error(f"Failed to merge time for delete: {e}")
             return pending_delete
+
+    def _merge_date_with_pending_delete(self, date_text: str, pending_delete: dict) -> dict:
+        """날짜-only 응답을 pending delete에 병합 (오늘/내일/모레)"""
+        try:
+            from datetime import datetime, timedelta
+            tl = date_text.strip().lower()
+            if '오늘' in tl:
+                tgt = datetime.now()
+            elif '내일' in tl:
+                tgt = datetime.now() + timedelta(days=1)
+            elif '모레' in tl:
+                tgt = datetime.now() + timedelta(days=2)
+            else:
+                return pending_delete
+
+            merged = pending_delete.copy()
+            merged['date'] = tgt.strftime('%Y-%m-%d')
+            self.logger.info(f"Date merged for delete: {date_text} -> {merged['date']}")
+            return merged
+        except Exception as e:
+            self.logger.error(f"Failed to merge date for delete: {e}")
+            return pending_delete
+
+    def _merge_info_with_pending_delete(self, new_info: dict, pending_delete: dict) -> dict:
+        """삭제용 정보 병합: pending 값 유지, 새 값이 있으면 덮어씀"""
+        try:
+            merged = pending_delete.copy() if isinstance(pending_delete, dict) else {}
+            for key, value in (new_info or {}).items():
+                if value not in (None, '', []):
+                    merged[key] = value
+            return merged
+        except Exception as e:
+            self.logger.error(f"Failed to merge delete info: {e}")
+            return new_info or pending_delete or {}
 
     def _handle_delete_confirmation(self, request: TextRequest, start_time: float) -> TextProcessingResult:
         """삭제 확인 응답 처리"""
