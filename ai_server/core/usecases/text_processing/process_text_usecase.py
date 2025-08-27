@@ -197,6 +197,38 @@ class ProcessTextUseCase:
     def _handle_schedule_read(self, request: TextRequest, intent: IntentAnalysis, start_time: float) -> TextProcessingResult:
         """일정 조회 처리 (시각적 인터페이스 방식)"""
         try:
+            # LLM이 의미있는 키워드를 못 뽑은 경우를 대비해 보정
+            search_info = intent.extracted_info or {}
+            raw_text = request.text or ""
+            keyword = (search_info.get('keyword') or '').strip()
+            title = (search_info.get('title') or '').strip()
+
+            # 제너릭/불용 키워드 목록
+            stop_keywords = [
+                '일정', '스케줄', '관련', '찾아', '찾아줘', '찾아 줄래', '검색', '좀', '해', '줘', '주세요',
+                '일정 찾아', '일정 찾아줘', '일정 찾아 줄래', '일정 검색'
+            ]
+
+            def _derive_keyword_from_text(text: str) -> str:
+                tl = (text or '').strip()
+                # 불용어 제거
+                for sk in stop_keywords:
+                    tl = tl.replace(sk, '')
+                tl = tl.replace('  ', ' ').strip()
+                # 공백 기준 첫 키워드 선택 (간단 규칙)
+                if tl:
+                    return tl.split()[0]
+                return ''
+
+            # 키워드가 비어있거나 불용어면 보정
+            if (not keyword) or any(keyword.lower() == sk.lower() for sk in stop_keywords):
+                derived = _derive_keyword_from_text(raw_text)
+                if derived and derived.lower() not in [s.lower() for s in stop_keywords] and not title:
+                    search_info['type'] = 'keyword'
+                    search_info['keyword'] = derived
+                    intent.extracted_info = search_info
+                    self.logger.info(f"Derived keyword for read: '{derived}' from text '{raw_text}'")
+
             # 1. 일정 조회 실행
             result = self.get_schedule_usecase.execute(request.user_id, intent.extracted_info)
             
