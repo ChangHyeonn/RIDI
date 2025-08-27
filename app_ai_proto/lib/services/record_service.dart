@@ -19,6 +19,7 @@ class RecordService {
   final TextToSpeechService _ttsService = TextToSpeechService();
   TaskProvider? _taskProvider; // TaskProvider 참조 추가
   BuildContext? _context; // Context 참조 추가
+  bool _ttsSuppressed = false; // 화면/오버레이/녹음 중에는 TTS 금지
 
   bool _isRecording = false;
   bool _isPlaying = false;
@@ -138,6 +139,8 @@ class RecordService {
     // STT 상태 스트림 구독
     _sttService.listeningStateStream.listen((isListening) {
       _isRecording = isListening;
+      // 녹음 중에는 TTS를 억제, 녹음이 끝나면 억제 해제
+      _ttsSuppressed = isListening;
       _recordingStateController.add(isListening);
       print('📊 녹음 상태 변경: $isListening');
     });
@@ -216,6 +219,9 @@ class RecordService {
       // audio_app2 방식: 매번 초기화하므로 여기서는 확인만
       print('🔧 audio_app2 방식으로 STT 서비스 사용');
 
+      // 새 녹음 시작 → TTS 즉시 억제 (AI 응답 도착 레이스 차단)
+      _ttsSuppressed = true;
+
       // STT 시작 전 TTS 재생 중이면 중지하여 오디오 경합 방지
       if (_ttsService.isSpeaking) {
         print('🔇 STT 시작 전 TTS 중지');
@@ -251,6 +257,12 @@ class RecordService {
   Future<String?> stopRecording() async {
     try {
       print('=== 음성 인식 중지 ===');
+
+      // 바로 이어지는 새 녹음 대비: 현재 TTS 즉시 중단
+      if (_ttsService.isSpeaking) {
+        print('🔇 중지 시 TTS 중지');
+        await _ttsService.stop();
+      }
 
       // STT 서비스 중지
       await _sttService.stopListening();
@@ -349,14 +361,9 @@ class RecordService {
           _aiResponseStreamController.add(_aiResponseText);
           print('✅ AI 텍스트 응답: "$_aiResponseText"');
 
-          // 3. TTS로 음성 재생 (한 번만)
+          // 3. TTS로 음성 재생 (한 번만) — 화면/오버레이 닫힘 플래그 시 무시
           print('🔊 TTS 음성 재생 시작...');
-          try {
-            await _ttsService.speak(_aiResponseText);
-            print('✅ TTS 음성 재생 완료');
-          } catch (ttsError) {
-            print('❌ TTS 재생 실패: $ttsError');
-          }
+          await _speakIfAllowed(_aiResponseText);
         } else {
           print('⚠️ AI 응답 텍스트가 없습니다');
         }
@@ -389,13 +396,8 @@ class RecordService {
       _aiResponseStreamController.add(_aiResponseText);
 
       // TTS로 오류 메시지 재생
-      try {
-        print('🔊 오류 메시지 TTS 재생 시작...');
-        await _ttsService.speak(_aiResponseText);
-        print('✅ 오류 메시지 TTS 재생 완료');
-      } catch (ttsError) {
-        print('❌ TTS 재생 중 오류: $ttsError');
-      }
+      print('🔊 오류 메시지 TTS 재생 시작...');
+      await _speakIfAllowed(_aiResponseText);
     }
 
     // AI 처리 완료 후 상태 해제를 위한 빈 응답 전송
@@ -895,13 +897,8 @@ class RecordService {
         _aiResponseStreamController.add(_aiResponseText);
 
         // TTS로 명확화 요청 재생
-        try {
-          print('🔊 명확화 요청 TTS 재생 시작...');
-          await _ttsService.speak(clarificationText);
-          print('✅ 명확화 요청 TTS 재생 완료');
-        } catch (ttsError) {
-          print('❌ 명확화 요청 TTS 재생 실패: $ttsError');
-        }
+        print('🔊 명확화 요청 TTS 재생 시작...');
+        await _speakIfAllowed(clarificationText);
       } else {
         print('⚠️ 명확화 요청 데이터가 올바르지 않습니다: $clarificationData');
       }
@@ -1168,6 +1165,8 @@ class RecordService {
         print('🔇 취소 시 TTS 중지');
         await _ttsService.stop();
       }
+      // 오버레이/화면 종료 흐름에서는 이후 TTS를 금지
+      _ttsSuppressed = true;
       await _sttService.cancelListening();
       _recognizedText = '';
       _aiResponseText = '';
@@ -1574,21 +1573,8 @@ class RecordService {
     _aiResponseStreamController.add(_aiResponseText);
 
     // TTS로 에러 메시지 재생
-    try {
-      print('🔊 에러 메시지 TTS 재생 시작...');
-      await _ttsService.speak(userFriendlyMessage);
-      print('✅ 에러 메시지 TTS 재생 완료');
-
-      // 특정 에러 타입에 대해서만 자동 재시작 (충분한 대기 시간 추가)
-      if (_shouldAutoRestartForError(errorType)) {
-        print('🔄 에러 타입 "$errorType"에 대해 자동 녹음 재시작...');
-        print('⏰ TTS 재생 완료 후 3초 대기...');
-        await Future.delayed(const Duration(seconds: 3)); // 3초 대기로 증가
-        await _autoRestartRecording();
-      }
-    } catch (ttsError) {
-      print('❌ 에러 메시지 TTS 재생 실패: $ttsError');
-    }
+    print('🔊 에러 메시지 TTS 재생 시작...');
+    await _speakIfAllowed(userFriendlyMessage);
   }
 
   // 구형 응답 구조 처리 (action + text_response)
@@ -1641,5 +1627,18 @@ class RecordService {
     _aiResponseStreamController.close();
     _recordingStateController.close();
     _playingStateController.close();
+  }
+
+  // 화면/오버레이 닫힘 후에는 TTS 재생을 억제
+  Future<void> _speakIfAllowed(String text) async {
+    if (_ttsSuppressed) {
+      print('🔇 TTS suppressed — 화면/오버레이 종료로 재생 생략');
+      return;
+    }
+    try {
+      await _ttsService.speak(text);
+    } catch (e) {
+      print('❌ TTS 재생 실패: $e');
+    }
   }
 }

@@ -109,6 +109,10 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
   void dispose() {
     _pulseController.dispose();
     _fadeController.dispose();
+    // 위젯 폐기 시 재생 중인 TTS가 있다면 중단
+    try {
+      _recordService.stopPlaying();
+    } catch (_) {}
     _recordService.dispose();
     super.dispose();
   }
@@ -152,6 +156,10 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
 
   Future<void> _stopRecording() async {
     try {
+      // 녹음 중지 직전 TTS 강제 중지 (레이스 차단)
+      try {
+        await _recordService.stopPlaying();
+      } catch (_) {}
       await _recordService.stopRecording();
       setState(() {
         _isRecording = false;

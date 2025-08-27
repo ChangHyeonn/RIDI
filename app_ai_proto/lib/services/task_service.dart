@@ -5,21 +5,20 @@ import '../models/task.dart';
 class TaskService {
   static const String _tasksKey = 'tasks';
   static const String _settingsKey = 'settings';
-  static const String _completedOccurrencesKey = 'completed_occurrences';
-
+  static const String _completedOccurrencesKey = 'completed_occurrence_keys';
+  
   // 캐싱을 위한 변수들
   List<Task>? _cachedTasks;
   Map<String, dynamic>? _cachedSettings;
+  List<String>? _cachedCompletedOccurrenceKeys;
 
   // 일정 목록 가져오기
   Future<List<Task>> getTasks() async {
     if (_cachedTasks != null) return _cachedTasks!;
-
+    
     final prefs = await SharedPreferences.getInstance();
     final tasksJson = prefs.getStringList(_tasksKey) ?? [];
-    _cachedTasks = tasksJson
-        .map((json) => Task.fromJson(jsonDecode(json)))
-        .toList();
+    _cachedTasks = tasksJson.map((json) => Task.fromJson(jsonDecode(json))).toList();
     return _cachedTasks!;
   }
 
@@ -84,7 +83,7 @@ class TaskService {
   // 설정 가져오기
   Future<Map<String, dynamic>> getSettings() async {
     if (_cachedSettings != null) return _cachedSettings!;
-
+    
     final prefs = await SharedPreferences.getInstance();
 
     // JSON으로 저장된 설정을 먼저 시도
@@ -116,25 +115,33 @@ class TaskService {
     // 개별 키로도 저장 (이전 버전 호환성)
     await prefs.setDouble('soundVolume', settings['soundVolume'] ?? 0.5);
     await prefs.setDouble('fontSize', settings['fontSize'] ?? 0.5);
-
+    
     _cachedSettings = settings; // 캐시 업데이트
+  }
+
+  // 반복 일정의 특정 날짜 완료 키 목록 가져오기
+  Future<List<String>> getCompletedOccurrences() async {
+    if (_cachedCompletedOccurrenceKeys != null) {
+      return _cachedCompletedOccurrenceKeys!;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    // StringList로 저장/로드. 없으면 빈 리스트 반환
+    final keys = prefs.getStringList(_completedOccurrencesKey) ?? <String>[];
+    _cachedCompletedOccurrenceKeys = List<String>.from(keys);
+    return _cachedCompletedOccurrenceKeys!;
+  }
+
+  // 반복 일정의 특정 날짜 완료 키 목록 저장하기
+  Future<void> saveCompletedOccurrences(List<String> keys) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_completedOccurrencesKey, keys);
+    _cachedCompletedOccurrenceKeys = List<String>.from(keys);
   }
 
   // 캐시 무효화 (동기화 후 사용)
   void invalidateCache() {
     _cachedTasks = null;
     _cachedSettings = null;
-  }
-
-  // 반복 일정 개별 발생(날짜별) 완료 목록 가져오기
-  Future<List<String>> getCompletedOccurrences() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getStringList(_completedOccurrencesKey) ?? const [];
-  }
-
-  // 반복 일정 개별 발생(날짜별) 완료 목록 저장
-  Future<void> saveCompletedOccurrences(List<String> keys) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_completedOccurrencesKey, keys);
+    _cachedCompletedOccurrenceKeys = null;
   }
 }
