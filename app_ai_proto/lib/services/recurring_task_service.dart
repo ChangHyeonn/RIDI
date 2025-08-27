@@ -13,7 +13,14 @@ class RecurringTaskService {
     List<int> days = [];
     List<String> times = [];
     if (r != null) {
-      if (r.daysOfWeek != null) {
+      // 요일 시그니처: 타입별 기본 집합 처리
+      if (r.type == 'daily') {
+        days = [0, 1, 2, 3, 4, 5, 6];
+      } else if (r.type == 'weekdays') {
+        days = [0, 1, 2, 3, 4];
+      } else if (r.type == 'weekends') {
+        days = [5, 6];
+      } else if (r.daysOfWeek != null) {
         days = List<int>.from(r.daysOfWeek!)..sort();
       }
       if (r.times.isNotEmpty) {
@@ -77,19 +84,54 @@ class RecurringTaskService {
 
     if (tasks.isEmpty) return weekdayStatus;
 
-    for (final task in tasks) {
-      if (task.recurrence?.daysOfWeek != null) {
-        for (final weekday in task.recurrence!.daysOfWeek!) {
-          if (weekday >= 0 && weekday < 7) {
-            weekdayStatus[weekday] = true;
+    // 우선 Recurrence 타입(daily/weekdays/weekends)을 반영
+    final RecurrenceInfo? r = tasks.first.recurrence;
+    if (r != null) {
+      switch (r.type) {
+        case 'daily':
+          for (int i = 0; i < 7; i++) {
+            weekdayStatus[i] = true;
           }
+          return weekdayStatus;
+        case 'weekdays':
+          for (int i = 0; i < 5; i++) {
+            weekdayStatus[i] = true; // 월(0)~금(4)
+          }
+          return weekdayStatus;
+        case 'weekends':
+          weekdayStatus[5] = true; // 토(5)
+          weekdayStatus[6] = true; // 일(6)
+          return weekdayStatus;
+        default:
+          break; // custom_days 또는 기타 → 아래 로직으로 처리
+      }
+    }
+
+    for (final task in tasks) {
+      final rec = task.recurrence;
+      if (rec != null) {
+        if (rec.type == 'daily') {
+          for (int i = 0; i < 7; i++) weekdayStatus[i] = true;
+          continue;
         }
-      } else {
-        final weekday = task.date.weekday - 1; // 0=월요일, 6=일요일
-        if (weekday >= 0 && weekday < 7) {
-          weekdayStatus[weekday] = true;
+        if (rec.type == 'weekdays') {
+          for (int i = 0; i < 5; i++) weekdayStatus[i] = true;
+          continue;
+        }
+        if (rec.type == 'weekends') {
+          weekdayStatus[5] = true;
+          weekdayStatus[6] = true;
+          continue;
+        }
+        if (rec.daysOfWeek != null) {
+          for (final weekday in rec.daysOfWeek!) {
+            if (weekday >= 0 && weekday < 7) weekdayStatus[weekday] = true;
+          }
+          continue;
         }
       }
+      final weekday = task.date.weekday - 1; // 0=월요일, 6=일요일
+      if (weekday >= 0 && weekday < 7) weekdayStatus[weekday] = true;
     }
 
     return weekdayStatus;

@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/task.dart';
+import '../providers/task_provider.dart';
 import '../widgets/global_voice_button.dart';
 
 class ScheduleListScreen extends StatefulWidget {
-  final List<Task> schedules;
-  final String searchCriteria;
-  final String? searchKeyword;
-  final Map<String, dynamic>? groupedSchedules;
-  final int? totalCount;
-  final Map<String, dynamic>? dateRange;
+  final List<Task>? schedules; // 호환용(더 이상 사용 권장 X)
+  final String? searchCriteria; // 호환용(텍스트)
+  final String? searchKeyword; // 미사용 시 null
+  final Map<String, dynamic>? groupedSchedules; // 미사용 시 null
+  final int? totalCount; // 미사용 시 null
+  final Map<String, dynamic>? dateRange; // 미사용 시 null
 
   const ScheduleListScreen({
     Key? key,
-    required this.schedules,
-    required this.searchCriteria,
+    this.schedules,
+    this.searchCriteria,
     this.searchKeyword,
     this.groupedSchedules,
     this.totalCount,
@@ -30,94 +32,134 @@ class _ScheduleListScreenState extends State<ScheduleListScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFfafafa),
       body: SafeArea(
-        child: Column(
-          children: [
-            // 헤더 영역
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+        child: Consumer<TaskProvider>(
+          builder: (context, taskProvider, child) {
+            // 필터 기준: 기존 호환 파라미터들에서 키워드/기간 등을 읽어 필터링
+            final keyword = widget.searchKeyword ?? widget.searchCriteria ?? '';
+            final dateRange = widget.dateRange;
+
+            Iterable<Task> base = taskProvider.tasks;
+            if (keyword.isNotEmpty) {
+              final k = keyword.trim();
+              base = base.where(
+                (t) =>
+                    t.title.contains(k) ||
+                    (t.category).toString().contains(k) ||
+                    (t.recurrence != null && '반복'.contains(k)),
+              );
+            }
+            if (dateRange != null &&
+                dateRange['start'] != null &&
+                dateRange['end'] != null) {
+              try {
+                final start = DateTime.parse(dateRange['start'].toString());
+                final end = DateTime.parse(dateRange['end'].toString());
+                base = base.where(
+                  (t) => !t.date.isBefore(start) && !t.date.isAfter(end),
+                );
+              } catch (_) {}
+            }
+
+            final schedules = base.toList()
+              ..sort((a, b) => a.date.compareTo(b.date));
+
+            return Column(
+              children: [
+                // 헤더 영역
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: Color(0xFF6366f1),
-                        size: 22,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '일정 조회',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey[800],
+                          child: const Icon(
+                            Icons.arrow_back,
+                            color: Color(0xFF6366f1),
+                            size: 22,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '검색어: ${widget.searchCriteria}',
-                          style: TextStyle(
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '일정 조회',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              keyword.isNotEmpty ? '검색어: $keyword' : '전체 일정',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366f1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${schedules.length}개',
+                          style: const TextStyle(
+                            color: Colors.white,
                             fontSize: 14,
-                            color: Colors.grey[600],
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6366f1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${widget.schedules.length}개',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            // 일정 목록
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: ListView.builder(
-                  itemCount: widget.schedules.length,
-                  itemBuilder: (context, index) {
-                    final task = widget.schedules[index];
-                    return _buildScheduleCard(task);
-                  },
                 ),
-              ),
-            ),
-          ],
+                // 일정 목록
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: schedules.isEmpty
+                        ? Center(
+                            child: Text(
+                              '검색 결과가 없습니다',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: schedules.length,
+                            itemBuilder: (context, index) {
+                              final task = schedules[index];
+                              return _buildScheduleCard(task);
+                            },
+                          ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
       floatingActionButton: const GlobalVoiceButton(),

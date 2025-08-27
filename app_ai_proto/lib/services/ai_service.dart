@@ -141,7 +141,6 @@ class AIService {
       // 타임아웃 30초 유지, 1회 재시도 (백오프)
       const timeoutDuration = Duration(seconds: 30);
       const maxAttempts = 1;
-      Object? lastError;
       late http.Response response;
       late DateTime startTime;
       late DateTime endTime;
@@ -162,7 +161,6 @@ class AIService {
           endTime = DateTime.now();
           break; // 성공 시 루프 탈출
         } catch (e) {
-          lastError = e;
           print('⚠️ 요청 시도 $attempt 실패: $e');
           if (attempt < maxAttempts) {
             print('⏳ 재시도 전 대기 800ms');

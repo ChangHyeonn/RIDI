@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'speech_to_text_service.dart';
@@ -31,8 +29,11 @@ class RecordService {
   // 최근 시각적 조회에서 서버가 내려준 일정 ID 캐시 (삭제 확인/명령에 사용)
   List<String> _lastFoundScheduleIds = <String>[];
   static const String _lastFoundIdsPrefsKey = 'last_found_schedule_ids';
-  // 직전 즉시 삭제된 ID들 (새로고침 레이스 방지용 힌트)
-  List<String> _justDeletedLocally = <String>[];
+  Map<String, dynamic>? _lastSearchCriteria; // 일정 조회 화면 갱신용
+  bool _isScheduleListOpen = false;
+  // 최근 추가된 Task ID들 (최대 10개 유지)
+  final List<String> _recentAddedIds = <String>[];
+  // 예약 필드 제거됨: 삭제 확인 문구 캐시는 사용하지 않음
 
   Future<void> _persistLastFoundIds() async {
     try {
@@ -88,6 +89,27 @@ class RecordService {
   Stream<String> get aiResponseStream => _aiResponseStreamController.stream;
   Stream<bool> get recordingStateStream => _recordingStateController.stream;
   Stream<bool> get playingStateStream => _playingStateController.stream;
+
+  // 서버 days_of_week 정규화: 1~7(월=1, 일=7) → 0~6(월=0, 일=6)
+  List<int>? _normalizeServerDaysOfWeek(dynamic raw) {
+    try {
+      if (raw is! List) return null;
+      final parsed = raw.map((e) => int.tryParse(e.toString()) ?? -1).toList();
+      if (parsed.isEmpty || parsed.any((v) => v < 0)) return null;
+      final hasZero = parsed.contains(0);
+      // 이미 0~6 기반이면 그대로 사용
+      if (hasZero || parsed.every((v) => v >= 0 && v <= 6)) {
+        return parsed;
+      }
+      // 1~7 기반이면 -1로 보정
+      if (parsed.every((v) => v >= 1 && v <= 7)) {
+        return parsed.map((v) => v - 1).toList();
+      }
+      return parsed; // 알 수 없는 값은 그대로
+    } catch (_) {
+      return null;
+    }
+  }
 
   // iOS 마이크 권한 팝업 문제 해결을 위한 메서드
   Future<void> triggerIOSMicrophoneRequest() async {
@@ -201,38 +223,7 @@ class RecordService {
   }
 
   // 권한 확인 (기존 메서드명 유지)
-  Future<bool> _requestPermission() async {
-    print('=== 마이크 권한 확인 ===');
-
-    try {
-      if (kIsWeb) {
-        print('🌐 Web 환경에서는 브라우저가 자동으로 권한을 요청합니다.');
-        return true;
-      }
-
-      final micStatus = await Permission.microphone.status;
-      print('현재 마이크 권한 상태: $micStatus');
-
-      if (micStatus == PermissionStatus.granted) {
-        print('✅ 마이크 권한이 허용되어 있습니다.');
-        return true;
-      }
-
-      if (micStatus == PermissionStatus.permanentlyDenied) {
-        print('❌ 마이크 권한이 영구적으로 거부되었습니다.');
-        print('⚠️ 앱 설정에서 마이크 권한을 수동으로 허용해주세요.');
-        await openAppSettings();
-        return false;
-      }
-
-      print('❌ 마이크 권한이 거부되었습니다.');
-      print('⚠️ 앱 시작 시 권한을 허용해주세요.');
-      return false;
-    } catch (e) {
-      print('권한 확인 중 오류: $e');
-      return false;
-    }
-  }
+  // 권한 확인 로직은 외부(화면/Flow)에서 처리 — 여기서는 제거
 
   // 음성 인식 시작 (기존 메서드명 유지)
   Future<bool> startRecording() async {
@@ -475,6 +466,9 @@ class RecordService {
       print('중요도(is_important): ${action.isImportant}');
 
       switch (action.type) {
+        case 'text_response':
+          // UI-only 응답은 별도 처리 필요 없음
+          break;
         case 'schedule_add':
           await _handleScheduleAdd(action);
           break;
@@ -520,12 +514,22 @@ class RecordService {
         if (ui.removeItem != null && ui.removeItem!.isNotEmpty) {
           print('🗑️ UI 지시사항 단일 삭제: ${ui.removeItem}');
           await taskProvider.deleteTask(ui.removeItem!);
-          await taskProvider.loadTasks();
+          // 즉시 UI 반영은 in-memory notifyListeners로 충분
+          // 저장 완료 후 정합을 위해 지연 새로고침만 예약
+          Future.delayed(const Duration(milliseconds: 800), () async {
+            try {
+              await taskProvider.loadTasks();
+            } catch (_) {}
+          });
         }
         if (ui.removeItems != null && ui.removeItems!.isNotEmpty) {
           print('🗑️ UI 지시사항 다중 삭제: ${ui.removeItems}');
           await taskProvider.deleteTasks(ui.removeItems!);
-          await taskProvider.loadTasks();
+          Future.delayed(const Duration(milliseconds: 800), () async {
+            try {
+              await taskProvider.loadTasks();
+            } catch (_) {}
+          });
         }
       }
 
@@ -730,9 +734,9 @@ class RecordService {
             endDate: recurrenceData['end_date'] != null
                 ? DateTime.parse(recurrenceData['end_date'])
                 : null,
-            daysOfWeek: recurrenceData['days_of_week'] != null
-                ? List<int>.from(recurrenceData['days_of_week'])
-                : null,
+            daysOfWeek: _normalizeServerDaysOfWeek(
+              recurrenceData['days_of_week'],
+            ),
           );
 
           print('📋 반복 일정 정보:');
@@ -781,7 +785,14 @@ class RecordService {
       // TaskProvider를 통해 일정 추가
       final taskProvider = _getTaskProvider();
       if (taskProvider != null) {
-        taskProvider.addTask(task);
+        await taskProvider.addTask(task);
+        // 최근 추가 ID 캐시 (최대 10개 유지)
+        try {
+          _recentAddedIds.add(task.id);
+          if (_recentAddedIds.length > 10) {
+            _recentAddedIds.removeAt(0);
+          }
+        } catch (_) {}
         print('✅ TaskProvider를 통해 일정 추가 완료');
       } else {
         print('❌ TaskProvider를 찾을 수 없습니다');
@@ -861,14 +872,9 @@ class RecordService {
               }
             }
 
-            List<int>? daysOfWeek;
-            if (recurrenceData['days_of_week'] != null) {
-              final raw = recurrenceData['days_of_week'] as List;
-              daysOfWeek = raw.map((e) {
-                if (e is int) return e;
-                return int.tryParse(e.toString()) ?? 0;
-              }).toList();
-            }
+            List<int>? daysOfWeek = _normalizeServerDaysOfWeek(
+              recurrenceData['days_of_week'],
+            );
 
             recurrence = RecurrenceInfo(
               type: (recurrenceData['type'] ?? 'daily').toString(),
@@ -923,6 +929,13 @@ class RecordService {
           final taskProvider = _getTaskProvider();
           if (taskProvider != null) {
             await taskProvider.addTask(task);
+            // 최근 추가 ID 캐시
+            try {
+              _recentAddedIds.add(task.id);
+              if (_recentAddedIds.length > 10) {
+                _recentAddedIds.removeAt(0);
+              }
+            } catch (_) {}
             print('✅ TaskProvider를 통해 일정 추가 완료 (알람은 TaskProvider에서 자동 설정됨)');
             print('✅ 일정 시간 처리 완료: $parsedDateTime');
           } else {
@@ -981,7 +994,7 @@ class RecordService {
       print('❓ === 명확화 요청 처리 시작 ===');
 
       final clarificationData = action.data;
-      if (clarificationData is Map<String, dynamic>) {
+      if (clarificationData is Map) {
         // 명확화 요청 정보 추출
         final clarificationText =
             clarificationData['clarification_text'] ?? '추가 정보가 필요합니다.';
@@ -1056,7 +1069,7 @@ class RecordService {
       if (taskProvider != null) {
         // 신규 가이드에선 서버에서 리스트를 내려줄 수 있음
         final data = action.data;
-        if (data.containsKey('schedules')) {
+        if (data is Map && data.containsKey('schedules')) {
           final schedules = data['schedules'] as List<dynamic>;
           print('📋 서버 제공 일정 수: ${schedules.length}');
           for (final s in schedules) {
@@ -1153,6 +1166,31 @@ class RecordService {
     }
   }
 
+  // 일정 조회 화면 갱신 (열려있다면 pop→push로 재생성)
+  void _refreshScheduleListScreen() {
+    try {
+      if (!_isScheduleListOpen) return;
+      if (navigatorKey.currentContext == null) return;
+      print('🔄 일정 조회 화면 갱신 시도');
+      // pop 후 동일 라우트로 재진입
+      Navigator.popUntil(
+        navigatorKey.currentContext!,
+        (route) => route.settings.name != '/schedule-list',
+      );
+      Navigator.pushNamed(
+        navigatorKey.currentContext!,
+        '/schedule-list',
+        arguments: {
+          'schedules': const <Task>[], // 화면에서 Provider를 구독하게 된다면 무시됨
+          'searchCriteria': _lastSearchCriteria ?? const <String, dynamic>{},
+        },
+      );
+      print('✅ 일정 조회 화면 갱신 완료');
+    } catch (e) {
+      print('⚠️ 일정 조회 화면 갱신 실패: $e');
+    }
+  }
+
   // 일정 삭제 처리
   Future<void> _handleScheduleDelete(AIAction action) async {
     try {
@@ -1171,7 +1209,15 @@ class RecordService {
         if (taskId != null && taskId.isNotEmpty) {
           await taskProvider.deleteTask(taskId);
           print('✅ 일정 삭제 완료: $taskId (알람은 TaskProvider에서 자동 취소됨)');
-          await taskProvider.loadTasks();
+          // 즉시 반영은 notifyListeners로 충분, 저장 정합은 지연 새로고침으로 처리
+          Future.delayed(const Duration(milliseconds: 500), () async {
+            try {
+              await taskProvider.loadTasks();
+            } catch (_) {}
+          });
+
+          // 일정 조회 화면이 열려 있으면 갱신
+          _refreshScheduleListScreen();
           return;
         }
       }
@@ -1186,13 +1232,60 @@ class RecordService {
         // 캐시 초기화 (중복 삭제 방지)
         _lastFoundScheduleIds = <String>[];
         await _persistLastFoundIds();
-        await taskProvider.loadTasks();
+        Future.delayed(const Duration(milliseconds: 500), () async {
+          try {
+            await taskProvider.loadTasks();
+          } catch (_) {}
+        });
+        _refreshScheduleListScreen();
         return;
       }
 
       print('⚠️ 삭제할 일정 ID가 없고 캐시도 비어 있습니다');
+      // 보조 삭제: 최근 추가 목록 + 제목/시간 매칭
+      try {
+        final titleFromText = _aiResponseText;
+        await _deleteByTitleHeuristic(titleFromText);
+      } catch (e) {
+        print('⚠️ 보조 삭제 중 오류: $e');
+      }
     } catch (e) {
       print('❌ 일정 삭제 처리 중 오류: $e');
+    }
+  }
+
+  // 제목(+최근 생성) 기반 보조 삭제 휴리스틱
+  Future<void> _deleteByTitleHeuristic(String? title) async {
+    if (title == null || title.isEmpty) return;
+    final taskProvider = _getTaskProvider();
+    if (taskProvider == null) return;
+
+    final now = DateTime.now();
+    // 최근 1시간 내 생성된 항목 + 제목 일치 우선
+    final candidates = taskProvider.tasks.where((t) {
+      final within1h = now.difference(t.date).inMinutes.abs() <= 60;
+      final titleMatch = t.title == title || t.title.contains(title);
+      return titleMatch || (titleMatch && within1h);
+    }).toList();
+
+    if (candidates.isEmpty && _recentAddedIds.isNotEmpty) {
+      // 최근 추가 목록에 포함된 항목 우선 제거
+      final byRecent = taskProvider.tasks
+          .where(
+            (t) =>
+                _recentAddedIds.contains(t.id) &&
+                (t.title == title || t.title.contains(title)),
+          )
+          .toList();
+      candidates.addAll(byRecent);
+    }
+
+    if (candidates.isNotEmpty) {
+      final ids = candidates.map((e) => e.id).toList();
+      print('🧹 보조 삭제 실행 IDs: $ids');
+      await taskProvider.deleteTasks(ids);
+      await taskProvider.loadTasks();
+      _refreshScheduleListScreen();
     }
   }
 
@@ -1219,6 +1312,10 @@ class RecordService {
       } catch (e) {
         print('⚠️ 조회 결과 ID 캐시 실패: $e');
       }
+
+      // 조회 화면 상태 기록
+      _lastSearchCriteria = searchCriteria;
+      _isScheduleListOpen = true;
 
       // Task 객체로 변환
       final tasks = foundSchedules.map((schedule) {
@@ -1254,7 +1351,7 @@ class RecordService {
       print('📅 일정 수정 처리 시작');
 
       final scheduleData = action.data;
-      if (scheduleData is Map<String, dynamic>) {
+      if (scheduleData is Map) {
         final taskId = scheduleData['id'];
         final title = scheduleData['title'];
         final datetime = scheduleData['datetime'];
@@ -1378,124 +1475,18 @@ class RecordService {
   Stream<Duration?> get positionStream => Stream.value(null); // TTS에서는 위치 정보 없음
   Stream<Duration?> get durationStream => Stream.value(null); // TTS에서는 길이 정보 없음
 
-  // 마이크 테스트 (기존 메서드명 유지)
-  Future<bool> testMicrophone() async {
-    try {
-      print('=== 마이크 테스트 시작 ===');
-
-      final hasPermission = await _requestPermission();
-      if (!hasPermission) {
-        print('❌ 마이크 권한이 없습니다.');
-        return false;
-      }
-
-      // 간단한 음성 인식 테스트
-      final success = await _sttService.startListening();
-      if (success) {
-        await Future.delayed(const Duration(seconds: 2));
-        await _sttService.stopListening();
-        print('✅ 마이크 테스트 성공');
-        return true;
-      } else {
-        print('❌ 마이크 테스트 실패');
-        return false;
-      }
-    } catch (e) {
-      print('마이크 테스트 실패: $e');
-      return false;
-    }
-  }
+  // 마이크 테스트 기능 제거 (필요 시 별도 테스트 화면에서 구현)
 
   // 자동 재녹음은 서버의 명확화/선택 지시에만 따름
-  bool _shouldAutoRestartForError(String errorType) {
-    return false;
-  }
+  // 자동 재녹음 정책 제거
 
   // 자동 녹음 재시작 메서드
-  Future<void> _autoRestartRecording() async {
-    try {
-      print('🔄 === 자동 녹음 재시작 시작 ===');
-
-      // 현재 녹음 상태 확인
-      if (_isRecording) {
-        print('⚠️ 이미 녹음 중이므로 재시작하지 않습니다.');
-        return;
-      }
-
-      // 이전 텍스트 초기화
-      _recognizedText = '';
-      _lastProcessedText = '';
-
-      // 녹음 시작
-      final success = await startRecording();
-      if (success) {
-        print('✅ 자동 녹음 재시작 성공');
-        // 녹음 상태를 스트림으로 전송
-        _recordingStateController.add(true);
-      } else {
-        print('❌ 자동 녹음 재시작 실패');
-      }
-    } catch (e) {
-      print('❌ 자동 녹음 재시작 중 오류: $e');
-    }
-  }
+  // 자동 녹음 재시작 기능 제거
 
   // 불완전 요청 클라이언트 감지는 제거됨: 서버 응답으로 처리
 
   // 텍스트 유효성 검증 메서드 (더 관대하게 수정)
-  bool _isValidTextForAI(String text) {
-    // 1. 빈 텍스트 체크
-    if (text.isEmpty) {
-      print('🔍 텍스트 검증 실패: 빈 텍스트');
-      return false;
-    }
-
-    // 2. 공백만 있는 텍스트 체크
-    if (text.trim().isEmpty) {
-      print('🔍 텍스트 검증 실패: 공백만 있는 텍스트');
-      return false;
-    }
-
-    // 3. 너무 짧은 텍스트 체크 (1글자 미만으로 완화)
-    if (text.trim().isEmpty) {
-      print('🔍 텍스트 검증 실패: 너무 짧은 텍스트 (${text.trim().length}글자)');
-      return false;
-    }
-
-    // 4. 의미없는 텍스트 패턴 체크 (더 엄격한 패턴만 체크)
-    final meaninglessPatterns = [
-      '음음음음음',
-      '아아아아아',
-      '어어어어어',
-      '으으으으으',
-      '그그그그그',
-      '저저저저저',
-      '그게그게그게그게그게',
-      '저게저게저게저게저게',
-      '뭐뭐뭐뭐뭐',
-      '어떻게어떻게어떻게어떻게어떻게',
-      '그래서그래서그래서그래서그래서',
-    ];
-
-    final trimmedText = text.trim();
-    for (final pattern in meaninglessPatterns) {
-      if (trimmedText == pattern) {
-        print('🔍 텍스트 검증 실패: 의미없는 패턴 "$pattern"');
-        return false;
-      }
-    }
-
-    // 5. 숫자나 특수문자만 있는 텍스트 체크 (완화)
-    final hasMeaningfulContent = RegExp(r'[가-힣a-zA-Z]').hasMatch(trimmedText);
-    if (!hasMeaningfulContent && trimmedText.length < 3) {
-      print('🔍 텍스트 검증 실패: 의미있는 텍스트가 없음 (숫자/특수문자만)');
-      return false;
-    }
-
-    // 6. 일정 관련 키워드 체크는 제거 (모든 텍스트를 AI로 전송)
-    print('✅ 텍스트 검증 통과: "$trimmedText" (AI로 전송)');
-    return true;
-  }
+  // 텍스트 유효성 검증 메서드 제거 (서버 주도 판단으로 이관)
 
   // AI_03 구형 에러 응답 처리
   Future<void> _handleErrorResponse(AIResponse aiResponse) async {
@@ -1727,6 +1718,22 @@ class RecordService {
         await _applyUiInstructions(aiResponse.action!.uiInstructions);
       } else {
         print('⚠️ 구형 action이 없습니다');
+      }
+
+      // 삭제 성공 문구 기반 보조 삭제: "'제목' 일정을 삭제했습니다."
+      try {
+        final txt = aiResponse.textResponse?.text ?? '';
+        final successReg = RegExp(r"'([^']+)'\s*일정을\s*삭제했습니다\.");
+        final m2 = successReg.firstMatch(txt);
+        if (m2 != null && m2.groupCount >= 1) {
+          final title = m2.group(1);
+          if (title != null && title.isNotEmpty) {
+            print('🧹 보조 삭제 시도(제목 매칭): $title');
+            await _deleteByTitleHeuristic(title);
+          }
+        }
+      } catch (e) {
+        print('⚠️ 보조 삭제 처리 실패: $e');
       }
 
       print('✅ 구형 응답 구조 처리 완료');

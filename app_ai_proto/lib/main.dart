@@ -7,7 +7,7 @@ import 'screens/login_screen.dart';
 import 'screens/schedule_list_screen.dart';
 import 'screens/delete_schedule_screen.dart';
 import 'models/task.dart';
-import 'services/alarm_service.dart';
+// 사용되지 않는 import 제거
 import 'permissions_init.dart';
 
 // 전역 NavigatorKey 정의
@@ -65,36 +65,34 @@ class MyApp extends StatelessWidget {
               home: const LoginScreen(),
               routes: {
                 '/delete-schedule': (context) {
-                  final arguments =
-                      ModalRoute.of(context)?.settings.arguments
-                          as Map<String, dynamic>?;
-                  if (arguments != null) {
-                    return DeleteScheduleScreen(
-                      schedules: arguments['schedules'] as List<Task>,
-                      searchCriteria: arguments['searchCriteria'] as String,
-                    );
-                  } else {
-                    // arguments가 없는 경우 빈 화면 반환
-                    return const Scaffold(
-                      body: Center(child: Text('삭제할 일정이 없습니다.')),
-                    );
-                  }
+                  final Object? args = ModalRoute.of(
+                    context,
+                  )?.settings.arguments;
+                  final Map<String, dynamic> arguments = (args is Map)
+                      ? Map<String, dynamic>.from(args)
+                      : {};
+                  return DeleteScheduleScreen(
+                    schedules:
+                        (arguments['schedules'] as List?)?.cast<Task>() ??
+                        const <Task>[],
+                    searchCriteria:
+                        arguments['searchCriteria']?.toString() ?? '',
+                  );
                 },
                 '/schedule-list': (context) {
-                  final arguments =
-                      ModalRoute.of(context)?.settings.arguments
-                          as Map<String, dynamic>?;
-                  if (arguments != null) {
-                    return ScheduleListScreen(
-                      schedules: arguments['schedules'] as List<Task>,
-                      searchCriteria: arguments['searchCriteria'] as String,
-                    );
-                  } else {
-                    // arguments가 없는 경우 빈 화면 반환
-                    return const Scaffold(
-                      body: Center(child: Text('조회할 일정이 없습니다.')),
-                    );
-                  }
+                  final Object? args = ModalRoute.of(
+                    context,
+                  )?.settings.arguments;
+                  final Map<String, dynamic> arguments = (args is Map)
+                      ? Map<String, dynamic>.from(args)
+                      : {};
+                  return ScheduleListScreen(
+                    schedules:
+                        (arguments['schedules'] as List?)?.cast<Task>() ??
+                        const <Task>[],
+                    searchCriteria:
+                        arguments['searchCriteria']?.toString() ?? '',
+                  );
                 },
               },
               debugShowCheckedModeBanner: false,

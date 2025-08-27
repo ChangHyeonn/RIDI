@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/task_provider.dart';
-import '../models/task.dart';
+// 사용되지 않는 import 제거
 import '../constants/categories.dart';
 import '../widgets/global_voice_button.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
 import 'date_detail_screen.dart';
-import 'record_screen.dart';
+// 사용되지 않는 import 제거
 import 'recurring_tasks_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -80,33 +80,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   }
 
   // 반복 일정 타입 표시
-  String _getRecurrenceText(Task task) {
-    if (!task.isRecurring || task.recurrence == null) {
-      return '반복';
-    }
-
-    switch (task.recurrence!.type) {
-      case 'daily':
-        return '매일';
-      case 'weekdays':
-        return '평일';
-      case 'weekends':
-        return '주말';
-      case 'custom_days':
-        // 특정 요일인 경우 요일 정보 표시
-        if (task.recurrence!.daysOfWeek != null &&
-            task.recurrence!.daysOfWeek!.isNotEmpty) {
-          final dayNames = ['월', '화', '수', '목', '금', '토', '일'];
-          final selectedDays = task.recurrence!.daysOfWeek!
-              .map((day) => dayNames[day])
-              .join(', ');
-          return '매주 $selectedDays';
-        }
-        return '특정 요일';
-      default:
-        return '반복';
-    }
-  }
+  // 미사용 메서드 제거: _getRecurrenceText
 
   @override
   Widget build(BuildContext context) {
@@ -201,18 +175,18 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                             final spaceBetweenTitleAndTasks =
                                                 8 * scaleFactor; // 여백 줄임
 
-                                            final fixedHeight =
+                                            // 사용 계산 제거: fixedHeight (직접 합산으로 대체)
+                                            final _fixedHeightForCalc =
                                                 topPadding +
                                                 headerHeight +
                                                 buttonHeight +
                                                 spaceBetweenTitleAndTasks +
                                                 bottomPadding;
-                                            final availableHeight =
-                                                panelHeight - fixedHeight;
+                                            // 사용되지 않음: availableHeight 계산 제거
 
                                             final itemVerticalPadding =
                                                 6 * scaleFactor;
-                                            final itemMargin = 6 * scaleFactor;
+                                            // 사용되지 않음: itemMargin 제거
                                             final textHeight = taskFontSize;
                                             // 실제 렌더링 높이 계산 (margin 포함)
                                             final actualItemMargin =
@@ -228,10 +202,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                 0.90; // 패널 높이의 90%
                                             final maxAvailableHeight =
                                                 maxAllowedHeight -
-                                                (topPadding +
-                                                    headerHeight +
-                                                    buttonHeight +
-                                                    spaceBetweenTitleAndTasks); // 헤더 영역만 제외
+                                                _fixedHeightForCalc; // 헤더 영역만 제외
 
                                             // 90% 제한 내에서 들어갈 수 있는 최대 일정 개수 계산
                                             int maxTasks =
@@ -919,18 +890,18 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                             final spaceBetweenTitleAndTasks =
                                                 8 * scaleFactor; // 여백 줄임
 
-                                            final fixedHeight =
+                                            // 사용 계산 제거: fixedHeight (직접 합산으로 대체)
+                                            final _fixedHeightForCalc2 =
                                                 topPadding +
                                                 headerHeight +
                                                 buttonHeight +
                                                 spaceBetweenTitleAndTasks +
                                                 bottomPadding;
-                                            final availableHeight =
-                                                panelHeight - fixedHeight;
+                                            // 사용되지 않음: availableHeight 계산 제거
 
                                             final itemVerticalPadding =
                                                 6 * scaleFactor;
-                                            final itemMargin = 6 * scaleFactor;
+                                            // 사용되지 않음: itemMargin 제거
                                             final textHeight = taskFontSize;
                                             // 실제 렌더링 높이 계산 (margin 포함)
                                             final actualItemMargin =
@@ -946,10 +917,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
                                                 0.90; // 패널 높이의 90%
                                             final maxAvailableHeight =
                                                 maxAllowedHeight -
-                                                (topPadding +
-                                                    headerHeight +
-                                                    buttonHeight +
-                                                    spaceBetweenTitleAndTasks); // 헤더 영역만 제외
+                                                _fixedHeightForCalc2; // 헤더 영역만 제외
 
                                             // 90% 제한 내에서 들어갈 수 있는 최대 일정 개수 계산
                                             int maxTasks =
