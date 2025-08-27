@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:path_provider/path_provider.dart';
 import 'speech_to_text_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'text_to_speech_service.dart';
 import 'ai_service.dart';
 import '../models/ai_response.dart';
@@ -27,6 +28,33 @@ class RecordService {
   String _aiResponseText = '';
   String _lastProcessedText = ''; // 중복 처리 방지를 위한 변수
   DateTime? _recordingStartTime;
+  // 최근 시각적 조회에서 서버가 내려준 일정 ID 캐시 (삭제 확인/명령에 사용)
+  List<String> _lastFoundScheduleIds = <String>[];
+  static const String _lastFoundIdsPrefsKey = 'last_found_schedule_ids';
+  // 직전 즉시 삭제된 ID들 (새로고침 레이스 방지용 힌트)
+  List<String> _justDeletedLocally = <String>[];
+
+  Future<void> _persistLastFoundIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_lastFoundIdsPrefsKey, _lastFoundScheduleIds);
+      print('💾 조회 ID 영구 저장: $_lastFoundScheduleIds');
+    } catch (e) {
+      print('⚠️ 조회 ID 저장 실패: $e');
+    }
+  }
+
+  Future<List<String>> _loadLastFoundIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final loaded = prefs.getStringList(_lastFoundIdsPrefsKey) ?? <String>[];
+      print('📥 조회 ID 로드: $loaded');
+      return loaded;
+    } catch (e) {
+      print('⚠️ 조회 ID 로드 실패: $e');
+      return <String>[];
+    }
+  }
 
   // 명확화 요청 관련 변수
   bool _isClarificationMode = false; // 명확화 모드 여부
@@ -228,9 +256,10 @@ class RecordService {
         await _ttsService.stop();
       }
 
-      // 이전 텍스트 초기화
+      // 이전 텍스트 초기화 (중복 처리 방지 해제)
       _recognizedText = '';
       _aiResponseText = '';
+      _lastProcessedText = '';
       _recordingStartTime = DateTime.now();
 
       // 음성 인식 시작 (권한은 이미 RecordScreen에서 확인됨)
@@ -486,6 +515,21 @@ class RecordService {
       print('🧭 UI 지시사항 적용 시작');
       final taskProvider = _getTaskProvider();
 
+      // 0) 즉시 삭제 반영: remove_item / remove_items 우선 처리
+      if (taskProvider != null) {
+        if (ui.removeItem != null && ui.removeItem!.isNotEmpty) {
+          print('🗑️ UI 지시사항 단일 삭제: ${ui.removeItem}');
+          await taskProvider.deleteTask(ui.removeItem!);
+          await taskProvider.loadTasks();
+        }
+        if (ui.removeItems != null && ui.removeItems!.isNotEmpty) {
+          print('🗑️ UI 지시사항 다중 삭제: ${ui.removeItems}');
+          await taskProvider.deleteTasks(ui.removeItems!);
+          await taskProvider.loadTasks();
+        }
+      }
+
+      // 1) 새로고침 지시가 있으면 서버 동기화/로컬 리로드
       if (ui.refreshData == true && taskProvider != null) {
         await taskProvider.loadTasks();
         print('🔄 데이터 새로고침 완료');
@@ -541,8 +585,73 @@ class RecordService {
   ) async {
     try {
       print('📅 일정 삭제 처리 시작 (ProcessingResult)');
-      // 일정 삭제 로직 구현
-      print('📋 삭제 결과: $result');
+      final taskProvider = _getTaskProvider();
+      if (taskProvider == null) {
+        print('❌ TaskProvider에 접근할 수 없습니다');
+        return;
+      }
+
+      // 1) 명시적 ID/IDs 우선 처리
+      final String? singleId = result['id']?.toString();
+      final List<String> multiIds = (result['ids'] is List)
+          ? List<String>.from((result['ids'] as List).map((e) => e.toString()))
+          : <String>[];
+
+      if (singleId != null && singleId.isNotEmpty) {
+        print('🗑️ ProcessingResult 단일 삭제 ID: $singleId');
+        await taskProvider.deleteTask(singleId);
+      }
+      if (multiIds.isNotEmpty) {
+        print('🗑️ ProcessingResult 다중 삭제 IDs: $multiIds');
+        await taskProvider.deleteTasks(multiIds);
+      }
+
+      // 2) schedule_data 기반 추론 삭제 (ID가 없을 때)
+      if ((singleId == null || singleId.isEmpty) && multiIds.isEmpty) {
+        final sd = result['schedule_data'];
+        if (sd is Map<String, dynamic>) {
+          final String? sdId = sd['id']?.toString();
+          if (sdId != null && sdId.isNotEmpty) {
+            print('🗑️ schedule_data 내 ID 삭제: $sdId');
+            await taskProvider.deleteTask(sdId);
+          } else {
+            final String title = (sd['title'] ?? '').toString();
+            final String? dtStr = sd['datetime']?.toString();
+            DateTime? dt;
+            if (dtStr != null && dtStr.isNotEmpty) {
+              try {
+                dt = DateTime.parse(dtStr);
+              } catch (_) {}
+            }
+
+            // 제목(+선택적으로 날짜시간) 매칭으로 삭제
+            final candidates = taskProvider.tasks
+                .where((t) {
+                  final byTitle = t.title == title && title.isNotEmpty;
+                  if (!byTitle) return false;
+                  if (dt == null) return true;
+                  return t.date.year == dt.year &&
+                      t.date.month == dt.month &&
+                      t.date.day == dt.day &&
+                      t.date.hour == dt.hour &&
+                      t.date.minute == dt.minute;
+                })
+                .map((t) => t.id)
+                .toList();
+
+            if (candidates.isNotEmpty) {
+              print('🗑️ 제목/시간 매칭 삭제 IDs: $candidates');
+              await taskProvider.deleteTasks(candidates);
+            } else {
+              print('⚠️ 삭제 후보를 찾지 못했습니다 (title="$title", datetime="$dtStr")');
+            }
+          }
+        }
+      }
+
+      // 3) 필요 시 새로고침 지시가 오지 않아도 메모리/스토리지 일치 보장
+      await taskProvider.loadTasks();
+      print('✅ 일정 삭제 처리 완료 (ProcessingResult)');
     } catch (e) {
       print('❌ 일정 삭제 처리 중 오류: $e');
     }
@@ -1050,22 +1159,38 @@ class RecordService {
       print('📅 일정 삭제 처리 시작');
 
       final scheduleData = action.data;
-      if (scheduleData is Map<String, dynamic>) {
-        final taskId = scheduleData['id'];
-        if (taskId != null) {
-          final taskProvider = _getTaskProvider();
-          if (taskProvider != null) {
-            await taskProvider.deleteTask(taskId);
-            print('✅ 일정 삭제 완료: $taskId (알람은 TaskProvider에서 자동 취소됨)');
-          } else {
-            print('❌ TaskProvider에 접근할 수 없습니다');
-          }
-        } else {
-          print('⚠️ 삭제할 일정 ID가 없습니다');
-        }
-      } else {
-        print('⚠️ 일정 삭제 데이터가 없습니다');
+      final taskProvider = _getTaskProvider();
+      if (taskProvider == null) {
+        print('❌ TaskProvider에 접근할 수 없습니다');
+        return;
       }
+
+      if (scheduleData is Map<String, dynamic>) {
+        final dynamic taskIdRaw = scheduleData['id'];
+        final String? taskId = taskIdRaw?.toString();
+        if (taskId != null && taskId.isNotEmpty) {
+          await taskProvider.deleteTask(taskId);
+          print('✅ 일정 삭제 완료: $taskId (알람은 TaskProvider에서 자동 취소됨)');
+          await taskProvider.loadTasks();
+          return;
+        }
+      }
+
+      // 서버가 id를 주지 않은 경우: 직전 조회 결과 캐시(메모리/디스크)로 즉시 삭제 시도
+      if (_lastFoundScheduleIds.isEmpty) {
+        _lastFoundScheduleIds = await _loadLastFoundIds();
+      }
+      if (_lastFoundScheduleIds.isNotEmpty) {
+        print('🗑️ 캐시 기반 즉시 삭제 시도: $_lastFoundScheduleIds');
+        await taskProvider.deleteTasks(_lastFoundScheduleIds);
+        // 캐시 초기화 (중복 삭제 방지)
+        _lastFoundScheduleIds = <String>[];
+        await _persistLastFoundIds();
+        await taskProvider.loadTasks();
+        return;
+      }
+
+      print('⚠️ 삭제할 일정 ID가 없고 캐시도 비어 있습니다');
     } catch (e) {
       print('❌ 일정 삭제 처리 중 오류: $e');
     }
@@ -1081,6 +1206,19 @@ class RecordService {
           taskData['search_criteria'] as Map<String, dynamic>? ?? {};
       final foundSchedules =
           taskData['found_schedules'] as List<dynamic>? ?? [];
+
+      // 최근 조회 결과의 ID들 캐시 (이후 음성 삭제 명령 시 즉시 사용)
+      try {
+        _lastFoundScheduleIds = foundSchedules
+            .map((s) => (s is Map && s['id'] != null) ? s['id'].toString() : '')
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList();
+        print('💾 최근 조회 일정 ID 캐시: $_lastFoundScheduleIds');
+        await _persistLastFoundIds();
+      } catch (e) {
+        print('⚠️ 조회 결과 ID 캐시 실패: $e');
+      }
 
       // Task 객체로 변환
       final tasks = foundSchedules.map((schedule) {

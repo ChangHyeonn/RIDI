@@ -115,8 +115,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         child: Slider(
                           value: taskProvider.fontSize,
-                          min: 0.0,
-                          max: 1.0,
+                          min: 0.25,
+                          max: 0.75,
                           onChanged: (value) {
                             print('📝 글씨 크기 슬라이더 변경: $value');
                             taskProvider.setFontSize(value);

@@ -61,57 +61,6 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
     }
   }
 
-  // 삭제 확인 다이얼로그 표시
-  void _showDeleteConfirmation(BuildContext context, Task task, double scaleFactor) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(
-            '일정 삭제',
-            style: TextStyle(
-              fontSize: 18 * scaleFactor,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Text(
-            '이 일정을 정말로 삭제하시겠습니까?\n삭제된 일정은 복구할 수 없습니다.',
-            style: TextStyle(
-              fontSize: 16 * scaleFactor,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                '취소',
-                style: TextStyle(
-                  fontSize: 16 * scaleFactor,
-                  color: const Color(0xFF6b7280),
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Provider.of<TaskProvider>(context, listen: false).deleteTask(task.id);
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                '삭제',
-                style: TextStyle(
-                  fontSize: 16 * scaleFactor,
-                  color: const Color(0xFFef4444),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -447,23 +396,7 @@ class _DateDetailScreenState extends State<DateDetailScreen> {
                                       ],
                                     ),
                                   ),
-                                  // 삭제 버튼
-                                  IconButton(
-                                    onPressed: () {
-                                      _showDeleteConfirmation(context, task, scaleFactor);
-                                    },
-                                    icon: Icon(
-                                      Icons.delete_outline,
-                                      color: const Color(0xFFef4444),
-                                      size: 24 * scaleFactor,
-                                    ),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: const Color(0xFFfef2f2),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                  ),
+                                  // 삭제 버튼 제거됨 (요구사항)
                                 ],
                               ),
                             ),

@@ -446,12 +446,17 @@ class TaskProvider with ChangeNotifier {
 
   // 글씨 크기 가져오기
   double get fontSize {
-    return _settings['fontSize'] ?? 0.5;
+    final value = (_settings['fontSize'] ?? 0.5) as double;
+    if (value < 0.25) return 0.25;
+    if (value > 0.75) return 0.75;
+    return value;
   }
 
   // 글씨 크기 설정
   Future<void> setFontSize(double size) async {
-    _settings['fontSize'] = size;
+    // 안전하게 범위[0.25, 0.75]로 고정
+    final clamped = size < 0.25 ? 0.25 : (size > 0.75 ? 0.75 : size);
+    _settings['fontSize'] = clamped;
     await _taskService.saveSettings(_settings);
     notifyListeners();
   }

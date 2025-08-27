@@ -321,8 +321,22 @@ class TextToSpeechService {
   // 사용 가능한 언어 목록 가져오기
   Future<List<Map<String, String>>> getAvailableLanguages() async {
     try {
-      final languages = await _flutterTts.getLanguages;
-      return languages.cast<Map<String, String>>();
+      final raw = await _flutterTts.getLanguages;
+      final result = <Map<String, String>>[];
+      if (raw is List) {
+        for (final item in raw) {
+          if (item is Map) {
+            final coerced = <String, String>{};
+            item.forEach((k, v) {
+              if (k != null && v != null) {
+                coerced[k.toString()] = v.toString();
+              }
+            });
+            result.add(coerced);
+          }
+        }
+      }
+      return result;
     } catch (e) {
       print('사용 가능한 언어 목록 가져오기 오류: $e');
       return [];
@@ -332,8 +346,22 @@ class TextToSpeechService {
   // 사용 가능한 음성 목록 가져오기
   Future<List<Map<String, String>>> getAvailableVoices() async {
     try {
-      final voices = await _flutterTts.getVoices;
-      return voices.cast<Map<String, String>>();
+      final raw = await _flutterTts.getVoices;
+      final result = <Map<String, String>>[];
+      if (raw is List) {
+        for (final item in raw) {
+          if (item is Map) {
+            final coerced = <String, String>{};
+            item.forEach((k, v) {
+              if (k != null && v != null) {
+                coerced[k.toString()] = v.toString();
+              }
+            });
+            result.add(coerced);
+          }
+        }
+      }
+      return result;
     } catch (e) {
       print('사용 가능한 음성 목록 가져오기 오류: $e');
       return [];

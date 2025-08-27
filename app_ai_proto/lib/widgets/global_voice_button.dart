@@ -160,10 +160,11 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
       try {
         await _recordService.stopPlaying();
       } catch (_) {}
-      await _recordService.stopRecording();
+      final result = await _recordService.stopRecording();
       setState(() {
         _isRecording = false;
-        _isProcessing = true;
+        // 인식 결과가 없으면 처리중 표시를 끔 (오버레이는 유지)
+        _isProcessing = result != null && result.trim().isNotEmpty;
       });
       _stopAnimations();
     } catch (e) {
