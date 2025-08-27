@@ -43,9 +43,23 @@ def _create_ai02_response(result):
             highlight_date=highlight_date
         )
     elif result.action_type == "schedule_delete":
+        # Ensure schedule_id is forwarded to UI as remove_item
+        raw_sched = (
+            result.action_data.get("schedule_data")
+            or result.action_data.get("deleted_schedule")
+            or result.action_data.get("schedule")
+            or {}
+        )
+        # Normalize to have 'id'
+        sched_id = raw_sched.get("id") or raw_sched.get("schedule_id")
+        schedule_data = dict(raw_sched)
+        if sched_id:
+            schedule_data["id"] = sched_id
+            # Also pass explicit remove_item for UI instruction usage
+            schedule_data["remove_item"] = sched_id
         return _create_schedule_action_response(
             action_type="schedule_delete",
-            schedule_data=result.action_data.get("schedule_data", {}),
+            schedule_data=schedule_data,
             text_response=result.response_text
         )
     elif result.action_type == "schedule_read":
