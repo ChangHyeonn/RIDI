@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/ai_response.dart';
-import '../providers/task_provider.dart';
+// TaskProvider 직접 사용 제거
 import '../models/task.dart';
-import 'package:provider/provider.dart';
+// Provider 직접 참조 제거
 
 class ActionHandler {
   static void handleAction(AIAction action, BuildContext context) {
@@ -10,7 +10,7 @@ class ActionHandler {
     print('🔍 action.type: ${action.type}');
     print('🔍 action.data 키들: ${action.data.keys.toList()}');
     print('🔍 action.uiInstructions: ${action.uiInstructions.toJson()}');
-    
+
     switch (action.type) {
       case 'schedule_add':
         handleScheduleAdd(action, context);
@@ -49,102 +49,25 @@ class ActionHandler {
 
   static void handleScheduleAdd(AIAction action, BuildContext context) {
     try {
-      final taskProvider = context.read<TaskProvider>();
-
-      // AI 서버에서 받은 일정 데이터를 Task 모델로 변환
+      // UI 통보만 처리 (TaskProvider 사용 안 함)
       final taskData = action.data;
-      final title = taskData['title'] as String? ?? '';
-      final datetimeStr = taskData['datetime'] as String? ?? '';
+      final title = taskData['title']?.toString() ?? '';
+      if (title.isEmpty) return;
 
-      if (title.isNotEmpty && datetimeStr.isNotEmpty) {
-        final dateTime = DateTime.parse(datetimeStr);
-
-        // 반복 정보 파싱 (있다면)
-        bool isRecurring = false;
-        RecurrenceInfo? recurrenceInfo;
-        final recurrence = taskData['recurrence'];
-        if (recurrence is Map<String, dynamic>) {
-          try {
-            // 서버 타입을 클라이언트 타입으로 정규화
-            String type = (recurrence['type']?.toString() ?? '').trim();
-            if (type == 'weekly') {
-              // 주간 반복은 특정 요일 반복으로 간주
-              type = 'custom_days';
-            }
-
-            // 시간 목록 파싱
-            final timesJson = (recurrence['times'] as List?) ?? const [];
-            final times = timesJson
-                .whereType<Map<String, dynamic>>()
-                .map((t) {
-                  final timeStr = t['time']?.toString() ?? '';
-                  final labelStr = t['label']?.toString() ?? '';
-                  return RecurrenceTime(time: timeStr, label: labelStr);
-                })
-                .toList();
-
-            // 종료일 파싱
-            DateTime? endDate;
-            final endStr = recurrence['end_date']?.toString();
-            if (endStr != null && endStr.isNotEmpty) {
-              try {
-                endDate = DateTime.parse(endStr);
-              } catch (_) {}
-            }
-
-            // 요일 파싱 (서버: 0=월, 6=일)
-            List<int>? daysOfWeek;
-            final days = recurrence['days_of_week'];
-            if (days is List) {
-              try {
-                daysOfWeek = days.map((e) => int.parse(e.toString())).toList();
-              } catch (_) {
-                daysOfWeek = null;
-              }
-            }
-
-            recurrenceInfo = RecurrenceInfo(
-              type: type.isEmpty ? 'daily' : type,
-              times: times,
-              endDate: endDate,
-              daysOfWeek: daysOfWeek,
-            );
-            isRecurring = true;
-          } catch (_) {
-            // 파싱 실패 시 반복 정보 없이 단일 일정으로 추가
-            isRecurring = false;
-            recurrenceInfo = null;
-          }
-        }
-
-        // Task 객체 생성
-        final task = Task(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          title: title,
-          date: dateTime,
-          isImportant: taskData['priority'] == 'important',
-          isRecurring: isRecurring,
-          recurrence: recurrenceInfo,
+      // UI 업데이트 지시사항 처리
+      if (action.uiInstructions.showConfirmation == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('일정이 추가되었습니다: $title'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
         );
+      }
 
-        // TaskProvider를 통해 일정 추가
-        taskProvider.addTask(task);
-
-        // UI 업데이트 지시사항 처리
-        if (action.uiInstructions.showConfirmation == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('일정이 추가되었습니다: $title'),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-
-        // 캘린더 화면으로 이동 (필요한 경우)
-        if (action.uiInstructions.screen == 'calendar') {
-          Navigator.pushNamed(context, '/calendar');
-        }
+      // 캘린더 화면으로 이동 (필요한 경우)
+      if (action.uiInstructions.screen == 'calendar') {
+        Navigator.pushNamed(context, '/calendar');
       }
     } catch (e) {
       print('일정 추가 처리 오류: $e');
@@ -160,15 +83,13 @@ class ActionHandler {
 
   static void handleScheduleDelete(AIAction action, BuildContext context) {
     try {
-      final taskProvider = context.read<TaskProvider>();
       final taskData = action.data;
       final taskId = taskData['id'] as String?;
       final title = taskData['title'] as String? ?? '일정';
 
       if (taskId != null) {
-        // TaskProvider를 통해 일정 삭제
-        taskProvider.deleteTask(taskId);
-        
+        // 삭제 UI 통보만 수행 (실제 삭제는 서버/RecordService 경로에서 반영)
+
         // UI 업데이트 지시사항 처리
         if (action.uiInstructions.notification != null) {
           final notification = action.uiInstructions.notification!;
@@ -214,8 +135,6 @@ class ActionHandler {
       );
     }
   }
-
-
 
   static void handleClarificationRequest(
     AIAction action,
@@ -263,11 +182,14 @@ class ActionHandler {
     }
   }
 
-  static void handleScheduleDeleteMultiple(AIAction action, BuildContext context) {
+  static void handleScheduleDeleteMultiple(
+    AIAction action,
+    BuildContext context,
+  ) {
     try {
-      final taskProvider = context.read<TaskProvider>();
+      // TaskProvider 접근은 생략 — UI 통보만 수행
       final taskData = action.data;
-      final deletedSchedules = taskData['deleted_schedules'] as List<dynamic>? ?? [];
+      // 서버에서 이미 삭제됨 — 개수만 UI로 알림
       final deletedCount = taskData['deleted_count'] as int? ?? 0;
 
       // 여러 일정 삭제 (실제로는 AI 서버에서 이미 삭제됨)
@@ -291,7 +213,10 @@ class ActionHandler {
     }
   }
 
-  static void handleScheduleDeleteCancelled(AIAction action, BuildContext context) {
+  static void handleScheduleDeleteCancelled(
+    AIAction action,
+    BuildContext context,
+  ) {
     try {
       // 삭제 취소 처리
       if (action.uiInstructions.notification != null) {
@@ -323,10 +248,11 @@ class ActionHandler {
       print('🔍 action.type: ${action.type}');
       print('🔍 showVisualList: ${action.uiInstructions.showVisualList}');
       print('🔍 screen: ${action.uiInstructions.screen}');
-      
+
       final taskData = action.data;
       final schedules = taskData['schedules'] as List<dynamic>? ?? [];
-      final groupedSchedules = taskData['grouped_schedules'] as Map<String, dynamic>? ?? {};
+      final groupedSchedules =
+          taskData['grouped_schedules'] as Map<String, dynamic>? ?? {};
       final searchKeyword = taskData['search_keyword'] as String?;
       final totalCount = taskData['total_count'] as int? ?? 0;
       final dateRange = taskData['date_range'] as Map<String, dynamic>? ?? {};
@@ -340,7 +266,7 @@ class ActionHandler {
         print('🔍 시각적 목록 화면으로 이동 시도');
         try {
           Navigator.pushNamed(
-            context, 
+            context,
             '/schedule-list',
             arguments: {
               'schedules': schedules,
@@ -403,8 +329,9 @@ class ActionHandler {
       // 일정 선택 UI 표시 (스펙트럼 삭제)
       final taskData = action.data;
       final searchTitle = taskData['search_title'] as String? ?? '';
-      final similarSchedules = taskData['similar_schedules'] as List<dynamic>? ?? [];
-      final totalFound = taskData['total_found'] as int? ?? 0;
+      final similarSchedules =
+          taskData['similar_schedules'] as List<dynamic>? ?? [];
+      // 미사용 변수 제거: totalFound
 
       if (similarSchedules.isNotEmpty) {
         _showScheduleSelectionDialog(context, searchTitle, similarSchedules);
@@ -472,7 +399,10 @@ class ActionHandler {
     }
   }
 
-  static void _handleScheduleSelection(BuildContext context, int selectedIndex) {
+  static void _handleScheduleSelection(
+    BuildContext context,
+    int selectedIndex,
+  ) {
     // 선택된 일정 삭제 처리
     // 실제로는 AI 서버에 선택 결과를 전송해야 함
     ScaffoldMessenger.of(context).showSnackBar(
@@ -495,34 +425,37 @@ class ActionHandler {
         return Colors.blue;
     }
   }
-  
-  static void handleScheduleDeleteVisual(AIAction action, BuildContext context) {
+
+  static void handleScheduleDeleteVisual(
+    AIAction action,
+    BuildContext context,
+  ) {
     try {
       final taskData = action.data;
-      final searchCriteria = taskData['search_criteria'] as Map<String, dynamic>? ?? {};
-      final foundSchedules = taskData['found_schedules'] as List<dynamic>? ?? [];
-      final totalCount = taskData['total_count'] as int? ?? 0;
-      
+      final searchCriteria =
+          taskData['search_criteria'] as Map<String, dynamic>? ?? {};
+      final foundSchedules =
+          taskData['found_schedules'] as List<dynamic>? ?? [];
+      // 미사용 변수 제거: totalCount
+
       // Task 객체로 변환
       final tasks = foundSchedules.map((schedule) {
         return Task.fromJson(schedule);
       }).toList();
-      
+
       // 검색 기준 텍스트 생성
       final title = searchCriteria['title'] as String? ?? '';
       final date = searchCriteria['date'] as String? ?? '';
-      final searchText = title.isNotEmpty ? title : (date.isNotEmpty ? date : '일정');
-      
+      final searchText = title.isNotEmpty
+          ? title
+          : (date.isNotEmpty ? date : '일정');
+
       // 삭제 화면으로 이동
       Navigator.pushNamed(
         context,
         '/delete-schedule',
-        arguments: {
-          'schedules': tasks,
-          'searchCriteria': searchText,
-        },
+        arguments: {'schedules': tasks, 'searchCriteria': searchText},
       );
-      
     } catch (e) {
       print('시각적 삭제 처리 오류: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -538,30 +471,30 @@ class ActionHandler {
   static void handleScheduleReadVisual(AIAction action, BuildContext context) {
     try {
       final taskData = action.data;
-      final searchCriteria = taskData['search_criteria'] as Map<String, dynamic>? ?? {};
-      final foundSchedules = taskData['found_schedules'] as List<dynamic>? ?? [];
-      final totalCount = taskData['total_count'] as int? ?? 0;
-      
+      final searchCriteria =
+          taskData['search_criteria'] as Map<String, dynamic>? ?? {};
+      final foundSchedules =
+          taskData['found_schedules'] as List<dynamic>? ?? [];
+      // 미사용 변수 제거: totalCount
+
       // Task 객체로 변환
       final tasks = foundSchedules.map((schedule) {
         return Task.fromJson(schedule);
       }).toList();
-      
+
       // 검색 기준 텍스트 생성
       final title = searchCriteria['title'] as String? ?? '';
       final date = searchCriteria['date'] as String? ?? '';
-      final searchText = title.isNotEmpty ? title : (date.isNotEmpty ? date : '일정');
-      
+      final searchText = title.isNotEmpty
+          ? title
+          : (date.isNotEmpty ? date : '일정');
+
       // 일정 조회 화면으로 이동
       Navigator.pushNamed(
         context,
         '/schedule-list',
-        arguments: {
-          'schedules': tasks,
-          'searchCriteria': searchText,
-        },
+        arguments: {'schedules': tasks, 'searchCriteria': searchText},
       );
-      
     } catch (e) {
       print('시각적 일정 조회 처리 오류: $e');
       ScaffoldMessenger.of(context).showSnackBar(
