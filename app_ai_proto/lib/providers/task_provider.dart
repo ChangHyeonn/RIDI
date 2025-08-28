@@ -40,6 +40,20 @@ class TaskProvider with ChangeNotifier {
 
     // 네트워크 동기화는 백그라운드에서 (사용자 경험 개선)
     _initializeSyncInBackground();
+
+    // 안전장치: 초기 로컬이 비어있으면 1회 전체 동기화 시도 후 재로드
+    if (_tasks.isEmpty) {
+      try {
+        final enabled = await _syncManager.isSyncEnabled();
+        if (enabled) {
+          await _syncManager.syncFull();
+          _taskService.invalidateCache();
+          await loadTasks();
+        }
+      } catch (e) {
+        // 네트워크 오류 시 조용히 무시하고 로컬만 유지
+      }
+    }
   }
 
   // 백그라운드에서 초기 동기화 수행

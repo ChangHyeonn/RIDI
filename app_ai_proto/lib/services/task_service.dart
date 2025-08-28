@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/task.dart';
 
@@ -6,34 +7,97 @@ class TaskService {
   static const String _tasksKey = 'tasks';
   static const String _settingsKey = 'settings';
   static const String _completedOccurrencesKey = 'completed_occurrence_keys';
-  
+  static const String _tasksBackupKey = 'tasks_backup';
+
   // 캐싱을 위한 변수들
   List<Task>? _cachedTasks;
   Map<String, dynamic>? _cachedSettings;
   List<String>? _cachedCompletedOccurrenceKeys;
 
+  // 쓰기 직렬화 큐 (플랫폼 공통 원자성 강화)
+  Future<void> _writeQueue = Future.value();
+
+  Future<T> _enqueueWrite<T>(Future<T> Function() action) {
+    // 이전 작업 완료 후 이어서 실행되도록 보장
+    final completer = Completer<T>();
+    _writeQueue = _writeQueue
+        .then((_) => action())
+        .then((value) {
+          completer.complete(value);
+        })
+        .catchError((e, st) {
+          completer.completeError(e, st);
+        });
+    return completer.future;
+  }
+
   // 일정 목록 가져오기
   Future<List<Task>> getTasks() async {
+    // 진행 중인 쓰기가 있으면 완료 후 읽기 (일관성 확보)
+    await _writeQueue;
     if (_cachedTasks != null) return _cachedTasks!;
-    
+
     final prefs = await SharedPreferences.getInstance();
-    final tasksJson = prefs.getStringList(_tasksKey) ?? [];
-    _cachedTasks = tasksJson.map((json) => Task.fromJson(jsonDecode(json))).toList();
+    final currentList = prefs.getStringList(_tasksKey);
+    final backupList = prefs.getStringList(_tasksBackupKey);
+
+    List<Task> parsed = [];
+    List<String>? source;
+    try {
+      source = currentList ?? <String>[];
+      parsed = (source).map((json) => Task.fromJson(jsonDecode(json))).toList();
+    } catch (e) {
+      // 현재 데이터 파싱 실패 시 백업에서 복구 시도
+      try {
+        if (backupList != null) {
+          parsed = backupList
+              .map((json) => Task.fromJson(jsonDecode(json)))
+              .toList();
+          await prefs.setStringList(_tasksKey, backupList);
+        } else {
+          parsed = [];
+        }
+      } catch (_) {
+        parsed = [];
+      }
+    }
+
+    _cachedTasks = parsed;
     return _cachedTasks!;
   }
 
   // 일정 저장하기
   Future<void> saveTasks(List<Task> tasks) async {
-    final prefs = await SharedPreferences.getInstance();
-    final tasksJson = tasks.map((task) => jsonEncode(task.toJson())).toList();
-    await prefs.setStringList(_tasksKey, tasksJson);
-    _cachedTasks = tasks; // 캐시 업데이트
+    await _enqueueWrite<void>(() async {
+      final prefs = await SharedPreferences.getInstance();
+
+      // ID 기준 중복 제거 및 안정적 정렬(옵션)
+      final Map<String, Task> byId = {for (final t in tasks) t.id: t};
+      final deduped = byId.values.toList();
+
+      // 백업 저장 (롤백 대비)
+      final prev = prefs.getStringList(_tasksKey) ?? <String>[];
+      await prefs.setStringList(_tasksBackupKey, prev);
+
+      // 실제 저장
+      final tasksJson = deduped.map((t) => jsonEncode(t.toJson())).toList();
+      await prefs.setStringList(_tasksKey, tasksJson);
+
+      // 캐시 갱신
+      _cachedTasks = deduped;
+    });
   }
 
   // 일정 추가하기
   Future<void> addTask(Task task) async {
     final tasks = await getTasks();
-    tasks.add(task);
+    // 동일 ID가 이미 있으면 교체, 없으면 추가
+    final idx = tasks.indexWhere((t) => t.id == task.id);
+    if (idx >= 0) {
+      tasks[idx] = task;
+    } else {
+      tasks.add(task);
+    }
     await saveTasks(tasks);
   }
 
@@ -41,8 +105,11 @@ class TaskService {
   Future<void> addTasks(List<Task> newTasks) async {
     if (newTasks.isEmpty) return;
     final tasks = await getTasks();
-    tasks.addAll(newTasks);
-    await saveTasks(tasks);
+    final Map<String, Task> byId = {for (final t in tasks) t.id: t};
+    for (final nt in newTasks) {
+      byId[nt.id] = nt;
+    }
+    await saveTasks(byId.values.toList());
   }
 
   // 일정 업데이트하기
@@ -83,7 +150,7 @@ class TaskService {
   // 설정 가져오기
   Future<Map<String, dynamic>> getSettings() async {
     if (_cachedSettings != null) return _cachedSettings!;
-    
+
     final prefs = await SharedPreferences.getInstance();
 
     // JSON으로 저장된 설정을 먼저 시도
@@ -115,7 +182,7 @@ class TaskService {
     // 개별 키로도 저장 (이전 버전 호환성)
     await prefs.setDouble('soundVolume', settings['soundVolume'] ?? 0.5);
     await prefs.setDouble('fontSize', settings['fontSize'] ?? 0.5);
-    
+
     _cachedSettings = settings; // 캐시 업데이트
   }
 

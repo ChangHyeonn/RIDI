@@ -1412,6 +1412,28 @@ class RecordService {
     }
   }
 
+  // 완전 종료(오버레이 종료 시 호출): STT keepAlive 차단 + 세션 강제 종료 + TTS stop
+  Future<void> shutdownRecordingCompletely() async {
+    try {
+      print('🛑 녹음 서비스 완전 종료 시작');
+      try {
+        await _ttsService.stop();
+      } catch (_) {}
+      try {
+        await _sttService.forceShutdown();
+      } catch (_) {}
+      _isRecording = false;
+      _ttsSuppressed = false;
+      _recognizedText = '';
+      _aiResponseText = '';
+      _recordingStartTime = null;
+      _recordingStateController.add(false);
+      print('✅ 녹음 서비스 완전 종료 완료');
+    } catch (e) {
+      print('❌ 녹음 서비스 완전 종료 실패: $e');
+    }
+  }
+
   // 음성 인식 상태 확인 (기존 메서드명 유지)
   Future<bool> checkRecordingStatus() async {
     return _isRecording;

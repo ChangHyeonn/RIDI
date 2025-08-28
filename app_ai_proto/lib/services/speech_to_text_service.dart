@@ -9,6 +9,12 @@ class SpeechToTextService {
   bool _isAvailable = false;
   String _lastWords = '';
   String _currentWords = '';
+  DateTime? _lastStopAt; // 연속 재시작 안정화를 위한 쿨다운 기준
+  bool _keepAlive = false; // 사용자가 중단할 때까지 유지
+  bool _userRequestedStop = false; // 사용자가 명시적으로 stop/cancel 했는지
+  String? _lastLocaleId; // 자동 재시작용 마지막 설정
+  bool _lastPartialResults = true;
+  bool _lastOnDevice = false;
 
   // 스트림 컨트롤러
   final StreamController<String> _textStreamController =
@@ -109,12 +115,25 @@ class SpeechToTextService {
           },
           onStatus: (status) {
             print('📊 음성 인식 상태 변경: $status');
-            if (status == 'done' ||
-                status == 'notListening' ||
-                status == 'error') {
+            if (status == 'done' || status == 'notListening') {
+              if (_keepAlive && !_userRequestedStop) {
+                print('♻️ 상태=$status, 자동 재시작 (keepAlive)');
+                _scheduleAutoRestart();
+                return;
+              }
               print('🛑 음성 인식 상태 종료: $status');
               _isListening = false;
-              // 스트림이 닫히지 않았을 때만 이벤트 추가
+              if (!_listeningStateController.isClosed) {
+                _listeningStateController.add(false);
+              }
+            } else if (status == 'error') {
+              if (_keepAlive && !_userRequestedStop) {
+                print('♻️ 상태=error, 자동 재시작 (keepAlive)');
+                _scheduleAutoRestart();
+                return;
+              }
+              print('🛑 음성 인식 상태 종료: error');
+              _isListening = false;
               if (!_listeningStateController.isClosed) {
                 _listeningStateController.add(false);
               }
@@ -205,6 +224,7 @@ class SpeechToTextService {
     bool partialResults = true,
     bool onDevice = false,
     bool assumePermissionGranted = false,
+    bool keepAlive = true,
   }) async {
     print('=== 음성 인식 시작 요청 (audio_app2 방식) ===');
     print('🌐 Web 환경 여부: $kIsWeb');
@@ -220,6 +240,24 @@ class SpeechToTextService {
       }
       print('✅ 권한 확인 완료');
     }
+
+    // 바로 직전 stop/cancel 이후 엔진 정리 대기 (바쁜 상태/무음 -2.0 방지)
+    if (_lastStopAt != null) {
+      final diff = DateTime.now().difference(_lastStopAt!);
+      const coolDown = Duration(milliseconds: 350);
+      if (diff < coolDown) {
+        final waitMs = coolDown - diff;
+        print('⏳ STT 재시작 쿨다운 대기: ${waitMs.inMilliseconds}ms');
+        await Future.delayed(waitMs);
+      }
+    }
+
+    // 엔진 상태 강제 초기화: 바쁜 상태/유령 세션 제거
+    try {
+      await _speech.cancel();
+      print('🔄 STT 엔진 상태 초기화(cancel)');
+      await Future.delayed(const Duration(milliseconds: 150));
+    } catch (_) {}
 
     // 이미 음성 인식 중이면 먼저 중지
     if (_isListening) {
@@ -275,6 +313,8 @@ class SpeechToTextService {
 
       if (available) {
         _isAvailable = true;
+        _keepAlive = keepAlive;
+        _userRequestedStop = false;
         // 이전 텍스트 초기화
         _currentWords = '';
         _lastWords = '';
@@ -312,6 +352,11 @@ class SpeechToTextService {
           selectedLocaleId = null; // 기본값에 위임
         }
 
+        // 자동 재시작을 위한 마지막 리슨 설정 저장
+        _lastLocaleId = selectedLocaleId;
+        _lastPartialResults = partialResults;
+        _lastOnDevice = onDevice;
+
         _speech.listen(
           onResult: (result) {
             print(
@@ -334,8 +379,8 @@ class SpeechToTextService {
           onSoundLevelChange: (level) {
             print('🔊 소리 레벨: $level');
           },
-          listenFor: const Duration(seconds: 60), // 60초로 늘림
-          pauseFor: const Duration(seconds: 60), // 60초로 늘림
+          listenFor: const Duration(minutes: 15), // 더 길게 유지
+          pauseFor: const Duration(minutes: 10), // 무음 허용 시간 확대
           partialResults: partialResults,
           localeId: selectedLocaleId, // null이면 시스템 기본 로케일 사용
           listenMode: stt.ListenMode.dictation,
@@ -360,13 +405,14 @@ class SpeechToTextService {
 
   // 음성 인식 중지
   Future<void> stopListening() async {
-    if (!_isListening) return;
-
     try {
       print('=== 음성 인식 중지 ===');
+      _keepAlive = false;
+      _userRequestedStop = true;
       await _speech.stop();
       _isListening = false;
       _listeningStateController.add(false);
+      _lastStopAt = DateTime.now();
       print('✅ 음성 인식 중지 완료');
     } catch (e) {
       print('❌ 음성 인식 중지 중 오류: $e');
@@ -376,19 +422,36 @@ class SpeechToTextService {
 
   // 음성 인식 취소
   Future<void> cancelListening() async {
-    if (!_isListening) return;
-
     try {
       print('=== 음성 인식 취소 ===');
+      _keepAlive = false;
+      _userRequestedStop = true;
       await _speech.cancel();
       _isListening = false;
       _listeningStateController.add(false);
       _currentWords = '';
+      _lastStopAt = DateTime.now();
       print('✅ 음성 인식 취소 완료');
     } catch (e) {
       print('❌ 음성 인식 취소 중 오류: $e');
       _errorStreamController.add('음성 인식 취소 오류: $e');
     }
+  }
+
+  // 강제 종료: keepAlive 중지 + cancel + 상태 초기화
+  Future<void> forceShutdown() async {
+    try {
+      print('🛑 STT 강제 종료(forceShutdown)');
+      _keepAlive = false;
+      _userRequestedStop = true;
+      await _speech.cancel();
+    } catch (_) {}
+    _isListening = false;
+    if (!_listeningStateController.isClosed) {
+      _listeningStateController.add(false);
+    }
+    _lastStopAt = DateTime.now();
+    print('✅ STT forceShutdown 완료');
   }
 
   // 사용 가능한 로케일 목록 가져오기
@@ -405,5 +468,50 @@ class SpeechToTextService {
     _textStreamController.close();
     _listeningStateController.close();
     _errorStreamController.close();
+  }
+}
+
+extension _SttKeepAlive on SpeechToTextService {
+  void _scheduleAutoRestart() {
+    if (_userRequestedStop) return;
+    Future<void>.delayed(const Duration(milliseconds: 450), () async {
+      if (_userRequestedStop) return;
+      try {
+        await _speech.cancel();
+        await Future.delayed(const Duration(milliseconds: 220));
+        print('🔁 자동 재시작 수행');
+        _speech.listen(
+          onResult: (result) {
+            print(
+              '🎤 음성 인식 결과: "${result.recognizedWords}" (final: ${result.finalResult})',
+            );
+            _currentWords = result.recognizedWords;
+            if (result.recognizedWords.isNotEmpty) {
+              print('🔄 실시간 텍스트 전송: "${result.recognizedWords}"');
+              _textStreamController.add(result.recognizedWords);
+            }
+            if (result.finalResult) {
+              _lastWords = result.recognizedWords;
+              print('✅ 최종 결과 저장: "$_lastWords"');
+            }
+          },
+          onSoundLevelChange: (level) => print('🔊 소리 레벨: $level'),
+          listenFor: const Duration(minutes: 10),
+          pauseFor: const Duration(minutes: 5),
+          partialResults: _lastPartialResults,
+          localeId: _lastLocaleId,
+          listenMode: stt.ListenMode.dictation,
+          onDevice: _lastOnDevice,
+        );
+        if (!_isListening) {
+          _isListening = true;
+          if (!_listeningStateController.isClosed) {
+            _listeningStateController.add(true);
+          }
+        }
+      } catch (e) {
+        print('♻️ 자동 재시작 실패: $e');
+      }
+    });
   }
 }

@@ -178,9 +178,8 @@ class _GlobalVoiceButtonState extends State<GlobalVoiceButton>
 
   Future<void> _cancelAndCloseOverlay() async {
     try {
-      if (_isRecording) {
-        await _recordService.cancelRecording();
-      }
+      // 오버레이 종료 시에는 항상 완전 종료로 정리
+      await _recordService.shutdownRecordingCompletely();
       // 오버레이를 닫을 때 진행 중인 TTS가 있다면 항상 중단
       try {
         await _recordService.stopPlaying();

@@ -442,7 +442,7 @@ class AlarmService {
         await _audioPlayer.stop();
         await _audioPlayer.setVolume(volume);
         await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-        await _audioPlayer.play(AssetSource('sounds/alarm.mp3'));
+        await _audioPlayer.play(AssetSource('sounds/alarm.m4a'));
         // 최초 진입 시 한 번 강한 햅틱
         HapticFeedback.heavyImpact();
         print('✅ 알람 소리 루프 재생 시작');
